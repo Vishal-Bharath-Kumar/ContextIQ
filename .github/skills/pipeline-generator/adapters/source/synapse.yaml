@@ -1,0 +1,151 @@
+adapter:
+  name: synapse
+  type: source
+  platform: Azure
+  description: >
+    Azure Synapse Analytics Pipeline source adapter.
+    Parses Synapse Pipeline JSON and extracts tasks, dependencies, triggers, and parameters
+    into the normalized workflow schema. Synapse pipelines share the same ARM-based structure
+    as ADF but include Synapse-specific activity types (SynapseNotebook, SparkJob with
+    BigDataPool references) and workspace-scoped linked services.
+
+  detection:
+    file_formats: [".json"]
+    indicators:
+      - '"properties"'
+      - '"activities"'
+      - '"SynapseNotebook"'
+      - '"SparkJob"'
+      - '"BigDataPoolReference"'
+      - '"SqlPoolReference"'
+      - '"dependsOn"'
+      - '"typeProperties"'
+      - '"workspace"'
+    structural_markers:
+      root_keys: ["name", "properties"]
+      nested_keys: ["properties.activities", "properties.parameters"]
+    priority_note: >
+      Synapse pipeline JSON is distinguished from ADF by the presence of
+      Synapse-exclusive activity types (SynapseNotebook, BigDataPoolReference,
+      SqlPoolReference). If "Microsoft.DataFactory" is present at root level
+      without these markers, route to the adf source adapter instead.
+
+  parsing:
+    workflow_name: "$.name"
+    tasks_path: "$.properties.activities"
+    parameters_path: "$.properties.parameters"
+    triggers_path: "$.properties.triggers OR separate trigger resource"
+
+    task_extraction:
+      task_id: "$.activities[*].name"
+      task_type_field: "$.activities[*].type"
+      task_config: "$.activities[*].typeProperties"
+      depends_on_field: "$.activities[*].dependsOn[*].activity"
+      parameters_field: "$.activities[*].typeProperties.parameters OR $.activities[*].typeProperties.baseParameters"
+      timeout_field: "$.activities[*].policy.timeout"
+      retry_field: "$.activities[*].policy.retry"
+
+    type_mapping:
+      SynapseNotebook:
+        normalized_type: "notebook"
+        config_keys:
+          notebook_ref: "typeProperties.notebook.referenceName"
+          spark_pool: "typeProperties.sparkPool.referenceName"
+          parameters: "typeProperties.parameters"
+        note: "Synapse-native notebook activity referencing a workspace notebook by name"
+      SparkJob:
+        normalized_type: "spark_job"
+        config_keys:
+          spark_job_ref: "typeProperties.sparkJob.referenceName"
+          arguments: "typeProperties.arguments"
+          spark_pool: "typeProperties.sparkPool.referenceName"
+      Copy:
+        normalized_type: "data_copy"
+        config_keys:
+          source: "typeProperties.source"
+          sink: "typeProperties.sink"
+      ExecutePipeline:
+        normalized_type: "sub_pipeline"
+        config_keys:
+          pipeline_ref: "typeProperties.pipeline.referenceName"
+          parameters: "typeProperties.parameters"
+      SqlPoolStoredProcedure:
+        normalized_type: "sql_task"
+        config_keys:
+          procedure: "typeProperties.storedProcedureName"
+          parameters: "typeProperties.storedProcedureParameters"
+          sql_pool: "typeProperties.sqlPool.referenceName"
+      WebActivity:
+        normalized_type: "http_task"
+        config_keys:
+          url: "typeProperties.url"
+          method: "typeProperties.method"
+      Lookup:
+        normalized_type: "lookup"
+        config_keys:
+          source: "typeProperties.source"
+      IfCondition:
+        normalized_type: "conditional_branch"
+        config_keys:
+          expression: "typeProperties.expression.value"
+          true_activities: "typeProperties.ifTrueActivities"
+          false_activities: "typeProperties.ifFalseActivities"
+      ForEach:
+        normalized_type: "for_each"
+        config_keys:
+          items: "typeProperties.items.value"
+          activities: "typeProperties.activities"
+
+  dependencies:
+    extraction_method: "direct"
+    source_field: "dependsOn"
+    format: |
+      Each activity has a dependsOn array:
+      [{"activity": "task_name", "dependencyConditions": ["Succeeded"]}]
+    condition_mapping:
+      Succeeded: "success"
+      Failed: "failure"
+      Completed: "completed"
+      Skipped: "skipped"
+
+  triggers:
+    extraction: |
+      Synapse triggers are either inline or separate workspace resources.
+      Support: ScheduleTrigger, TumblingWindowTrigger, BlobEventsTrigger, CustomEventsTrigger
+    schedule_format: "recurrence"
+    fields:
+      type: "$.type"
+      recurrence: "$.recurrence"
+      interval: "$.recurrence.interval"
+      frequency: "$.recurrence.frequency"
+      hours: "$.recurrence.schedule.hours"
+      minutes: "$.recurrence.schedule.minutes"
+      time_zone: "$.recurrence.timeZone"
+
+  parameters:
+    format: "typed_with_default"
+    structure: |
+      {
+        "param_name": {
+          "type": "String",
+          "defaultValue": "value"
+        }
+      }
+
+  timeout:
+    format: "iso8601"
+    parsing: |
+      Synapse uses ISO 8601 duration (same as ADF): "01:00:00" = 3600s, "1.00:00:00" = 86400s
+      Parse: days.hours:minutes:seconds → total seconds
+
+  compute:
+    extraction: |
+      Synapse uses Apache Spark pools (BigDataPool) referenced by name in activity typeProperties.
+      Extract sparkPool.referenceName for compute mapping.
+      Spark pool specs (node size, min/max nodes) are workspace-level resources, not in pipeline JSON.
+      For compute tier mapping, treat Synapse Spark pools as:
+        Small pool  → tier: "small"
+        Medium pool → tier: "medium"
+        Large pool  → tier: "large"
+        XLarge pool → tier: "xlarge"
+      If pool name is unavailable, default to tier: "medium".

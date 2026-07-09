@@ -1,0 +1,25 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "PropelIQ: Copilot pre-prompt submit",
+      "type": "shell",
+      "command": "python",
+      "args": [
+        ".propel/hooks/context_tracker_tiktoken/copilot.py",
+        "userPromptSubmitted"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "PropelIQ: Copilot session end",
+      "type": "shell",
+      "command": "python",
+      "args": [
+        ".propel/hooks/context_tracker_tiktoken/copilot.py",
+        "sessionEnd"
+      ],
+      "problemMatcher": []
+    }
+  ]
+}

@@ -1,0 +1,37 @@
+{
+  "version": 1,
+  "hooks": {
+    "sessionStart": [
+      {
+        "type": "command",
+        "bash": "echo \"Copilot session started: $(date)\" >> .propel/telemetry/session.log",
+        "powershell": "Add-Content -Path '.propel/telemetry/session.log' -Value \"Copilot session started: $(Get-Date)\"",
+        "timeoutSec": 5
+      }
+    ],
+    "userPromptSubmitted": [
+      {
+        "type": "command",
+        "bash": "python .propel/hooks/context_tracker_tiktoken/copilot.py userPromptSubmitted",
+        "powershell": "python .propel/hooks/context_tracker_tiktoken/copilot.py userPromptSubmitted",
+        "timeoutSec": 5
+      }
+    ],
+    "sessionEnd": [
+      {
+        "type": "command",
+        "bash": "python .propel/hooks/context_tracker_tiktoken/copilot.py sessionEnd",
+        "powershell": "python .propel/hooks/context_tracker_tiktoken/copilot.py sessionEnd",
+        "timeoutSec": 5
+      }
+    ],
+    "errorOccurred": [
+      {
+        "type": "command",
+        "bash": "echo \"Error occurred in Copilot session\" >> .propel/telemetry/errors.log",
+        "powershell": "Add-Content -Path '.propel/telemetry/errors.log' -Value \"Error occurred in Copilot session at $(Get-Date)\"",
+        "timeoutSec": 5
+      }
+    ]
+  }
+}

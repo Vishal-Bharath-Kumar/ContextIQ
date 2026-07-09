@@ -1,0 +1,124 @@
+adapter:
+  name: glue
+  type: source
+  platform: AWS
+  description: >
+    AWS Glue PySpark source adapter. Reads data from Glue catalog tables,
+    S3 paths, and DynamicFrame sources. Provides normalized DataFrame output.
+
+  detection:
+    indicators:
+      - "from awsglue.context import GlueContext"
+      - "from awsglue.utils import getResolvedOptions"
+      - "from awsglue.transforms import *"
+      - "from awsglue.dynamicframe import DynamicFrame"
+      - "from awsglue.job import Job"
+      - "glueContext = GlueContext"
+      - "DynamicFrame"
+      - "job.commit()"
+      - "import boto3"
+    file_patterns:
+      - "*.ipynb"
+      - "*.py"
+    storage_prefix: "s3://"
+
+  read:
+    mode: full
+    include_cells: true
+    include_metadata: true
+
+  rules:
+    - do_not_detect_source
+    - read_complete_notebook
+
+  connection:
+    parameters:
+      - name: glue_database
+        type: string
+        description: "Glue Catalog database name"
+      - name: glue_table
+        type: string
+        description: "Glue Catalog table name"
+      - name: s3_path
+        type: string
+        description: "S3 path for raw data"
+      - name: region
+        type: string
+        description: "AWS region"
+      - name: iam_role
+        type: string
+        description: "IAM role ARN for Glue execution"
+
+  read_logic:
+    spark:
+      initialization: |
+        sc = SparkContext()
+        glueContext = GlueContext(sc)
+        spark = glueContext.spark_session
+        job = Job(glueContext)
+        job.init(args['JOB_NAME'], args)
+      catalog_read: |
+        dynamic_frame = glueContext.create_dynamic_frame.from_catalog(
+            database="{glue_database}",
+            table_name="{glue_table}"
+        )
+        df = dynamic_frame.toDF()
+      path_read: |
+        dynamic_frame = glueContext.create_dynamic_frame.from_options(
+            connection_type="s3",
+            format="parquet",
+            connection_options={"paths": ["{s3_path}"]}
+        )
+        df = dynamic_frame.toDF()
+      finalization: |
+        job.commit()
+    python:
+      read: |
+        import boto3
+        s3 = boto3.client('s3')
+        obj = s3.get_object(Bucket="{bucket}", Key="{key}")
+        df = pd.read_parquet(obj['Body'])
+
+  parameters:
+    extraction: |
+      args = getResolvedOptions(sys.argv, ['JOB_NAME', '{param_keys}'])
+      value = args['{param_name}']
+    format: "getResolvedOptions"
+
+  secrets:
+    method: "boto3_ssm"
+    read: |
+      import boto3
+      ssm = boto3.client('ssm')
+      value = ssm.get_parameter(Name='{secret_name}', WithDecryption=True)['Parameter']['Value']
+
+  imports:
+    remove:
+      - "import sys"
+      - "from awsglue.context import GlueContext"
+      - "from awsglue.utils import getResolvedOptions"
+      - "from pyspark.context import SparkContext"
+      - "from awsglue.transforms import *"
+      - "from awsglue.dynamicframe import DynamicFrame"
+      - "from awsglue.job import Job"
+    keep:
+      - "pyspark.*"
+      - "datetime"
+      - "uuid"
+      - "re"
+      - "delta.*"
+      - "pandas"
+      - "numpy"
+
+  catalog:
+    operations:
+      - source: "glueContext.create_dynamic_frame.from_catalog"
+        normalized: "spark.read.table"
+      - source: "DynamicFrame.toDF()"
+        normalized: "# already DataFrame"
+      - source: "glueContext.write_dynamic_frame.from_catalog"
+        normalized: "df.write.saveAsTable"
+
+  storage:
+    prefix: "s3://"
+    path_format: "s3://{bucket}/{path}"

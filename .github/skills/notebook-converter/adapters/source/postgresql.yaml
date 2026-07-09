@@ -1,0 +1,494 @@
+adapter:
+  name: postgresql
+  type: source
+  platform: Database
+  description: >
+    PostgreSQL source adapter. Reads DDL, DML, views, functions, and analytical
+    queries from .sql files. Detects PostgreSQL-specific syntax (SERIAL, ::casting,
+    ON CONFLICT, JSONB, LATERAL, DISTINCT ON) and normalizes to Spark SQL / PySpark
+    DataFrame operations for target platform conversion.
+
+  detection:
+    indicators:
+      - "SERIAL"
+      - "BIGSERIAL"
+      - "::text"
+      - "::integer"
+      - "::timestamp"
+      - "::jsonb"
+      - "ON CONFLICT"
+      - "ILIKE"
+      - "RETURNING"
+      - "DISTINCT ON"
+      - "LATERAL"
+      - "JSONB"
+      - "JSONB_BUILD_OBJECT"
+      - "JSONB_AGG"
+      - "CREATE EXTENSION"
+      - "pg_catalog"
+      - "RAISE NOTICE"
+      - "DO $"
+      - "NOW()"
+      - "CURRENT_TIMESTAMP"
+      - "WITH RECURSIVE"
+      - "CREATE MATERIALIZED VIEW"
+      - "REFRESH MATERIALIZED VIEW"
+      - "VACUUM"
+      - "ANALYZE"
+      - "CREATE INDEX CONCURRENTLY"
+      - "\\set"
+      - "\\copy"
+      - "text[]"
+      - "integer[]"
+      - "uuid_generate_v4()"
+      - "gen_random_uuid()"
+    file_patterns:
+      - "*.sql"
+    storage_prefix: "postgresql://"
+
+  read:
+    mode: full
+    include_cells: false
+    include_metadata: false
+
+  rules:
+    - do_not_detect_source
+    - read_complete_file
+    - split_on_semicolons
+
+  connection:
+    parameters:
+      - name: host
+        type: string
+        description: "PostgreSQL server hostname"
+      - name: port
+        type: integer
+        description: "PostgreSQL server port (default 5432)"
+      - name: database
+        type: string
+        description: "PostgreSQL database name"
+      - name: schema
+        type: string
+        description: "PostgreSQL schema name (default public)"
+      - name: username
+        type: string
+        description: "Database username"
+      - name: password
+        type: secret
+        description: "Database password (from secret store)"
+
+  read_logic:
+    sql:
+      initialization: |
+        -- PostgreSQL SQL file — read and parse statements
+      ddl_read: |
+        -- Parse CREATE TABLE, CREATE INDEX, ALTER TABLE statements
+      dml_read: |
+        -- Parse INSERT, UPDATE, DELETE, MERGE statements
+      query_read: |
+        -- Parse SELECT, WITH (CTE), window functions
+      view_read: |
+        -- Parse CREATE VIEW, CREATE MATERIALIZED VIEW
+      function_read: |
+        -- Parse CREATE FUNCTION, CREATE PROCEDURE (PL/pgSQL)
+      finalization: |
+        -- No explicit finalization required
+    spark:
+      jdbc_read: |
+        df = spark.read.format("jdbc") \
+            .option("url", "jdbc:postgresql://{host}:{port}/{database}") \
+            .option("dbtable", "{schema}.{table}") \
+            .option("user", "{username}") \
+            .option("password", "{password}") \
+            .option("driver", "org.postgresql.Driver") \
+            .load()
+
+  data_type_mapping:
+    # Numeric types
+    - source: "SERIAL"
+      target: "BIGINT"
+      note: "GENERATED ALWAYS AS IDENTITY is NOT supported in Fabric Spark SQL. Use plain BIGINT and generate IDs at write time via monotonically_increasing_id() or row_number()"
+    - source: "BIGSERIAL"
+      target: "BIGINT"
+      note: "GENERATED ALWAYS AS IDENTITY is NOT supported in Fabric Spark SQL. Use plain BIGINT and generate IDs at write time via monotonically_increasing_id() or row_number()"
+    - source: "SMALLSERIAL"
+      target: "INT"
+      note: "Generate IDs at write time via monotonically_increasing_id()"
+    - source: "INTEGER"
+      target: "INT"
+    - source: "BIGINT"
+      target: "BIGINT"
+    - source: "SMALLINT"
+      target: "SMALLINT"
+    - source: "NUMERIC"
+      target: "DECIMAL"
+      note: "Preserve precision and scale: NUMERIC(p,s) → DECIMAL(p,s)"
+    - source: "REAL"
+      target: "FLOAT"
+    - source: "DOUBLE PRECISION"
+      target: "DOUBLE"
+    - source: "MONEY"
+      target: "DECIMAL(19,4)"
+
+    # String types
+    - source: "TEXT"
+      target: "STRING"
+    - source: "VARCHAR"
+      target: "STRING"
+      note: "Length constraint dropped — STRING is unbounded"
+    - source: "CHAR"
+      target: "STRING"
+    - source: "CHARACTER VARYING"
+      target: "STRING"
+    - source: "NAME"
+      target: "STRING"
+
+    # Date/Time types
+    - source: "TIMESTAMP WITH TIME ZONE"
+      target: "TIMESTAMP"
+      note: "Timezone info stored separately if needed"
+    - source: "TIMESTAMP WITHOUT TIME ZONE"
+      target: "TIMESTAMP"
+    - source: "TIMESTAMP"
+      target: "TIMESTAMP"
+    - source: "DATE"
+      target: "DATE"
+    - source: "TIME"
+      target: "STRING"
+      note: "No native TIME type in Spark — store as STRING HH:MM:SS"
+    - source: "INTERVAL"
+      target: "STRING"
+      note: "No native INTERVAL in Spark — store as STRING or decompose"
+
+    # Boolean type
+    - source: "BOOLEAN"
+      target: "BOOLEAN"
+
+    # Binary type
+    - source: "BYTEA"
+      target: "BINARY"
+
+    # JSON types
+    - source: "JSON"
+      target: "STRING"
+      note: "Parse with from_json(col, schema) when structured access needed"
+    - source: "JSONB"
+      target: "STRING"
+      note: "Parse with from_json(col, schema) when structured access needed"
+
+    # UUID type
+    - source: "UUID"
+      target: "STRING"
+      note: "Generate with uuid() UDF if needed"
+
+    # Array types
+    - source: "TEXT[]"
+      target: "ARRAY<STRING>"
+    - source: "INTEGER[]"
+      target: "ARRAY<INT>"
+    - source: "VARCHAR[]"
+      target: "ARRAY<STRING>"
+
+    # Network types
+    - source: "INET"
+      target: "STRING"
+    - source: "CIDR"
+      target: "STRING"
+    - source: "MACADDR"
+      target: "STRING"
+
+    # Geometric types
+    - source: "POINT"
+      target: "STRING"
+      note: "Store as 'x,y' string — parse in downstream processing"
+    - source: "GEOMETRY"
+      target: "STRING"
+      note: "Store as WKT string"
+
+    # Enum types
+    - source: "USER-DEFINED ENUM"
+      target: "STRING"
+      note: "Validate with CHECK constraint or data quality rule"
+
+  sql_pattern_conversions:
+    # Type casting
+    - source: "::text"
+      target: "CAST({expr} AS STRING)"
+      description: "PostgreSQL shorthand cast to text"
+    - source: "::integer"
+      target: "CAST({expr} AS INT)"
+    - source: "::bigint"
+      target: "CAST({expr} AS BIGINT)"
+    - source: "::numeric"
+      target: "CAST({expr} AS DECIMAL)"
+    - source: "::boolean"
+      target: "CAST({expr} AS BOOLEAN)"
+    - source: "::timestamp"
+      target: "CAST({expr} AS TIMESTAMP)"
+    - source: "::date"
+      target: "CAST({expr} AS DATE)"
+    - source: "::jsonb"
+      target: "CAST({expr} AS STRING)"
+    - source: "::uuid"
+      target: "CAST({expr} AS STRING)"
+
+    # String operations
+    - source: "ILIKE"
+      target: "LOWER({left}) LIKE LOWER({right})"
+      description: "Case-insensitive LIKE — Spark has no native ILIKE"
+    - source: "~"
+      target: "RLIKE"
+      description: "POSIX regex match"
+    - source: "~*"
+      target: "RLIKE"
+      note: "Case-insensitive regex — wrap pattern with (?i)"
+    - source: "||"
+      target: "CONCAT({left}, {right})"
+      description: "String concatenation operator"
+    - source: "SIMILAR TO"
+      target: "RLIKE"
+
+    # Upsert / conflict handling
+    - source: "ON CONFLICT DO NOTHING"
+      target: "MERGE INTO ... WHEN NOT MATCHED THEN INSERT"
+      description: "Convert to Delta MERGE for upsert"
+    - source: "ON CONFLICT DO UPDATE"
+      target: "MERGE INTO ... WHEN MATCHED THEN UPDATE WHEN NOT MATCHED THEN INSERT"
+      description: "Full upsert via Delta MERGE"
+
+    # DML clauses
+    - source: "RETURNING *"
+      target: "-- RETURNING not supported; read-after-write if needed"
+      description: "No direct equivalent — use separate SELECT after write"
+    - source: "RETURNING {cols}"
+      target: "-- RETURNING not supported; read-after-write for {cols}"
+
+    # Functions
+    - source: "NOW()"
+      target: "CURRENT_TIMESTAMP()"
+    - source: "CURRENT_TIMESTAMP"
+      target: "CURRENT_TIMESTAMP()"
+    - source: "EXTRACT(EPOCH FROM {expr})"
+      target: "UNIX_TIMESTAMP({expr})"
+    - source: "TO_CHAR({expr}, {fmt})"
+      target: "DATE_FORMAT({expr}, {spark_fmt})"
+      note: "Format string needs PostgreSQL → Java SimpleDateFormat translation"
+    - source: "TO_DATE({expr}, {fmt})"
+      target: "TO_DATE({expr}, {spark_fmt})"
+    - source: "TO_TIMESTAMP({expr}, {fmt})"
+      target: "TO_TIMESTAMP({expr}, {spark_fmt})"
+    - source: "AGE({expr1}, {expr2})"
+      target: "DATEDIFF({expr1}, {expr2})"
+      note: "AGE returns interval; DATEDIFF returns integer days"
+    - source: "GENERATE_SERIES({start}, {end})"
+      target: "SEQUENCE({start}, {end})"
+    - source: "STRING_AGG({expr}, {delim})"
+      target: "CONCAT_WS({delim}, COLLECT_LIST({expr}))"
+    - source: "ARRAY_AGG({expr})"
+      target: "COLLECT_LIST({expr})"
+    - source: "JSONB_BUILD_OBJECT({pairs})"
+      target: "TO_JSON(NAMED_STRUCT({pairs}))"
+    - source: "JSONB_AGG({expr})"
+      target: "TO_JSON(COLLECT_LIST({expr}))"
+    - source: "JSONB_EXTRACT_PATH_TEXT({col}, {keys})"
+      target: "GET_JSON_OBJECT({col}, '$.{path}')"
+    - source: "{col} ->> '{key}'"
+      target: "GET_JSON_OBJECT({col}, '$.{key}')"
+      description: "JSONB text extraction operator"
+    - source: "{col} -> '{key}'"
+      target: "GET_JSON_OBJECT({col}, '$.{key}')"
+      description: "JSONB object extraction operator"
+    - source: "uuid_generate_v4()"
+      target: "UUID()"
+    - source: "gen_random_uuid()"
+      target: "UUID()"
+    - source: "COALESCE({args})"
+      target: "COALESCE({args})"
+      note: "Direct equivalent — no conversion needed"
+    - source: "GREATEST({args})"
+      target: "GREATEST({args})"
+    - source: "LEAST({args})"
+      target: "LEAST({args})"
+
+  unsupported_features:
+    - feature: "DISTINCT ON"
+      workaround: |
+        -- PostgreSQL: SELECT DISTINCT ON (col) * FROM t ORDER BY col, ts DESC
+        -- Spark SQL:  Use ROW_NUMBER() window function:
+        SELECT * FROM (
+            SELECT *, ROW_NUMBER() OVER (PARTITION BY {col} ORDER BY {ts} DESC) AS rn
+            FROM {table}
+        ) WHERE rn = 1
+      severity: "medium"
+
+    - feature: "LATERAL JOIN"
+      workaround: |
+        -- PostgreSQL: SELECT * FROM t1, LATERAL (SELECT ... FROM t2 WHERE t2.id = t1.id) sub
+        -- Spark SQL:  Use EXPLODE() for array expansion or correlated subquery:
+        SELECT t1.*, sub.*
+        FROM t1
+        JOIN (SELECT ... FROM t2) sub ON sub.id = t1.id
+      severity: "medium"
+
+    - feature: "WITH RECURSIVE (Recursive CTEs)"
+      workaround: |
+        -- PostgreSQL: WITH RECURSIVE cte AS (base UNION ALL SELECT ... FROM cte ...)
+        -- Spark SQL:  Iterative processing via PySpark loop or GraphFrames for graph traversal
+        -- See: sql-ddl.md for iterative CTE expansion pattern
+      severity: "high"
+
+    - feature: "MATERIALIZED VIEW"
+      workaround: |
+        -- PostgreSQL: CREATE MATERIALIZED VIEW mv AS SELECT ...
+        -- Target:     CREATE OR REPLACE TABLE {mv_name} USING DELTA AS SELECT ...
+        -- Schedule refresh via orchestration pipeline (Fabric Data Pipeline / ADF / DAB)
+      severity: "low"
+
+    - feature: "PL/pgSQL Functions (CREATE FUNCTION ... LANGUAGE plpgsql)"
+      workaround: |
+        -- PostgreSQL: CREATE FUNCTION ... RETURNS ... LANGUAGE plpgsql AS $$ ... $$
+        -- Target:     Convert to PySpark UDF or Spark SQL function
+        -- Simple: CREATE FUNCTION {name}({params}) RETURNS {type} RETURN {expression}
+        -- Complex: Register PySpark UDF via spark.udf.register()
+      severity: "high"
+
+    - feature: "LISTEN / NOTIFY"
+      workaround: |
+        -- PostgreSQL event notification — no equivalent in Spark
+        -- Use: Event-driven architecture (Event Hub, Kafka, Service Bus)
+      severity: "high"
+
+    - feature: "TABLESPACE"
+      workaround: |
+        -- PostgreSQL: CREATE TABLE ... TABLESPACE ts
+        -- Target:     Use storage LOCATION clause (ADLS path, OneLake path)
+      severity: "low"
+
+    - feature: "INHERITS (Table Inheritance)"
+      workaround: |
+        -- PostgreSQL: CREATE TABLE child () INHERITS (parent)
+        -- Target:     Flatten into single table or use UNION ALL views
+      severity: "medium"
+
+    - feature: "EXCLUSION CONSTRAINTS"
+      workaround: |
+        -- No equivalent in Spark / Delta — enforce via data quality checks
+      severity: "medium"
+
+    - feature: "Full-Text Search (tsvector, tsquery)"
+      workaround: |
+        -- PostgreSQL: WHERE to_tsvector(col) @@ to_tsquery('term')
+        -- Target:     Use external search engine (Azure AI Search, OpenSearch)
+        --             or LIKE/RLIKE for simple text matching
+      severity: "high"
+
+    - feature: "CHECK constraints"
+      workaround: |
+        -- PostgreSQL: CHECK (status IN ('a', 'b', 'c'))
+        -- Delta:      Add Delta CHECK constraint or data quality expectation
+        -- ALTER TABLE {table} ADD CONSTRAINT {name} CHECK ({expression})
+      severity: "low"
+
+    - feature: "FOREIGN KEY constraints"
+      workaround: |
+        -- Delta Lake does not enforce foreign keys at write time
+        -- Convert to:
+        --   1. Data quality check (validate referential integrity post-load)
+        --   2. Documentation comment preserving the relationship
+        -- Comment: -- FK: {child_col} REFERENCES {parent_table}({parent_col})
+      severity: "low"
+
+  ddl_conversions:
+    create_table:
+      description: "Convert CREATE TABLE with PostgreSQL types to target DDL"
+      rules:
+        - "Map data types using data_type_mapping"
+        - "Convert SERIAL/BIGSERIAL to plain BIGINT (GENERATED ALWAYS AS IDENTITY is NOT supported in Fabric Spark SQL — generate IDs at write time)"
+        - "Inline CHECK constraints in column definition (ALTER TABLE ADD CONSTRAINT fails on empty Delta tables — Delta log not initialized)"
+        - "Convert FOREIGN KEY to inline comment on column (Delta does not enforce FKs)"
+        - "Add USING DELTA clause for Delta targets"
+        - "Add TBLPROPERTIES with delta.feature.allowColumnDefaults if DEFAULT values present"
+        - "Add TBLPROPERTIES for optimization settings (enableChangeDataFeed, autoOptimize)"
+    create_index:
+      description: "Convert CREATE INDEX to target optimization"
+      rules:
+        - "B-tree index → OPTIMIZE ... ZORDER BY (indexed columns)"
+        - "GIN index on JSONB → Skip (no equivalent; document as TODO)"
+        - "GiST index → Skip (spatial index; document as TODO)"
+        - "Partial index (WHERE clause) → Document as data quality filter"
+        - "CONCURRENTLY keyword → Remove (not applicable to Delta)"
+    alter_table:
+      description: "Convert ALTER TABLE statements"
+      rules:
+        - "ADD COLUMN → ALTER TABLE ... ADD COLUMN (Spark SQL syntax)"
+        - "DROP COLUMN → ALTER TABLE ... DROP COLUMN"
+        - "ALTER COLUMN TYPE → Comment: manual migration needed"
+        - "ADD CONSTRAINT → Convert per constraint type rules"
+    create_sequence:
+      description: "Convert CREATE SEQUENCE"
+      rules:
+        - "Sequences have no Delta equivalent"
+        - "Convert to BIGINT with monotonically_increasing_id() or IDENTITY"
+
+  dml_conversions:
+    insert:
+      description: "Convert INSERT statements"
+      rules:
+        - "Simple INSERT → INSERT INTO (Spark SQL)"
+        - "INSERT ... ON CONFLICT → Delta MERGE (generate PySpark notebook)"
+        - "INSERT ... RETURNING → INSERT + separate SELECT"
+        - "COPY → spark.read.csv/parquet + df.write"
+    update:
+      description: "Convert UPDATE statements"
+      rules:
+        - "Simple UPDATE → UPDATE (Delta SQL)"
+        - "UPDATE ... FROM → MERGE INTO with source subquery"
+        - "UPDATE ... RETURNING → UPDATE + separate SELECT"
+    delete:
+      description: "Convert DELETE statements"
+      rules:
+        - "Simple DELETE → DELETE FROM (Delta SQL)"
+        - "DELETE ... USING → DELETE with subquery IN clause"
+        - "TRUNCATE → DELETE FROM (or DROP + CREATE for full truncate)"
+
+  parameters:
+    extraction: |
+      -- PostgreSQL parameters extracted from:
+      -- \set variable value
+      -- $1, $2 (positional parameters)
+      -- current_setting('param.name')
+    format: "psql_variables"
+
+  secrets:
+    method: "connection_string"
+    read: |
+      -- Secrets stored in connection string or environment variables
+      -- Convert to target secret management (Key Vault, Secrets Manager)
+
+  imports:
+    remove:
+      - "\\set"
+      - "\\copy"
+      - "\\i"
+      - "\\connect"
+      - "\\encoding"
+      - "SET search_path"
+      - "SET statement_timeout"
+      - "SET lock_timeout"
+    keep:
+      - "-- Business logic comments"
+
+  catalog:
+    operations:
+      - source: "CREATE TABLE"
+        normalized: "CREATE TABLE ... USING DELTA"
+      - source: "CREATE INDEX"
+        normalized: "OPTIMIZE ... ZORDER BY"
+      - source: "CREATE MATERIALIZED VIEW"
+        normalized: "CREATE OR REPLACE TABLE ... USING DELTA AS"
+      - source: "CREATE VIEW"
+        normalized: "CREATE OR REPLACE VIEW"
+
+  storage:
+    prefix: "postgresql://"
+    path_format: "postgresql://{host}:{port}/{database}/{schema}/{table}"

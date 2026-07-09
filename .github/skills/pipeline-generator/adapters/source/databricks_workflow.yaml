@@ -1,0 +1,121 @@
+adapter:
+  name: databricks_workflow
+  type: source
+  platform: Multi-Cloud
+  description: >
+    Databricks Workflow / DAB (Databricks Asset Bundle) source adapter.
+    Parses Databricks job definitions (JSON or YAML) and extracts tasks, dependencies,
+    clusters, schedules, and parameters into the normalized workflow schema.
+
+  detection:
+    file_formats: [".json", ".yaml", ".yml"]
+    indicators:
+      - '"tasks"'
+      - '"task_key"'
+      - '"job_clusters"'
+      - '"notebook_task"'
+      - '"spark_python_task"'
+      - '"depends_on"'
+      - '"quartz_cron_expression"'
+      - "resources:"
+      - "jobs:"
+    structural_markers:
+      root_keys_json: ["tasks", "job_clusters"]
+      root_keys_yaml: ["resources.jobs"]
+      nested_keys: ["tasks[].task_key", "tasks[].notebook_task"]
+
+  parsing:
+    workflow_name: "$.name OR $.resources.jobs.<key>.name"
+    tasks_path: "$.tasks OR $.resources.jobs.<key>.tasks"
+    clusters_path: "$.job_clusters OR $.resources.jobs.<key>.job_clusters"
+    schedule_path: "$.schedule OR $.resources.jobs.<key>.schedule"
+
+    dab_unwrap: |
+      If YAML contains resources.jobs.<key>, unwrap to get the job object.
+      The <key> is the job identifier (exactly one entry expected under resources.jobs).
+
+    task_extraction:
+      task_id: "$.tasks[*].task_key"
+      task_type_field: "inferred_from_task_keys"
+      task_config: "$.tasks[*]"
+      depends_on_field: "$.tasks[*].depends_on[*].task_key"
+      parameters_field: "$.tasks[*].notebook_task.base_parameters OR $.tasks[*].spark_python_task.parameters"
+      timeout_field: "$.tasks[*].timeout_seconds"
+      retry_field: "$.tasks[*].max_retries"
+
+    type_mapping:
+      notebook_task:
+        normalized_type: "notebook"
+        config_keys:
+          notebook_path: "notebook_task.notebook_path"
+          base_parameters: "notebook_task.base_parameters"
+      spark_python_task:
+        normalized_type: "spark_job"
+        config_keys:
+          python_file: "spark_python_task.python_file"
+          parameters: "spark_python_task.parameters"
+      spark_jar_task:
+        normalized_type: "spark_job"
+        config_keys:
+          main_class: "spark_jar_task.main_class_name"
+          parameters: "spark_jar_task.parameters"
+      sql_task:
+        normalized_type: "sql_task"
+        config_keys:
+          query: "sql_task.query"
+          warehouse_id: "sql_task.warehouse_id"
+      dbt_task:
+        normalized_type: "dbt_task"
+        config_keys:
+          commands: "dbt_task.commands"
+          project_directory: "dbt_task.project_directory"
+      pipeline_task:
+        normalized_type: "dlt_pipeline"
+        config_keys:
+          pipeline_id: "pipeline_task.pipeline_id"
+
+  dependencies:
+    extraction_method: "direct"
+    source_field: "depends_on"
+    format: |
+      Each task has optional depends_on array:
+      [{"task_key": "upstream_task_name"}]
+    condition_mapping:
+      default: "success"
+
+  triggers:
+    extraction: |
+      Databricks uses schedule object with quartz_cron_expression.
+      Also supports file_arrival triggers and continuous triggers.
+    schedule_format: "quartz_cron"
+    fields:
+      quartz_cron: "$.schedule.quartz_cron_expression"
+      timezone: "$.schedule.timezone_id"
+      pause_status: "$.schedule.pause_status"
+    cron_format: |
+      Quartz cron: 6-7 fields — seconds minutes hours day-of-month month day-of-week [year]
+      Example: "0 0 10 * * ?" = daily at 10:00
+
+  parameters:
+    format: "flat_key_value"
+    structure: |
+      {
+        "param_name": "value"
+      }
+
+  timeout:
+    format: "seconds"
+    parsing: |
+      Databricks uses seconds directly in timeout_seconds field.
+      No conversion needed for normalized format.
+
+  compute:
+    extraction:
+      clusters_path: "job_clusters"
+      cluster_fields:
+        job_cluster_key: "job_cluster_key"
+        spark_version: "new_cluster.spark_version"
+        node_type_id: "new_cluster.node_type_id"
+        num_workers: "new_cluster.num_workers"
+        autoscale: "new_cluster.autoscale"
+    task_cluster_ref: "job_cluster_key"

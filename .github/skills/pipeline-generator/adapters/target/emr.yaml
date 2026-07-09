@@ -1,0 +1,186 @@
+adapter:
+  name: emr
+  type: target
+  platform: AWS
+  description: >
+    AWS EMR (Elastic MapReduce) target adapter.
+    Generates EMR Step Functions orchestration JSON from the normalized workflow schema.
+    EMR workflows are orchestrated via AWS Step Functions using EMR-specific resource ARNs,
+    or via EMR Serverless job run APIs. Triggers are managed through EventBridge rules.
+
+  output_format:
+    type: "json"
+    extension: ".json"
+
+  generation:
+    structure: |
+      {
+        "Comment": "{workflow_name} — converted by PropelIQ Adapter Engine",
+        "StartAt": "{first_task_id}",
+        "States": {}
+      }
+    wrapper_note: |
+      EMR workflows are expressed as Step Functions state machines using EMR resource ARNs.
+      A companion EventBridge rule JSON is generated for scheduled triggers.
+      An EMR cluster config JSON is generated separately for compute provisioning.
+
+    task_generation:
+      state_structure: |
+        "{task_id}": {
+          "Type": "Task",
+          "Resource": "{emr_resource_arn}",
+          "Parameters": {},
+          "Next": "{next_task_id}",
+          "TimeoutSeconds": {timeout},
+          "Retry": [
+            {
+              "ErrorEquals": ["States.ALL"],
+              "IntervalSeconds": 30,
+              "MaxAttempts": {retry_count},
+              "BackoffRate": 2.0
+            }
+          ],
+          "Catch": [
+            {
+              "ErrorEquals": ["States.ALL"],
+              "Next": "FailState"
+            }
+          ]
+        }
+
+      type_mapping:
+        notebook:
+          emr_resource_arn: "arn:aws:states:::emr-serverless:startJobRun.sync"
+          parameters:
+            ApplicationId: "{emr_application_id}"
+            ExecutionRoleArn: "{execution_role_arn}"
+            JobDriver:
+              SparkSubmit:
+                EntryPoint: "s3://{bucket}/scripts/{task_id}.py"
+                EntryPointArguments: "{parameters_list}"
+                SparkSubmitParameters: "--conf spark.executor.cores=4 --conf spark.executor.memory=8g"
+          note: "Notebook converted to PySpark script deployed to S3 for EMR Serverless"
+        spark_job:
+          emr_resource_arn: "arn:aws:states:::emr-serverless:startJobRun.sync"
+          parameters:
+            ApplicationId: "{emr_application_id}"
+            ExecutionRoleArn: "{execution_role_arn}"
+            JobDriver:
+              SparkSubmit:
+                EntryPoint: "{config.main_file}"
+                EntryPointArguments: "{parameters_list}"
+        data_copy:
+          emr_resource_arn: "arn:aws:states:::emr-serverless:startJobRun.sync"
+          note: "Data copy mapped to a Spark job that performs the copy via EMR Serverless"
+        sql_task:
+          emr_resource_arn: "arn:aws:states:::athena:startQueryExecution.sync"
+          parameters:
+            QueryString: "{config.query}"
+            WorkGroup: "primary"
+            ResultConfiguration:
+              OutputLocation: "s3://{bucket}/athena-results/"
+        sub_pipeline:
+          emr_resource_arn: "arn:aws:states:::states:startExecution.sync:2"
+          parameters:
+            StateMachineArn: "{sub_state_machine_arn}"
+            Input: "{parameters}"
+        parallel_group:
+          state_type: "Parallel"
+          handling: |
+            Convert to Step Functions Parallel state with Branches array.
+            Each branch is a mini state machine with its own StartAt/States.
+        conditional_branch:
+          state_type: "Choice"
+          handling: |
+            Map conditions to Choice rules with Variable/StringEquals/Next pattern.
+
+    state_ordering: |
+      1. Determine execution order from dependency graph (topological sort)
+      2. First task in order = StartAt
+      3. Each state's Next = next task in topological order
+      4. Last state has "End": true (no Next)
+      5. Append terminal FailState for error catching
+
+    fail_state: |
+      "FailState": {
+        "Type": "Fail",
+        "Error": "WorkflowFailed",
+        "Cause": "One or more EMR job steps failed"
+      }
+
+  dependencies:
+    generation: |
+      EMR/Step Functions uses Next pointers, not dependency arrays.
+      Convert normalized dependencies to sequential state chain:
+        IF task has single successor → set Next to successor task_id
+        IF task has multiple successors → use Parallel state
+        IF task has no successor → set "End": true
+      Retry block is generated for every Task state using normalized retry_count.
+
+  triggers:
+    generation:
+      eventbridge_rule: |
+        {
+          "Name": "{workflow_name}_schedule",
+          "ScheduleExpression": "cron({normalized_cron_eventbridge})",
+          "State": "ENABLED",
+          "Targets": [
+            {
+              "Id": "{workflow_name}_target",
+              "Arn": "{state_machine_arn}",
+              "RoleArn": "{eventbridge_role_arn}"
+            }
+          ]
+        }
+      conversion_rules: |
+        FROM normalized trigger:
+          IF type == "cron":
+            Convert normalized cron → EventBridge cron (6 fields: min hour dom month dow year)
+            Wrap in "cron(...)" expression
+          IF type == "event":
+            Generate S3 event rule targeting the state machine
+          IF type == "manual":
+            No EventBridge rule generated
+
+  parameters:
+    generation: |
+      EMR Serverless receives parameters as EntryPointArguments list or SparkSubmitParameters.
+      Convert normalized flat key-value to ordered argument list:
+        ["--param_name", "value", "--param2", "value2"]
+      For Step Functions input, pass as execution input JSON.
+
+  timeout:
+    generation: |
+      Use TimeoutSeconds directly from normalized format (already in seconds).
+      Also generate HeartbeatSeconds = min(timeout / 4, 3600) for health checks.
+
+  compute:
+    generation: |
+      EMR Serverless manages compute automatically via application config.
+      Generate companion EMR Serverless application config JSON:
+      {
+        "name": "{workflow_name}_app",
+        "type": "SPARK",
+        "releaseLabel": "{emr_release_label}",
+        "initialCapacity": {
+          "DRIVER": {
+            "workerCount": 1,
+            "workerConfiguration": {
+              "cpu": "{driver_cpu}",
+              "memory": "{driver_memory}"
+            }
+          },
+          "EXECUTOR": {
+            "workerCount": {num_workers},
+            "workerConfiguration": {
+              "cpu": "{executor_cpu}",
+              "memory": "{executor_memory}"
+            }
+          }
+        }
+      }
+      node_size_mapping:
+        small:   { cpu: "4 vCPU", memory: "16 GB", emr_release: "emr-6.15.0" }
+        medium:  { cpu: "8 vCPU", memory: "32 GB", emr_release: "emr-6.15.0" }
+        large:   { cpu: "16 vCPU", memory: "64 GB", emr_release: "emr-6.15.0" }
+        xlarge:  { cpu: "32 vCPU", memory: "128 GB", emr_release: "emr-6.15.0" }

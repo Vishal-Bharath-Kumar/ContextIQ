@@ -1,0 +1,619 @@
+{
+    "projectName": "Project Name",
+    "description": "Project Description",
+    "basePropelPath": "./.propel/context",
+    "baseProjectPath": "./",
+    "artifacts": {
+        "brainstorm": {
+            "propelFileName": "brainstorm.md",
+            "propelDirPath": "${basePropelPath}/docs",
+            "templates": {
+                "default": ".propel/templates/brainstorm-template.md"
+            },
+            "projectFileName": "",
+            "projectDirPath": "",
+            "contentType": "md",
+            "mcpType": "local",
+            "references": [],
+            "workflow": "/brainstorm-idea"
+        },
+        "spec": {
+            "propelFileName": "spec.md",
+            "propelDirPath": "${basePropelPath}/docs",
+            "templates": {
+                "default": ".propel/templates/requirements-template.md"
+            },
+            "projectFileName": "spec.pdf",
+            "projectDirPath": "${baseProjectPath}/docs/",
+            "contentType": "pdf",
+            "mcpType": "local",
+            "references": ["codeanalysis", "prototype", "brainstorm"],
+            "workflow": "/create-spec"
+        },
+        "ds_spec": {
+            "propelFileName": "ds-spec.md",
+            "propelDirPath": "${basePropelPath}/docs",
+            "templates": {
+                "default": ".propel/templates/ds-requirements-template.md"
+            },
+            "projectFileName": "ds-spec.pdf",
+            "projectDirPath": "${baseProjectPath}/docs/",
+            "contentType": "pdf",
+            "mcpType": "local",
+            "references": ["brainstorm", "discovery_context", "codeanalysis"],
+            "workflow": "/create-ds-spec",
+            "_note": "DS-specific requirements spec. Adds ML Problem Statement (target variable, task type, baseline, primary metric), Data Requirements (sources, volume, freshness, PII), Model Performance Requirements, and Governance & Ethics sections."
+        },
+        "design": {
+            "propelFileName": "design.md",
+            "propelDirPath": "${basePropelPath}/docs",
+            "templates": {
+                "default": ".propel/templates/design-specification-template.md"
+            },
+            "projectFileName": "design.docx",
+            "projectDirPath": "${baseProjectPath}/docs/",
+            "contentType": "docx",
+            "mcpType": "local",
+            "references": ["spec", "codeanalysis"],
+            "workflow": "/design-architecture"
+        },
+        "model": {
+            "propelFileName": "model.md",
+            "propelDirPath": "${basePropelPath}/docs",
+            "templates": {
+                "default": ".propel/templates/design-model-template.md"
+            },
+            "projectFileName": "model.pdf",
+            "projectDirPath": "${baseProjectPath}/docs/",
+            "contentType": "pdf",
+            "mcpType": "local",
+            "references": ["spec", "design", "codeanalysis"],
+            "workflow": "/design-model"
+        },
+        "task": {
+            "propelFileName": "task_<seq>_<name>.md",
+            "propelDirPath": "${basePropelPath}/tasks",
+            "templates": {
+                "default": ".propel/templates/task-template.md"
+            },
+            "projectFileName": "",
+            "projectDirPath": "",
+            "contentType": "md",
+            "mcpType": "local",
+            "references": ["spec", "design", "model", "figma_spec", "designsystem", "findings_registry"],
+            "workflow": "/plan-development-task"
+        },
+        "figma_spec": {
+            "propelFileName": "figma_spec.md",
+            "propelDirPath": "${basePropelPath}/docs",
+            "templates": {
+                "figma_specification": ".propel/templates/figma-specification-template.md",
+                "design_reference": ".propel/templates/design-reference-template.md"
+            },
+            "projectFileName": "",
+            "projectDirPath": "",
+            "contentType": "md",
+            "mcpType": "local",
+            "references": ["spec", "design"],
+            "workflow": "/create-figma-spec"
+        },
+        "designsystem": {
+            "propelFileName": "designsystem.md",
+            "propelDirPath": "${basePropelPath}/docs",
+            "templates": {
+                "default": ".propel/templates/design-reference-template.md"
+            },
+            "projectFileName": "",
+            "projectDirPath": "",
+            "contentType": "md",
+            "mcpType": "local",
+            "references": [],
+            "workflow": ""
+        },
+        "codeanalysis": {
+            "propelFileName": "codeanalysis.md",
+            "propelDirPath": "${basePropelPath}/docs",
+            "templates": {
+                "default": ".propel/templates/codebase-analysis-template.md"
+            },
+            "projectFileName": "",
+            "projectDirPath": "",
+            "contentType": "md",
+            "mcpType": "local",
+            "references": [],
+            "workflow": "/analyze-codebase"
+        },
+        "codebase_maturity": {
+            "propelFileName": "codebase-maturity.md",
+            "propelDirPath": "${basePropelPath}/docs",
+            "templates": {
+                "default": ".propel/templates/codebase-maturity-template.md"
+            },
+            "projectFileName": "",
+            "projectDirPath": "",
+            "contentType": "md",
+            "mcpType": "local",
+            "references": ["codeanalysis"],
+            "workflow": "/assess-codebase-maturity"
+        },
+        "findings_registry": {
+            "propelFileName": "findings-registry.md",
+            "propelDirPath": "./.propel/learnings",
+            "templates": {},
+            "schema": "./.propel/learnings/findings-registry-schema.md",
+            "projectFileName": "",
+            "projectDirPath": "",
+            "contentType": "md",
+            "mcpType": "local",
+            "references": [],
+            "workflow": ""
+        },
+        "signal_ledger": {
+            "propelFileName": "signal-ledger.md",
+            "propelDirPath": "./.propel/learnings",
+            "templates": {},
+            "schema": "./.propel/learnings/signal-ledger-schema.md",
+            "projectFileName": "",
+            "projectDirPath": "",
+            "contentType": "md",
+            "mcpType": "local",
+            "references": [],
+            "workflow": "",
+            "_note": "Write-only during workflows. Read only by signal-health reports. Do not add to workflow references arrays."
+        },
+        "epics": {
+            "propelFileName": "epics.md",
+            "propelDirPath": "${basePropelPath}/docs",
+            "templates": {
+                "default": ".propel/templates/epics-template.md"
+            },
+            "projectFileName": "",
+            "projectDirPath": "",
+            "contentType": "md",
+            "mcpType": "local",
+            "references": ["spec", "design", "model", "codeanalysis", "figma_spec"],
+            "workflow": "/create-epics",
+            "_note": "Epic IDs are EP-<seqnum> (e.g., EP-001), with reserved foundational tokens EP-TECH (technical bootstrap) and EP-DATA (data foundation)."
+        },
+        "user_story": {
+            "propelFileName": "us_<id>.md",
+            "propelDirPath": "${basePropelPath}/tasks",
+            "templates": {
+                "default": ".propel/templates/user-story-template.md"
+            },
+            "projectFileName": "",
+            "projectDirPath": "",
+            "contentType": "md",
+            "mcpType": "local",
+            "references": ["epics", "spec", "design", "model", "figma_spec"],
+            "workflow": "/create-user-stories",
+            "_note": "Written to nested path <epic_id>/us_<id>/us_<id>.md — composed by the prompt from propelDirPath + EPIC_ID + US_ID. <id> is zero-padded 3-digit."
+        },
+        "wireframe": {
+            "propelFileName": "",
+            "propelFileNames": {
+                "information_architecture": "information-architecture.md",
+                "component_inventory": "component-inventory.md",
+                "navigation_map": "navigation-map.md",
+                "design_tokens_applied": "design-tokens-applied.md"
+            },
+            "propelDirPath": "./.propel/context/wireframes",
+            "templates": {
+                "information_architecture": ".propel/templates/wireframe-reference-template.md",
+                "component_inventory": ".propel/templates/component-inventory-template.md"
+            },
+            "projectFileName": "",
+            "projectDirPath": "",
+            "contentType": "html",
+            "mcpType": "local",
+            "references": ["figma_spec", "designsystem", "spec"],
+            "workflow": "/generate-wireframe",
+            "_note": "Multi-file artifact. propelFileNames documents the markdown outputs (one per template key). Per-screen HTML wireframes also written as wireframe-SCR-XXX-<name>.html (composed by prompt). design_tokens_applied is conditional on --fidelity=high. propelFileNames is documentation today; resolver does not yet read this field."
+        },
+        "bug_resolution": {
+            "propelFileName": "task_<seq>_fix_<name>.md",
+            "propelDirPath": "${basePropelPath}/tasks",
+            "templates": {
+                "default": ".propel/templates/issue-triage-template.md"
+            },
+            "projectFileName": "",
+            "projectDirPath": "",
+            "contentType": "md",
+            "mcpType": "local",
+            "references": ["findings_registry"],
+            "workflow": "/plan-bug-resolution"
+        },
+        "unit_test": {
+            "propelFileName": "test_plan_<layer>_<name>.md",
+            "propelDirPath": "${basePropelPath}/tasks",
+            "templates": {
+                "default": ".propel/templates/unit-test-template.md"
+            },
+            "projectFileName": "",
+            "projectDirPath": "",
+            "contentType": "md",
+            "mcpType": "local",
+            "references": ["design"],
+            "workflow": "/plan-unit-test"
+        },
+        "automation_test": {
+            "propelFileName": "",
+            "propelFileNames": {
+                "feature": "tw_<feature>.md",
+                "e2e": "e2e_<journey>.md"
+            },
+            "propelDirPath": "${basePropelPath}/test",
+            "templates": {
+                "feature": ".propel/templates/automated-testing-template.md",
+                "e2e": ".propel/templates/automated-e2e-template.md"
+            },
+            "projectFileName": "",
+            "projectDirPath": "",
+            "contentType": "md",
+            "mcpType": "local",
+            "references": ["spec", "design", "test_plan", "figma_spec"],
+            "workflow": "/create-automation-test",
+            "_note": "Multi-template artifact. propelFileNames map keyed by template name documents the per-template output filename. Tokens <feature> and <journey> are slugified scope names. propelFileNames is documentation today; resolver does not yet read this field."
+        },
+        "playwright_scripts": {
+            "propelFileName": "",
+            "propelFileNames": {
+                "feature": "tests/<feature>.spec.ts",
+                "e2e": "e2e/<journey>.spec.ts"
+            },
+            "propelDirPath": "./test-automation",
+            "templates": {},
+            "projectFileName": "",
+            "projectDirPath": "",
+            "contentType": "code",
+            "mcpType": "local",
+            "references": ["automation_test"],
+            "workflow": "/generate-playwright-scripts",
+            "_note": "Multi-template artifact. Generates Playwright .spec.ts files per workflow file. propelFileNames is documentation today; resolver does not yet read this field."
+        },
+        "test_plan": {
+            "propelFileName": "test_plan_<feature>.md",
+            "propelDirPath": "${basePropelPath}/docs",
+            "templates": {
+                "default": ".propel/templates/test-plan-template.md"
+            },
+            "projectFileName": "",
+            "projectDirPath": "",
+            "contentType": "md",
+            "mcpType": "local",
+            "references": ["spec", "design", "findings_registry"],
+            "workflow": "/create-test-plan"
+        },
+        "implement_task": {
+            "propelFileName": "",
+            "propelDirPath": "",
+            "templates": {},
+            "projectFileName": "",
+            "projectDirPath": "",
+            "contentType": "code",
+            "mcpType": "local",
+            "references": ["spec", "design", "model", "epics", "codeanalysis", "figma_spec", "designsystem", "findings_registry"],
+            "workflow": "/implement-tasks",
+            "_note": "Code-action prompt; modifies source code, produces no markdown artifact. propelFileName/propelDirPath intentionally empty."
+        },
+        "code_review": {
+            "propelFileName": "review_<timestamp>.md",
+            "propelDirPath": "./.propel/code-reviews",
+            "templates": {
+                "default": ".propel/templates/code-review-template.md"
+            },
+            "projectFileName": "",
+            "projectDirPath": "",
+            "contentType": "md",
+            "mcpType": "local",
+            "references": ["findings_registry"],
+            "workflow": "/review-code"
+        },
+        "execute_unittest": {
+            "propelFileName": "",
+            "propelDirPath": "",
+            "templates": {},
+            "projectFileName": "",
+            "projectDirPath": "",
+            "contentType": "code",
+            "mcpType": "local",
+            "references": [],
+            "workflow": "/execute-unittest",
+            "_note": "Test-execution prompt; runs tests, produces no markdown artifact. propelFileName/propelDirPath intentionally empty."
+        },
+        "challenge_artifact": {
+            "propelFileName": "challenge_<timestamp>.md",
+            "propelDirPath": "./.propel/challenge-reviews",
+            "templates": {
+                "default": ".propel/templates/challenge-artifact-template.md"
+            },
+            "projectFileName": "",
+            "projectDirPath": "",
+            "contentType": "md",
+            "mcpType": "local",
+            "references": ["findings_registry"],
+            "workflow": "/challenge-artifact"
+        },
+        "edge_case_review": {
+            "propelFileName": "edge-cases_<timestamp>.md",
+            "propelDirPath": "./.propel/edge-case-reviews",
+            "templates": {
+                "default": ".propel/templates/edge-case-review-template.md"
+            },
+            "projectFileName": "",
+            "projectDirPath": "",
+            "contentType": "md",
+            "mcpType": "local",
+            "references": ["findings_registry"],
+            "workflow": "/review-edge-cases"
+        },
+        "project_plan": {
+            "propelFileName": "project-plan.md",
+            "propelDirPath": "${basePropelPath}/docs",
+            "templates": {
+                "default": ".propel/templates/project-plan-template.md"
+            },
+            "projectFileName": "",
+            "projectDirPath": "",
+            "contentType": "md",
+            "mcpType": "local",
+            "references": ["spec", "design", "model", "figma_spec", "test_plan", "codeanalysis"],
+            "workflow": "/create-project-plan"
+        },
+        "sprint_plan": {
+            "propelFileName": "sprint-plan.md",
+            "propelDirPath": "${basePropelPath}/docs",
+            "templates": {
+                "default": ".propel/templates/sprint-plan-template.md"
+            },
+            "projectFileName": "",
+            "projectDirPath": "",
+            "contentType": "md",
+            "mcpType": "local",
+            "references": ["project_plan", "epics", "user_story", "spec"],
+            "workflow": "/create-sprint-plan"
+        },
+        "review_devops_security": {
+            "propelFileName": "review_<timestamp>.md",
+            "propelDirPath": "${basePropelPath}/devops/security-reviews",
+            "templates": {
+                "default": ".propel/templates/devops-security-review-template.md"
+            },
+            "projectFileName": "",
+            "projectDirPath": "",
+            "contentType": "md",
+            "mcpType": "local",
+            "references": ["findings_registry"],
+            "workflow": "/review-devops-security"
+        },
+        "review_ux": {
+            "propelFileName": "ux-review-<timestamp>.md",
+            "propelDirPath": "./.propel/reviews",
+            "templates": {
+                "default": ".propel/templates/review-ux-template.md"
+            },
+            "projectFileName": "",
+            "projectDirPath": "",
+            "contentType": "md",
+            "mcpType": "local",
+            "references": ["findings_registry"],
+            "workflow": "/review-ux"
+        },
+        "change_request": {
+            "propelFileName": "CR-<seqnum>.md",
+            "propelDirPath": "${basePropelPath}/change-requests",
+            "templates": {
+                "default": ".propel/templates/change-request-template.md"
+            },
+            "projectFileName": "",
+            "projectDirPath": "",
+            "contentType": "md",
+            "mcpType": "local",
+            "references": ["spec", "design", "model", "figma_spec", "epics", "user_story", "test_plan", "codeanalysis", "findings_registry"],
+            "workflow": "/request-change",
+            "_note": "<seqnum> = zero-padded 3-digit, auto-incremented by request-change Step 0.1. Flat layout: all CR files live directly under propelDirPath. The order of `references` is the execution sequence used by /apply-change. Each referenced artifact's `workflow` attribute is the slash command invoked when CR rows are tagged for that artifact. Artifacts with empty `workflow` (e.g., findings_registry) are context-only and never invoked."
+        },
+        "prototype": {
+            "propelFileName": "mvp-scope-and-journeys.md",
+            "propelDirPath": "./mvp",
+            "templates": {
+                "default": ".propel/templates/mvp-scope-and-journeys-template.md"
+            },
+            "projectFileName": "",
+            "projectDirPath": "",
+            "contentType": "code",
+            "mcpType": "local",
+            "references": ["codeanalysis", "spec", "design"],
+            "workflow": "/build-prototype"
+        },
+        "snowpark_conversion": {
+            "propelFileNames": {
+                "procedure": "snowpark_<script_name>_proc.sql",
+                "deploy": "snowpark_<script_name>_deploy.sql",
+                "usage": "snowpark_<script_name>_usage.md",
+                "data_setup": "snowpark_<script_name>_data_setup.sql"
+            },
+            "propelDirPath": "${basePropelPath}/snowpark",
+            "templates": {},
+            "projectFileName": "",
+            "projectDirPath": "",
+            "contentType": "code",
+            "mcpType": "local",
+            "references": [
+                "findings_registry",
+                "signal_ledger"
+            ],
+            "workflow": "/convert-to-snowpark"
+        },
+        "discovery_context": {
+            "propelFileName": "discovery_context.md",
+            "propelDirPath": "${basePropelPath}/docs",
+            "templates": {},
+            "projectFileName": "",
+            "projectDirPath": "",
+            "contentType": "md",
+            "mcpType": "local",
+            "references": ["spec"],
+            "workflow": "",
+            "_note": "Populated after create-spec. Must include a 'dataset_paths' section listing source file paths or connection strings used by /data-ingestion when no $ARGUMENTS are supplied."
+        },
+        "data_ingestion": {
+            "propelFileName": "ingestion-plan.md",
+            "propelDirPath": "${basePropelPath}/data/staging",
+            "templates": {
+                "default": ".propel/templates/data-ingestion-plan-template.md"
+            },
+            "projectFileName": "",
+            "projectDirPath": "",
+            "contentType": "md",
+            "mcpType": "local",
+            "references": ["ds_spec", "discovery_context"],
+            "workflow": "/data-ingestion",
+            "_note": "Self-sufficient planning prompt. Reads ds_spec first; falls back to discovery_context; falls back to user interview. Produces ingestion-plan.md + epics entry + user stories + task files. Does not extract data. Run /implement-tasks on generated task files to produce ingestion code."
+        },
+        "source_inventory": {
+            "propelFileName": "source_inventory.md",
+            "propelDirPath": "${basePropelPath}/data/staging",
+            "templates": {},
+            "projectFileName": "",
+            "projectDirPath": "",
+            "contentType": "md",
+            "mcpType": "local",
+            "references": [],
+            "workflow": "",
+            "_note": "Read-only reference artifact. Produced by data_ingestion. Used as reference context by data_preprocessing."
+        },
+        "data_preprocessing": {
+            "propelFileName": "preprocessing-plan.md",
+            "propelDirPath": "${basePropelPath}/data/processed",
+            "templates": {
+                "default": ".propel/templates/data-preprocessing-plan-template.md"
+            },
+            "projectFileName": "",
+            "projectDirPath": "",
+            "contentType": "md",
+            "mcpType": "local",
+            "references": ["data_ingestion", "source_inventory"],
+            "workflow": "/data-preprocessing",
+            "_note": "Self-sufficient planning prompt. Reads data_ingestion plan first; falls back to source_inventory; falls back to user interview. Produces preprocessing-plan.md + epics entry + user stories + task files for consolidation, imputation, outlier treatment, deduplication, encoding, and scaling code. Does not process data. Run /implement-tasks on generated task files to produce preprocessing code."
+        },
+        "preprocessing_log": {
+            "propelFileName": "preprocessing_log.md",
+            "propelDirPath": "${basePropelPath}/data/processed",
+            "templates": {},
+            "projectFileName": "",
+            "projectDirPath": "",
+            "contentType": "md",
+            "mcpType": "local",
+            "references": [],
+            "workflow": "",
+            "_note": "Read-only reference artifact. Produced by data_preprocessing. Used as reference context by /eda and /feature-engineering workflows."
+        },
+        "eda": {
+            "propelFileName": "eda-plan.md",
+            "propelDirPath": "${basePropelPath}/data/eda",
+            "templates": {
+                "default": ".propel/templates/eda-plan-template.md"
+            },
+            "projectFileName": "",
+            "projectDirPath": "",
+            "contentType": "md",
+            "mcpType": "local",
+            "references": ["data_preprocessing", "preprocessing_log", "ds_spec"],
+            "workflow": "/eda",
+            "_note": "Self-sufficient planning prompt. Reads data_preprocessing plan first; falls back to preprocessing_log; falls back to ds_spec; falls back to user interview. Produces eda-plan.md + epics entry + user stories + task files for univariate, bivariate, seasonality (conditional), leakage, visualization, and report code. Does not compute statistics. Run /implement-tasks on generated task files to produce EDA code."
+        },
+        "eda_report": {
+            "propelFileName": "eda_report.md",
+            "propelDirPath": "${basePropelPath}/data/eda",
+            "templates": {},
+            "projectFileName": "",
+            "projectDirPath": "",
+            "contentType": "md",
+            "mcpType": "local",
+            "references": [],
+            "workflow": "",
+            "_note": "Read-only reference artifact. Produced by /eda. Consumed by feature_engineering for leakage guard ($LEAKAGE_DROPS) and seasonal period sizing ($SEASONAL_PERIODS)."
+        },
+        "feature_engineering": {
+            "propelFileName": "feature-engineering-plan.md",
+            "propelDirPath": "${basePropelPath}/data/features",
+            "templates": {
+                "default": ".propel/templates/feature-engineering-plan-template.md"
+            },
+            "projectFileName": "",
+            "projectDirPath": "",
+            "contentType": "md",
+            "mcpType": "local",
+            "references": ["eda", "eda_report", "preprocessing_log", "ds_spec"],
+            "workflow": "/feature-engineering",
+            "_note": "Self-sufficient planning prompt. Reads eda plan first; falls back to eda_report; falls back to preprocessing_log; falls back to ds_spec; falls back to user interview. Produces feature-engineering-plan.md + epics entry + user stories + task files for temporal, encoding, transform, interaction, baseline, selection, feature store (conditional), and manifest/writer code. Does not compute features. Run /implement-tasks on generated task files."
+        },
+        "model_selection_report": {
+            "propelFileName": "model_selection_report.md",
+            "propelDirPath": "${basePropelPath}/data/model_selection",
+            "templates": {},
+            "projectFileName": "",
+            "projectDirPath": "",
+            "contentType": "md",
+            "mcpType": "local",
+            "references": [],
+            "workflow": "",
+            "_note": "Read-only reference artifact. Used as optional context by model_training when a model selection report is available."
+        },
+        "model_training": {
+            "propelFileName": "model-training-plan.md",
+            "propelDirPath": "${basePropelPath}/data/models",
+            "templates": {
+                "default": ".propel/templates/model-training-plan-template.md"
+            },
+            "projectFileName": "",
+            "projectDirPath": "",
+            "contentType": "md",
+            "mcpType": "local",
+            "references": ["feature_engineering", "model_selection_report", "ds_spec"],
+            "workflow": "/model-training",
+            "_note": "Self-sufficient planning prompt. Reads feature_engineering plan first; falls back to model_selection_report; falls back to ds_spec; falls back to user interview. Produces model-training-plan.md + epics entry + user stories + task files for data loader, train/test split, imbalance handling (conditional), one trainer per candidate model, serializer, registry, and CLI pipeline. Does not train models. Run /implement-tasks on generated task files."
+        },
+        "model_registry": {
+            "propelFileName": "model_registry.md",
+            "propelDirPath": "${basePropelPath}/data/models",
+            "templates": {},
+            "projectFileName": "",
+            "projectDirPath": "",
+            "contentType": "md",
+            "mcpType": "local",
+            "references": [],
+            "workflow": "",
+            "_note": "Read-only reference artifact. Produced by model_training. Used as reference context by model_evaluation."
+        },
+        "model_evaluation": {
+            "propelFileName": "model-evaluation-plan.md",
+            "propelDirPath": "${basePropelPath}/data/models/evaluation",
+            "templates": {
+                "default": ".propel/templates/model-evaluation-plan-template.md"
+            },
+            "projectFileName": "",
+            "projectDirPath": "",
+            "contentType": "md",
+            "mcpType": "local",
+            "references": ["model_training", "model_registry", "ds_spec"],
+            "workflow": "/model-evaluation",
+            "_note": "Self-sufficient planning prompt. Reads model training plan first; falls back to model_registry; falls back to ds_spec; falls back to user interview. Produces model-evaluation-plan.md + epics entry + user stories + task files for loader, predictor, metrics, residuals (conditional), interpretability (conditional), fairness (conditional), MLflow (conditional), report/registry, and CLI pipeline. Does not load or run models. Run /implement-tasks on generated task files."
+        },
+        "model_tuning": {
+            "propelFileName": "model-tuning-plan.md",
+            "propelDirPath": "${basePropelPath}/data/models/tuning",
+            "templates": {
+                "default": ".propel/templates/model-tuning-plan-template.md"
+            },
+            "projectFileName": "",
+            "projectDirPath": "",
+            "contentType": "md",
+            "mcpType": "local",
+            "references": ["model_evaluation", "model_training", "ds_spec"],
+            "workflow": "/model-tuning",
+            "_note": "Self-sufficient planning prompt. Reads model evaluation plan first; falls back to model training plan; falls back to ds_spec; falls back to user interview. Produces model-tuning-plan.md + epics entry + user stories + task files for loader, search_space, objective/CV runner, searcher, retrainer, serializer, results_writer, and CLI pipeline. Does not run trials. Run /implement-tasks on generated task files."
+        }
+    }
+}

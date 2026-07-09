@@ -1,0 +1,131 @@
+adapter:
+  name: fabric_pipeline
+  type: source
+  platform: Azure
+  description: >
+    Microsoft Fabric Pipeline source adapter.
+    Parses Fabric pipeline JSON and extracts tasks, dependencies, triggers, and parameters
+    into the normalized workflow schema. Fabric pipelines are structurally similar to ADF
+    but use Fabric-specific activity types (TridentNotebook, SparkJob) and workspace references.
+
+  detection:
+    file_formats: [".json"]
+    indicators:
+      - '"objectType": "pipeline"'
+      - '"TridentNotebook"'
+      - '"workspaceId"'
+      - '"notebookId"'
+      - '"SparkJobDefinitionReference"'
+      - '"fabricPipeline"'
+      - '"OneLake"'
+    structural_markers:
+      root_keys: ["name", "objectType", "properties"]
+      nested_keys: ["properties.activities", "properties.parameters"]
+    priority_note: >
+      Fabric pipeline JSON is distinguished from ADF by the presence of
+      "objectType": "pipeline" at root level and Fabric-exclusive activity types
+      (TridentNotebook, SparkJobDefinitionReference). If "Microsoft.DataFactory"
+      is present instead, route to the adf source adapter.
+
+  parsing:
+    workflow_name: "$.name"
+    tasks_path: "$.properties.activities"
+    parameters_path: "$.properties.parameters"
+    triggers_path: "$.properties.triggers OR separate trigger resource"
+
+    task_extraction:
+      task_id: "$.activities[*].name"
+      task_type_field: "$.activities[*].type"
+      task_config: "$.activities[*].typeProperties"
+      depends_on_field: "$.activities[*].dependsOn[*].activity"
+      parameters_field: "$.activities[*].typeProperties.parameters"
+      timeout_field: "$.activities[*].policy.timeout"
+      retry_field: "$.activities[*].policy.retry"
+
+    type_mapping:
+      TridentNotebook:
+        normalized_type: "notebook"
+        config_keys:
+          notebook_id: "typeProperties.notebookId"
+          workspace_id: "typeProperties.workspaceId"
+          parameters: "typeProperties.parameters"
+        note: "Fabric-native notebook activity. notebook_id is a GUID — use name mapping for target conversion."
+      SparkJob:
+        normalized_type: "spark_job"
+        config_keys:
+          main_file: "typeProperties.sparkJob.referenceName"
+          job_type: "typeProperties.sparkJob.type"
+      Copy:
+        normalized_type: "data_copy"
+        config_keys:
+          source: "typeProperties.source"
+          sink: "typeProperties.sink"
+      ExecutePipeline:
+        normalized_type: "sub_pipeline"
+        config_keys:
+          pipeline_ref: "typeProperties.pipeline.referenceName"
+          parameters: "typeProperties.parameters"
+      Script:
+        normalized_type: "sql_task"
+        config_keys:
+          query: "typeProperties.scriptBlockEntries[0].text"
+          connection: "typeProperties.connection.referenceName"
+      Lookup:
+        normalized_type: "lookup"
+        config_keys:
+          source: "typeProperties.source"
+      IfCondition:
+        normalized_type: "conditional_branch"
+        config_keys:
+          expression: "typeProperties.expression.value"
+          true_activities: "typeProperties.ifTrueActivities"
+          false_activities: "typeProperties.ifFalseActivities"
+
+  dependencies:
+    extraction_method: "direct"
+    source_field: "dependsOn"
+    format: |
+      Each activity has a dependsOn array:
+      [{"activity": "task_name", "dependencyConditions": ["Succeeded"]}]
+    condition_mapping:
+      Succeeded: "success"
+      Failed: "failure"
+      Completed: "completed"
+      Skipped: "skipped"
+
+  triggers:
+    extraction: |
+      Fabric supports ScheduleTrigger (same structure as ADF) and OneLake event triggers.
+      Support: ScheduleTrigger, StorageEventsTrigger (OneLake)
+    schedule_format: "recurrence"
+    fields:
+      type: "$.type"
+      recurrence: "$.recurrence"
+      interval: "$.recurrence.interval"
+      frequency: "$.recurrence.frequency"
+      hours: "$.recurrence.schedule.hours"
+      minutes: "$.recurrence.schedule.minutes"
+      time_zone: "$.recurrence.timeZone"
+
+  parameters:
+    format: "typed_with_default"
+    structure: |
+      {
+        "param_name": {
+          "type": "string",
+          "defaultValue": "value"
+        }
+      }
+
+  timeout:
+    format: "iso8601"
+    parsing: |
+      Fabric uses ISO 8601 duration (same as ADF): "01:00:00" = 3600s, "1.00:00:00" = 86400s
+      Parse: days.hours:minutes:seconds → total seconds
+
+  compute:
+    extraction: |
+      Fabric manages compute automatically via workspace Spark pools.
+      No explicit cluster definition in pipeline JSON.
+      For compute mapping purposes, treat as equivalent to a medium-tier Spark pool.
+      If SparkJob activity is present, extract job definition reference for compute hints.

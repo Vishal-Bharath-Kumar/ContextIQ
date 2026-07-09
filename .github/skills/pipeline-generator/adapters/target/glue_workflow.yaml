@@ -1,0 +1,181 @@
+adapter:
+  name: glue_workflow
+  type: target
+  platform: AWS
+  description: >
+    AWS Glue Workflow target adapter.
+    Generates AWS Glue Workflow JSON from the normalized workflow schema.
+    Glue workflows orchestrate Glue jobs and crawlers using triggers (SCHEDULED,
+    CONDITIONAL, ON_DEMAND). Dependencies are expressed via CONDITIONAL triggers
+    with predicate conditions referencing upstream job completion status.
+
+  output_format:
+    type: "json"
+    extension: ".json"
+    template_ref: "templates/glue.json"
+
+  generation:
+    structure: |
+      {
+        "Name": "{workflow_name}",
+        "Description": "Converted by PropelIQ Adapter Engine",
+        "Actions": [],
+        "Triggers": []
+      }
+
+    task_generation:
+      action_structure: |
+        {
+          "JobName": "{task_id}",
+          "Arguments": {
+            "--param_name": "value"
+          },
+          "Timeout": {timeout_minutes},
+          "SecurityConfiguration": "",
+          "NotificationProperty": {
+            "NotifyDelayAfter": null
+          }
+        }
+
+      type_mapping:
+        notebook:
+          glue_type: "GlueJob"
+          fields:
+            JobName: "{task_id}_glue"
+            Arguments: "{parameters_with_dash_prefix}"
+          note: "Notebook converted to Glue PySpark job. Script must be deployed to S3."
+        spark_job:
+          glue_type: "GlueJob"
+          fields:
+            JobName: "{task_id}"
+            Arguments: "{parameters_with_dash_prefix}"
+        data_copy:
+          glue_type: "GlueJob"
+          fields:
+            JobName: "{task_id}_copy"
+          note: "Data copy mapped to a Glue ETL job performing the copy operation"
+        sql_task:
+          glue_type: "GlueJob"
+          fields:
+            JobName: "{task_id}_sql"
+          note: "SQL task mapped to a Glue job using JDBC connection or Athena"
+        crawler:
+          glue_type: "GlueCrawler"
+          fields:
+            CrawlerName: "{task_id}_crawler"
+        sub_pipeline:
+          glue_type: "GlueWorkflow"
+          note: "Sub-pipeline mapped to a nested Glue workflow trigger"
+        parallel_group:
+          handling: |
+            Glue does not support native parallel execution within a workflow.
+            Flatten parallel tasks as independent Actions in the same workflow.
+            All parallel tasks share the same CONDITIONAL trigger from the upstream job.
+        conditional_branch:
+          handling: |
+            Map to CONDITIONAL trigger with predicate conditions.
+            Each branch becomes a separate trigger with its own predicate.
+
+  dependencies:
+    generation: |
+      Glue expresses dependencies via CONDITIONAL triggers, not direct task links.
+      FOR each normalized dependency (source_task → target_task):
+        Generate a CONDITIONAL trigger:
+        {
+          "Name": "{target_task_id}_trigger",
+          "Type": "CONDITIONAL",
+          "Predicate": {
+            "Logical": "ANY",
+            "Conditions": [
+              {
+                "LogicalOperator": "EQUALS",
+                "JobName": "{source_task_id}",
+                "State": "{condition_mapped}"
+              }
+            ]
+          },
+          "Actions": [
+            { "JobName": "{target_task_id}" }
+          ]
+        }
+      Condition mapping:
+        success → "SUCCEEDED"
+        failure → "FAILED"
+        completed → "STOPPED"
+
+  triggers:
+    generation:
+      scheduled_trigger: |
+        {
+          "Name": "{workflow_name}_scheduled_trigger",
+          "Type": "SCHEDULED",
+          "Schedule": "cron({normalized_cron_glue})",
+          "Actions": [
+            { "JobName": "{first_task_id}" }
+          ],
+          "StartOnCreation": true
+        }
+      on_demand_trigger: |
+        {
+          "Name": "{workflow_name}_ondemand_trigger",
+          "Type": "ON_DEMAND",
+          "Actions": [
+            { "JobName": "{first_task_id}" }
+          ]
+        }
+      conversion_rules: |
+        FROM normalized trigger:
+          IF type == "cron":
+            Convert normalized cron → Glue cron (6 fields: min hour dom month dow year)
+            Wrap in "cron(...)" expression
+            Generate SCHEDULED trigger targeting the first task (root node)
+          IF type == "manual" or no trigger:
+            Generate ON_DEMAND trigger targeting the first task
+
+  parameters:
+    generation: |
+      Glue job arguments use double-dash prefix format:
+      {
+        "--param_name": "value",
+        "--param2": "value2"
+      }
+      Convert normalized flat key-value by prepending "--" to each key.
+      Reserved Glue keys (--job-bookmark-option, --TempDir, --job-language) are preserved as-is.
+
+  timeout:
+    generation: |
+      Convert seconds → minutes (Glue uses minutes):
+        timeout_minutes = ceil(timeout_seconds / 60)
+      Minimum: 1 minute.
+
+  compute:
+    generation: |
+      Glue job compute is defined on the job definition, not the workflow.
+      Generate companion Glue job definition JSON for each task:
+      {
+        "Name": "{task_id}",
+        "Role": "{glue_iam_role_arn}",
+        "Command": {
+          "Name": "glueetl",
+          "ScriptLocation": "s3://{bucket}/scripts/{task_id}.py",
+          "PythonVersion": "3"
+        },
+        "DefaultArguments": {
+          "--job-bookmark-option": "job-bookmark-enable",
+          "--TempDir": "s3://{bucket}/temp/"
+        },
+        "WorkerType": "{worker_type}",
+        "NumberOfWorkers": {num_workers},
+        "GlueVersion": "{glue_version}",
+        "Timeout": {timeout_minutes}
+      }
+      node_size_mapping:
+        small:   { WorkerType: "G.1X",  glue_version: "4.0" }
+        medium:  { WorkerType: "G.2X",  glue_version: "4.0" }
+        large:   { WorkerType: "G.4X",  glue_version: "4.0" }
+        xlarge:  { WorkerType: "G.8X",  glue_version: "4.0" }
+      spark_to_glue_version:
+        "2.4": "2.0"
+        "3.1": "3.0"
+        "3.3": "4.0"
+        "3.5": "4.0"

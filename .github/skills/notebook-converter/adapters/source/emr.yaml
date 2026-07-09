@@ -1,0 +1,114 @@
+adapter:
+  name: emr
+  type: source
+  platform: AWS
+  description: >
+    Amazon EMR source adapter. Reads data from S3 via standard PySpark,
+    Hive metastore, and HDFS paths. Uses boto3 for AWS service interactions.
+
+  detection:
+    indicators:
+      - "SparkSession.builder"
+      - "s3://"
+      - "s3a://"
+      - "hdfs://"
+      - "import boto3"
+      - "emr"
+      - "hadoop"
+      - "hive_metastore"
+      - "spark.sql.catalogImplementation"
+      - "spark-submit"
+    file_patterns:
+      - "*.ipynb"
+      - "*.py"
+    storage_prefix: "s3://"
+
+  read:
+    mode: full
+    include_cells: true
+    include_metadata: true
+
+  rules:
+    - do_not_detect_source
+    - read_complete_notebook
+
+  connection:
+    parameters:
+      - name: s3_path
+        type: string
+        description: "S3 data path"
+      - name: cluster_id
+        type: string
+        description: "EMR cluster ID"
+      - name: region
+        type: string
+        description: "AWS region"
+      - name: hive_database
+        type: string
+        description: "Hive metastore database"
+      - name: iam_role
+        type: string
+        description: "IAM role for EMR execution"
+
+  read_logic:
+    spark:
+      initialization: |
+        from pyspark.sql import SparkSession
+        spark = SparkSession.builder \
+            .appName("{app_name}") \
+            .enableHiveSupport() \
+            .getOrCreate()
+      catalog_read: |
+        df = spark.sql("SELECT * FROM {hive_database}.{table}")
+      path_read: |
+        df = spark.read.parquet("s3://{bucket}/{path}")
+      hdfs_read: |
+        df = spark.read.parquet("hdfs://{namenode}/{path}")
+      finalization: |
+        spark.stop()
+    python:
+      read: |
+        import boto3
+        s3 = boto3.client('s3')
+        obj = s3.get_object(Bucket="{bucket}", Key="{key}")
+        df = pd.read_parquet(obj['Body'])
+
+  parameters:
+    extraction: |
+      import argparse
+      parser = argparse.ArgumentParser()
+      parser.add_argument('--{param_name}', required=True)
+      args = parser.parse_args()
+      value = args.{param_name}
+    format: "argparse"
+
+  secrets:
+    method: "boto3_ssm"
+    read: |
+      import boto3
+      ssm = boto3.client('ssm')
+      value = ssm.get_parameter(Name='{secret_name}', WithDecryption=True)['Parameter']['Value']
+
+  imports:
+    remove: []
+    keep:
+      - "pyspark.*"
+      - "datetime"
+      - "uuid"
+      - "re"
+      - "pandas"
+      - "numpy"
+      - "boto3"
+      - "argparse"
+
+  catalog:
+    operations:
+      - source: "spark.sql('SELECT * FROM')"
+        normalized: "spark.read.table"
+      - source: "df.write.saveAsTable"
+        normalized: "df.write.saveAsTable"
+
+  storage:
+    prefix: "s3://"
+    path_format: "s3://{bucket}/{path}"
+    hdfs_format: "hdfs://{namenode}/{path}"

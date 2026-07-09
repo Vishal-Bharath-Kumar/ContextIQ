@@ -1,0 +1,99 @@
+adapter:
+  name: emr
+  type: target
+  platform: AWS
+  description: >
+    Amazon EMR target adapter. Writes data to S3 paths, Hive metastore
+    tables, and HDFS via standard PySpark APIs.
+
+  runtime:
+    spark_session: "manual"
+    initialization: |
+      from pyspark.sql import SparkSession
+      spark = SparkSession.builder \
+          .appName("{app_name}") \
+          .enableHiveSupport() \
+          .getOrCreate()
+    spark_config_migration: |
+      spark.conf.set("{config_key}", "{config_value}")
+
+  write_logic:
+    spark:
+      catalog_write: |
+        df.write.mode("overwrite").saveAsTable("{hive_database}.{table}")
+      path_write: |
+        df.write.mode("overwrite") \
+            .parquet("s3://{bucket}/{path}")
+      delta_write: |
+        df.write.format("delta") \
+            .mode("overwrite") \
+            .save("s3://{bucket}/{path}")
+    sql:
+      write: |
+        CREATE TABLE IF NOT EXISTS {hive_database}.{table}
+        STORED AS PARQUET
+        LOCATION 's3://{bucket}/{path}'
+        AS SELECT * FROM temp_view;
+
+  parameters:
+    definition: |
+      import argparse
+      parser = argparse.ArgumentParser()
+      parser.add_argument('--{param_name}', required=True)
+    extraction: |
+      args = parser.parse_args()
+      value = args.{param_name}
+    format: "argparse"
+
+  secrets:
+    method: "boto3_ssm"
+    write: |
+      import boto3
+      ssm = boto3.client('ssm')
+      value = ssm.get_parameter(Name='{secret_name}', WithDecryption=True)['Parameter']['Value']
+
+  imports:
+    add:
+      - "from pyspark.sql import SparkSession"
+      - "import argparse"
+    platform_specific:
+      - "boto3"
+
+  storage:
+    prefix: "s3://"
+    path_format: "s3://{bucket}/{path}"
+    hdfs_format: "hdfs://{namenode}/{path}"
+
+  notebook_format:
+    type: "py"
+    header_cell: |
+      # EMR PySpark script
+      # Converted by PropelIQ Adapter Engine
+    metadata:
+      kernel: "python3"
+      language: "python"
+
+  catalog:
+    operations:
+      - normalized: "spark.read.table"
+        target: "spark.sql(\"SELECT * FROM {hive_database}.{table}\")"
+      - normalized: "df.write.saveAsTable"
+        target: "df.write.mode(\"overwrite\").saveAsTable(\"{hive_database}.{table}\")"
+
+  enhancements:
+    - "Hive metastore integration"
+    - "S3 optimized committer"
+    - "EMR-specific Spark configurations"
+    - "EMRFS consistent view"
+
+  transformations:
+    - convert_magic_commands
+    - replace_platform_utils
+    - adjust_imports
+    - convert_storage_paths
+    - convert_catalog_operations
+    - convert_parameters
+    - convert_secrets
+
+  output:
+    format: py

@@ -1,0 +1,113 @@
+adapter:
+  name: databricks
+  type: source
+  platform: Multi-Cloud
+  description: >
+    Databricks source adapter. Reads data from Unity Catalog tables,
+    DBFS, mounted storage, and Delta Lake tables.
+
+  detection:
+    indicators:
+      - "dbutils.widgets"
+      - "dbutils.secrets"
+      - "dbutils.fs"
+      - "dbutils.notebook"
+      - "dbfs:/"
+      - "/mnt/"
+      - "spark.table"
+      - "display("
+      - "# MAGIC"
+      - "# COMMAND ----------"
+      - "USE CATALOG"
+      - "USE SCHEMA"
+    file_patterns:
+      - "*.ipynb"
+      - "*.py"
+      - "*.sql"
+    storage_prefix: "dbfs:/"
+
+  read:
+    mode: full
+    include_cells: true
+    include_metadata: true
+
+  rules:
+    - do_not_detect_source
+    - read_complete_notebook
+
+  connection:
+    parameters:
+      - name: catalog
+        type: string
+        description: "Unity Catalog name"
+      - name: schema
+        type: string
+        description: "Schema/database name"
+      - name: workspace_url
+        type: string
+        description: "Databricks workspace URL"
+      - name: token
+        type: string
+        description: "Databricks personal access token"
+      - name: cluster_id
+        type: string
+        description: "Compute cluster ID"
+
+  read_logic:
+    spark:
+      initialization: |
+        # Spark session pre-initialized by Databricks runtime
+      catalog_read: |
+        df = spark.table("{catalog}.{schema}.{table}")
+      path_read: |
+        df = spark.read.format("delta").load("{path}")
+      dbfs_read: |
+        df = spark.read.parquet("dbfs:/{path}")
+      mount_read: |
+        df = spark.read.parquet("/mnt/{mount_name}/{path}")
+      finalization: |
+        # No explicit finalization required
+    sql:
+      read: |
+        USE CATALOG {catalog};
+        USE SCHEMA {schema};
+        SELECT * FROM {table};
+
+  parameters:
+    extraction: |
+      value = dbutils.widgets.get("{param_name}")
+    definition: |
+      dbutils.widgets.text("{param_name}", "{default_value}", "{label}")
+    format: "dbutils.widgets"
+
+  secrets:
+    method: "dbutils_secrets"
+    read: |
+      value = dbutils.secrets.get(scope="{scope}", key="{key}")
+
+  imports:
+    remove: []
+    keep:
+      - "pyspark.*"
+      - "datetime"
+      - "uuid"
+      - "re"
+      - "delta.*"
+      - "pandas"
+      - "numpy"
+      - "mlflow.*"
+
+  catalog:
+    operations:
+      - source: "spark.table"
+        normalized: "spark.read.table"
+      - source: "spark.read.format('delta').load"
+        normalized: "spark.read.table"
+      - source: "df.write.format('delta').saveAsTable"
+        normalized: "df.write.saveAsTable"
+
+  storage:
+    prefix: "dbfs:/"
+    path_format: "dbfs:/{path}"
+    mount_format: "/mnt/{mount_name}/{path}"
+    uc_format: "{catalog}.{schema}.{table}"

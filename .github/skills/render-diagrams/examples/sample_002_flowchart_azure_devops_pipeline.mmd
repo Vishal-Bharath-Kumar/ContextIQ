@@ -1,0 +1,26 @@
+---
+config:
+  theme: base
+  themeVariables:
+    primaryColor: "#005A9E"
+    primaryTextColor: "#ffffff"
+    primaryBorderColor: "#003f6e"
+    lineColor: "#333333"
+    background: "#ffffff"
+    fontFamily: "Segoe UI, Arial, sans-serif"
+---
+flowchart TD
+    Dev["👨‍💻 Developer\nPushes Code"] --> GH["GitHub\nRepository"]
+    GH --> CI["Azure DevOps\nCI Pipeline"]
+    CI --> Build["🔨 Build\nAngular + .NET"]
+    Build --> Test["🧪 Run Tests\nUnit + Integration"]
+    Test -->|Pass| Scan["🔍 Security Scan\nSonarQube + OWASP"]
+    Test -->|Fail| Notify1["❌ Notify Dev\nSlack / Email"]
+    Scan -->|Clean| Artifact["📦 Publish Artifact\nAzure Artifacts"]
+    Scan -->|Issues| Notify2["⚠️ Notify Team\nSecurity Alert"]
+    Artifact --> CD["Azure DevOps\nCD Pipeline"]
+    CD --> Staging["🟡 Deploy to Staging\nApp Service Slot"]
+    Staging --> Smoke["💨 Smoke Tests\nPlaywright E2E"]
+    Smoke -->|Pass| Prod["🟢 Swap to Production\nApp Service Slot Swap"]
+    Smoke -->|Fail| Rollback["🔄 Rollback\nRevert Slot Swap"]
+    Prod --> Monitor["📊 Azure Monitor\nApp Insights"]

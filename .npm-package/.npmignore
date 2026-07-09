@@ -1,0 +1,16 @@
+# Development files
+node_modules/
+*.log
+.DS_Store
+
+# Git files
+.git/
+.gitignore
+
+# Local environment
+.env
+
+# Development scripts
+prepare.js
+
+# Only include .env.example in package

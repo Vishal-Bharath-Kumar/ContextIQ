@@ -1,0 +1,112 @@
+adapter:
+  name: dataproc
+  type: source
+  platform: GCP
+  description: >
+    Google Cloud Dataproc source adapter. Reads data from GCS paths,
+    BigQuery tables, and Hive metastore via standard PySpark and google-cloud libraries.
+
+  detection:
+    indicators:
+      - "gs://"
+      - "google.cloud"
+      - "from google.cloud import bigquery"
+      - "from google.cloud import storage"
+      - "bigquery.Client"
+      - "spark.read.format('bigquery')"
+      - "dataproc"
+      - "spark-bigquery-connector"
+      - "temporaryGcsBucket"
+    file_patterns:
+      - "*.ipynb"
+      - "*.py"
+    storage_prefix: "gs://"
+
+  read:
+    mode: full
+    include_cells: true
+    include_metadata: true
+
+  rules:
+    - do_not_detect_source
+    - read_complete_notebook
+
+  connection:
+    parameters:
+      - name: project_id
+        type: string
+        description: "GCP project ID"
+      - name: gcs_bucket
+        type: string
+        description: "GCS bucket name"
+      - name: dataset
+        type: string
+        description: "BigQuery dataset name"
+      - name: region
+        type: string
+        description: "GCP region"
+      - name: service_account
+        type: string
+        description: "Service account email"
+
+  read_logic:
+    spark:
+      initialization: |
+        from pyspark.sql import SparkSession
+        spark = SparkSession.builder \
+            .appName("{app_name}") \
+            .config("spark.jars.packages", "com.google.cloud.spark:spark-bigquery-with-dependencies_2.12:0.32.2") \
+            .getOrCreate()
+      catalog_read: |
+        df = spark.read.format("bigquery") \
+            .option("table", "{project_id}.{dataset}.{table}") \
+            .load()
+      path_read: |
+        df = spark.read.parquet("gs://{gcs_bucket}/{path}")
+      finalization: |
+        spark.stop()
+    python:
+      read: |
+        from google.cloud import bigquery
+        client = bigquery.Client(project="{project_id}")
+        query = "SELECT * FROM `{project_id}.{dataset}.{table}`"
+        df = client.query(query).to_dataframe()
+
+  parameters:
+    extraction: |
+      import argparse
+      parser = argparse.ArgumentParser()
+      parser.add_argument('--{param_name}', required=True)
+      args = parser.parse_args()
+      value = args.{param_name}
+    format: "argparse"
+
+  secrets:
+    method: "google_secret_manager"
+    read: |
+      from google.cloud import secretmanager
+      client = secretmanager.SecretManagerServiceClient()
+      name = f"projects/{project_id}/secrets/{secret_name}/versions/latest"
+      value = client.access_secret_version(request={"name": name}).payload.data.decode("UTF-8")
+
+  imports:
+    remove: []
+    keep:
+      - "pyspark.*"
+      - "datetime"
+      - "uuid"
+      - "re"
+      - "pandas"
+      - "numpy"
+      - "google.cloud.*"
+
+  catalog:
+    operations:
+      - source: "spark.read.format('bigquery').load"
+        normalized: "spark.read.table"
+      - source: "df.write.format('bigquery').save"
+        normalized: "df.write.saveAsTable"
+
+  storage:
+    prefix: "gs://"
+    path_format: "gs://{gcs_bucket}/{path}"

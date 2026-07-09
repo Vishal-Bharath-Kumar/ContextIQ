@@ -1,0 +1,107 @@
+adapter:
+  name: fabric
+  type: source
+  platform: Azure
+  description: >
+    Microsoft Fabric source adapter. Reads data from OneLake lakehouses,
+    Fabric warehouses, and shortcuts via Spark and semantic links.
+
+  detection:
+    indicators:
+      - "onelake.dfs.fabric.microsoft.com"
+      - "notebookutils"
+      - "notebookutils.credentials"
+      - "notebookutils.widgets"
+      - "mssparkutils.lakehouse"
+      - "sempy"
+      - "trident"
+      - "spark.read.format('delta').load('Tables/"
+      - "onelake"
+      - "lakehouse"
+      - "fabric"
+    file_patterns:
+      - "*.ipynb"
+      - "*.py"
+    storage_prefix: "abfss://"
+    priority_note: >
+      Fabric detection takes priority over Synapse when 'notebookutils' or
+      'onelake.dfs.fabric.microsoft.com' is present. These are Fabric-exclusive
+      indicators. 'mssparkutils' alone without these indicators resolves to Synapse.
+
+  read:
+    mode: full
+    include_cells: true
+    include_metadata: true
+
+  rules:
+    - do_not_detect_source
+    - read_complete_notebook
+
+  connection:
+    parameters:
+      - name: workspace_id
+        type: string
+        description: "Fabric workspace ID"
+      - name: lakehouse_name
+        type: string
+        description: "Lakehouse name"
+      - name: warehouse_name
+        type: string
+        description: "Warehouse name"
+      - name: onelake_path
+        type: string
+        description: "OneLake path"
+
+  read_logic:
+    spark:
+      initialization: |
+        # Spark session pre-initialized by Fabric runtime
+      catalog_read: |
+        df = spark.sql("SELECT * FROM {lakehouse_name}.{table}")
+      path_read: |
+        df = spark.read.format("delta").load("Tables/{table}")
+      onelake_read: |
+        df = spark.read.parquet("abfss://{workspace_id}@onelake.dfs.fabric.microsoft.com/{lakehouse_name}/Tables/{table}")
+      finalization: |
+        # No explicit finalization required
+    python:
+      read: |
+        import sempy.fabric as fabric
+        df = fabric.read_table("{dataset}", "{table}")
+
+  parameters:
+    extraction: |
+      value = notebookutils.widgets.get("{param_name}")
+    format: "notebookutils.widgets"
+
+  secrets:
+    method: "notebookutils_credentials"
+    read: |
+      value = notebookutils.credentials.getSecret("{vault_url}", "{secret_name}")
+
+  imports:
+    remove:
+      - "from notebookutils import mssparkutils"
+    keep:
+      - "pyspark.*"
+      - "datetime"
+      - "uuid"
+      - "re"
+      - "delta.*"
+      - "pandas"
+      - "numpy"
+      - "sempy.*"
+
+  catalog:
+    operations:
+      - source: "spark.sql('SELECT * FROM')"
+        normalized: "spark.read.table"
+      - source: "spark.read.format('delta').load('Tables/')"
+        normalized: "spark.read.table"
+      - source: "df.write.format('delta').mode('overwrite').save('Tables/')"
+        normalized: "df.write.saveAsTable"
+
+  storage:
+    prefix: "abfss://"
+    path_format: "abfss://{workspace_id}@onelake.dfs.fabric.microsoft.com/{lakehouse_name}/{path}"
+    local_format: "Tables/{table}"

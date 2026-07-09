@@ -1,0 +1,137 @@
+adapter:
+  name: fabric
+  type: target
+  platform: Azure
+  description: >
+    Microsoft Fabric target adapter. Writes data to OneLake lakehouses,
+    Fabric warehouses, and Delta tables via Spark and semantic links.
+
+  runtime:
+    spark_session: "pre-initialized"
+    initialization: |
+      # Spark session pre-initialized by Fabric runtime — no manual creation needed
+    lakehouse_context: |
+      # REQUIRED: Set default lakehouse before running %%sql cells with unqualified table names.
+      # Without this, Fabric throws: "No default context found, please attach a lakehouse"
+      # Option 1: Programmatic (first code cell in notebook)
+      LAKEHOUSE_NAME = "{lakehouse_name}"  # Replace with actual lakehouse name
+      spark.catalog.setCurrentDatabase(LAKEHOUSE_NAME)
+      # Option 2: Attach via Fabric notebook sidebar (UI) — sets context automatically
+    lakehouse_context_rule: |
+      Every generated Fabric notebook MUST include a lakehouse configuration cell
+      as the FIRST code cell (after any markdown header). This cell sets the default
+      database context via spark.catalog.setCurrentDatabase(). Without it, all %%sql
+      cells using unqualified table names will fail.
+    spark_config_migration: |
+      spark.conf.set("{config_key}", "{config_value}")
+
+  write_logic:
+    spark:
+      catalog_write: |
+        df.write.format("delta") \
+            .mode("overwrite") \
+            .save("Tables/{table}")
+      path_write: |
+        df.write.format("delta") \
+            .mode("overwrite") \
+            .save("abfss://{workspace_id}@onelake.dfs.fabric.microsoft.com/{lakehouse_name}/Tables/{table}")
+      shortcut_write: |
+        # Use Fabric shortcuts for cross-lakehouse / external writes
+        df.write.format("delta") \
+            .mode("overwrite") \
+            .save("Tables/{shortcut_name}/{table}")
+    sql:
+      write: |
+        CREATE TABLE {lakehouse_name}.{table}
+        USING DELTA
+        TBLPROPERTIES (
+            'delta.feature.allowColumnDefaults' = 'supported',
+            'delta.enableChangeDataFeed' = 'true',
+            'delta.autoOptimize.optimizeWrite' = 'true',
+            'delta.autoOptimize.autoCompact' = 'true'
+        )
+        AS SELECT * FROM temp_view;
+
+  parameters:
+    definition: |
+      notebookutils.widgets.define("{param_name}", "{default_value}")
+    extraction: |
+      value = notebookutils.widgets.get("{param_name}")
+    format: "notebookutils.widgets"
+
+  secrets:
+    method: "notebookutils_credentials"
+    write: |
+      value = notebookutils.credentials.getSecret("{vault_url}", "{secret_name}")
+
+  imports:
+    add:
+      - "# Fabric notebook — Spark session pre-initialized"
+    platform_specific:
+      - "notebookutils"
+      - "sempy"
+
+  storage:
+    prefix: "abfss://"
+    onelake_format: "abfss://{workspace_id}@onelake.dfs.fabric.microsoft.com/{lakehouse_name}/{path}"
+    local_format: "Tables/{table}"
+    files_format: "Files/{path}"
+
+  notebook_format:
+    type: "ipynb"
+    header_cell: |
+      # Fabric notebook
+      # Converted by PropelIQ Adapter Engine
+    metadata:
+      kernel: "synapse_pyspark"
+      language: "python"
+    sql_cell_strategy:
+      description: >
+        For pure SQL statements (DDL, DML, queries), use %%sql cell magic
+        instead of spark.sql() triple-quoted wrappers. Triple-quoted strings
+        inside spark.sql("""...""") cause SyntaxError in Fabric runtime.
+      pattern: |
+        %%sql
+        {sql_statement}
+      use_for:
+        - CREATE TABLE
+        - ALTER TABLE
+        - DROP TABLE
+        - CREATE VIEW
+        - CREATE OR REPLACE VIEW
+        - CREATE OR REPLACE TABLE
+        - OPTIMIZE
+        - INSERT INTO (simple)
+        - UPDATE
+        - DELETE FROM
+        - MERGE INTO
+      do_not_use_for:
+        - "Dynamic SQL with Python variables (use spark.sql(f\"...\") single-line)"
+        - "SQL inside Python loops (use spark.sql() with variable)"
+        - "Conditional SQL execution (use Python if/else + spark.sql())"  
+
+  catalog:
+    operations:
+      - normalized: "spark.read.table"
+        target: "spark.sql(\"SELECT * FROM {lakehouse_name}.{table}\")"
+      - normalized: "df.write.saveAsTable"
+        target: "df.write.format(\"delta\").mode(\"overwrite\").save(\"Tables/{table}\")"
+
+  enhancements:
+    - "OneLake integration for unified storage"
+    - "Fabric shortcuts for cross-lakehouse access"
+    - "Semantic model integration via sempy"
+    - "V-Order optimization for Delta tables"
+    - "Native Power BI integration"
+
+  transformations:
+    - convert_magic_commands
+    - replace_platform_utils
+    - adjust_imports
+    - convert_storage_paths
+    - convert_catalog_operations
+    - convert_parameters
+    - convert_secrets
+
+  output:
+    format: ipynb

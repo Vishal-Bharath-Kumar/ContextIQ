@@ -1,0 +1,142 @@
+adapter:
+  name: step_functions
+  type: target
+  platform: AWS
+  description: >
+    AWS Step Functions target adapter.
+    Generates Amazon States Language (ASL) JSON from the normalized workflow schema.
+
+  output_format:
+    type: "json"
+    extension: ".json"
+
+  generation:
+    structure: |
+      {
+        "Comment": "{workflow_name} — converted by PropelIQ Adapter Engine",
+        "StartAt": "{first_task_id}",
+        "States": {}
+      }
+
+    task_generation:
+      state_structure: |
+        "{task_id}": {
+          "Type": "{state_type}",
+          "Resource": "{resource_arn}",
+          "Parameters": {},
+          "Next": "{next_task_id}",
+          "End": true,
+          "TimeoutSeconds": {timeout},
+          "Retry": [],
+          "Catch": []
+        }
+
+      type_mapping:
+        notebook:
+          state_type: "Task"
+          resource_pattern: "arn:aws:states:::glue:startJobRun.sync"
+          parameters:
+            JobName: "{task_id}"
+            Arguments: "{parameters_with_dash_prefix}"
+        spark_job:
+          state_type: "Task"
+          resource_pattern: "arn:aws:states:::glue:startJobRun.sync"
+          parameters:
+            JobName: "{task_id}"
+            Arguments: "{parameters_with_dash_prefix}"
+        data_copy:
+          state_type: "Task"
+          resource_pattern: "arn:aws:states:::glue:startJobRun.sync"
+          note: "Data copy mapped to a Glue job that performs the copy"
+        sub_pipeline:
+          state_type: "Task"
+          resource_pattern: "arn:aws:states:::states:startExecution.sync:2"
+          parameters:
+            StateMachineArn: "{sub_state_machine_arn}"
+            Input: "{parameters}"
+        sql_task:
+          state_type: "Task"
+          resource_pattern: "arn:aws:states:::athena:startQueryExecution.sync"
+          parameters:
+            QueryString: "{config.query}"
+        parallel_group:
+          state_type: "Parallel"
+          handling: |
+            Convert to Parallel state with Branches array.
+            Each branch is a mini state machine with its own StartAt/States.
+        conditional_branch:
+          state_type: "Choice"
+          handling: |
+            Map conditions to Choice rules:
+            {
+              "Variable": "$.status",
+              "StringEquals": "value",
+              "Next": "{target_state}"
+            }
+        delay:
+          state_type: "Wait"
+          parameters:
+            Seconds: "{delay_seconds}"
+        error_handler:
+          state_type: "Fail"
+          parameters:
+            Error: "{error_code}"
+            Cause: "{error_message}"
+
+    state_ordering: |
+      1. Determine execution order from dependency graph (topological sort)
+      2. First task in order = StartAt
+      3. Each state's Next = next task in topological order
+      4. Last state has "End": true (no Next)
+      5. For parallel/branching: use Parallel/Choice states
+
+  dependencies:
+    generation: |
+      Step Functions uses Next pointers, not dependency arrays.
+      Convert normalized dependencies to sequential state chain:
+        IF task has single successor → set Next
+        IF task has multiple successors → use Choice or Parallel
+        IF task has no successor → set End: true
+      
+      Retry mapping:
+        FOR each normalized retry:
+        {
+          "ErrorEquals": ["States.ALL"],
+          "IntervalSeconds": 30,
+          "MaxAttempts": {retry_count},
+          "BackoffRate": 2.0
+        }
+
+  triggers:
+    generation: |
+      Step Functions triggers are external EventBridge rules.
+      Generate companion EventBridge rule JSON:
+      {
+        "Name": "{workflow_name}_schedule",
+        "ScheduleExpression": "cron({normalized_cron})",
+        "Targets": [{
+          "Arn": "{state_machine_arn}",
+          "Id": "{workflow_name}_target"
+        }]
+      }
+      Note: EventBridge cron uses 6 fields: min hour dom month dow year
+
+  parameters:
+    generation: |
+      Step Functions receives input via execution input JSON.
+      Parameters are passed to states via Parameters field with JsonPath:
+      {
+        "ParamName.$": "$.param_name"
+      }
+
+  timeout:
+    generation: |
+      Use TimeoutSeconds directly from normalized format (already in seconds).
+      Also generate HeartbeatSeconds = timeout / 4 (health check).
+
+  compute:
+    generation: |
+      Step Functions delegates compute to target services.
+      For Glue jobs: WorkerType and NumberOfWorkers in Glue job definition.
+      For Lambda: MemorySize in Lambda function config.
+      Compute is NOT in the state machine JSON.

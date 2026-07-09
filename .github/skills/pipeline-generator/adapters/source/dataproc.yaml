@@ -1,0 +1,175 @@
+adapter:
+  name: dataproc
+  type: source
+  platform: GCP
+  description: >
+    Google Cloud Dataproc / Cloud Composer (Airflow) source adapter.
+    Parses Cloud Composer Airflow DAG Python files or Dataproc workflow template YAML/JSON
+    and extracts tasks, dependencies, schedules, and compute specs into the normalized
+    workflow schema. Supports both DAG-based orchestration and Dataproc Workflow Templates.
+
+  detection:
+    file_formats: [".py", ".yaml", ".yml", ".json"]
+    indicators:
+      - "from airflow"
+      - "DataprocSubmitJobOperator"
+      - "DataprocCreateClusterOperator"
+      - "BigQueryInsertJobOperator"
+      - "google.cloud.dataproc"
+      - "with DAG("
+      - "dag_id="
+      - "schedule_interval="
+      - '"kind": "WorkflowTemplate"'
+      - '"placement"'
+      - '"pyspark_job"'
+      - "gs://"
+    structural_markers:
+      python_dag:
+        indicators: ["from airflow", "with DAG(", "dag_id="]
+        format: "python"
+      workflow_template:
+        indicators: ['"kind": "WorkflowTemplate"', "placement:", "jobs:"]
+        format: "yaml_or_json"
+
+  parsing:
+    python_dag:
+      workflow_name: "dag_id= value in DAG() constructor"
+      tasks_path: "Operator instantiations within the DAG context manager"
+      schedule: "schedule_interval= value in DAG() constructor"
+
+      task_extraction:
+        task_id: "task_id= parameter in each operator"
+        task_type_field: "Operator class name"
+        depends_on_field: "set_upstream() / set_downstream() calls OR >> / << operators"
+        parameters_field: "Operator-specific keyword arguments"
+        timeout_field: "execution_timeout= parameter"
+        retry_field: "retries= in default_args or operator"
+
+    workflow_template:
+      workflow_name: "$.metadata.name OR $.name"
+      tasks_path: "$.jobs"
+      schedule: "not embedded — external Cloud Scheduler"
+
+      task_extraction:
+        task_id: "$.jobs[*].stepId"
+        task_type_field: "$.jobs[*] key (pysparkJob, sparkJob, hiveJob, etc.)"
+        depends_on_field: "$.jobs[*].prerequisiteStepIds"
+        parameters_field: "$.jobs[*].*.args OR $.jobs[*].*.properties"
+
+    type_mapping:
+      DataprocSubmitJobOperator:
+        normalized_type: "spark_job"
+        config_keys:
+          project_id: "project_id"
+          region: "region"
+          cluster_name: "job.placement.cluster_name"
+          entry_point: "job.pyspark_job.main_python_file_uri"
+          arguments: "job.pyspark_job.args"
+      BigQueryInsertJobOperator:
+        normalized_type: "sql_task"
+        config_keys:
+          query: "configuration.query.query"
+          project_id: "project_id"
+      DataprocCreateClusterOperator:
+        normalized_type: "cluster_provision"
+        config_keys:
+          cluster_name: "cluster_name"
+          project_id: "project_id"
+          region: "region"
+      DataprocDeleteClusterOperator:
+        normalized_type: "cluster_teardown"
+        config_keys:
+          cluster_name: "cluster_name"
+      TriggerDagRunOperator:
+        normalized_type: "sub_pipeline"
+        config_keys:
+          trigger_dag_id: "trigger_dag_id"
+          conf: "conf"
+      BranchPythonOperator:
+        normalized_type: "conditional_branch"
+        config_keys:
+          python_callable: "python_callable"
+      PythonOperator:
+        normalized_type: "task_dispatch"
+        config_keys:
+          python_callable: "python_callable"
+          op_kwargs: "op_kwargs"
+      pysparkJob:
+        normalized_type: "spark_job"
+        config_keys:
+          entry_point: "mainPythonFileUri"
+          arguments: "args"
+          jar_file_uris: "jarFileUris"
+      hiveJob:
+        normalized_type: "sql_task"
+        config_keys:
+          query: "queryList.queries[0]"
+          script_uri: "queryFileUri"
+
+  dependencies:
+    extraction_method: "dual_source"
+    sources:
+      python_dag: |
+        Parse set_upstream() / set_downstream() calls and >> / << bitshift operators.
+        Build adjacency list from all dependency declarations in the DAG file.
+      workflow_template: |
+        Extract prerequisiteStepIds arrays from each job definition.
+        Each stepId in prerequisiteStepIds is a direct predecessor.
+    condition_mapping:
+      default: "success"
+      TriggerRule.ONE_FAILED: "failure"
+      TriggerRule.ALL_DONE: "completed"
+
+  triggers:
+    extraction: |
+      Airflow DAG schedule is defined in the DAG() constructor:
+        schedule_interval="0 10 * * *"  → standard cron
+        schedule_interval="@daily"      → Airflow preset
+        schedule_interval=None          → manual trigger only
+      Cloud Composer also supports Cloud Scheduler for external triggers.
+    schedule_format: "airflow_cron"
+    fields:
+      schedule_interval: "schedule_interval= in DAG() constructor"
+    cron_format: |
+      Airflow cron: 5 fields — minute hour day-of-month month day-of-week
+      Example: "0 10 * * *" = daily at 10:00 UTC
+      Presets: @daily, @hourly, @weekly, @monthly → convert to equivalent cron
+
+  parameters:
+    format: "python_kwargs_or_args_list"
+    structure: |
+      Airflow parameters are passed as:
+        - op_kwargs dict in PythonOperator
+        - args list in DataprocSubmitJobOperator job.pyspark_job.args
+        - conf dict in TriggerDagRunOperator
+        - dag_run.conf for runtime parameters
+    normalization: |
+      Convert args list to flat key-value pairs:
+        ["--param_name", "value"] → {"param_name": "value"}
+      Convert op_kwargs dict directly to normalized flat key-value.
+
+  timeout:
+    format: "timedelta_or_seconds"
+    parsing: |
+      Airflow uses timedelta for execution_timeout:
+        timedelta(seconds=3600) → 3600 seconds
+        timedelta(hours=1) → 3600 seconds
+      Workflow templates use seconds directly in timeout fields.
+      Convert all to seconds for normalized format.
+
+  compute:
+    extraction: |
+      Dataproc cluster specs are defined in DataprocCreateClusterOperator or cluster_config:
+        master_config.machine_type_uri → master machine type
+        worker_config.machine_type_uri → worker machine type
+        worker_config.num_instances → num_workers
+        software_config.image_version → dataproc image version
+      Map machine types to compute tiers:
+    machine_type_to_tier:
+      "n1-standard-4":  { tier: "small",  vcpu: 4,  memory_gb: 15 }
+      "n1-standard-8":  { tier: "medium", vcpu: 8,  memory_gb: 30 }
+      "n1-standard-16": { tier: "large",  vcpu: 16, memory_gb: 60 }
+      "n1-standard-32": { tier: "xlarge", vcpu: 32, memory_gb: 120 }
+      "n1-highmem-4":   { tier: "small",  vcpu: 4,  memory_gb: 26 }
+      "n1-highmem-8":   { tier: "medium", vcpu: 8,  memory_gb: 52 }
+      "n1-highmem-16":  { tier: "large",  vcpu: 16, memory_gb: 104 }

@@ -1,0 +1,57 @@
+# Databricks Asset Bundle (DAB) Template
+# All ${...} values are resolved from source workflow input
+
+resources:
+  jobs:
+    ${source.workflow_name | sanitize_key}:
+      name: ${source.workflow_name}
+      email_notifications:
+        on_failure: []                                    # Enhancement: Alerts — populate with ${config.alert_email}
+        # on_start: []                                    # Enhancement: Alerts — uncomment if needed
+        # on_success: []                                  # Enhancement: Alerts — uncomment if needed
+      # webhook_notifications:                            # Enhancement: Alerts — uncomment if webhook available
+      #   on_failure:
+      #     - id: ${config.webhook_id}
+      timeout_seconds: ${derived.job_level_timeout}
+      max_concurrent_runs: ${source.max_concurrent_runs | default: 1}
+      tasks:
+        # Repeat for each task/activity in source workflow
+        - task_key: ${source.task_name | sanitize_key}
+          notebook_task:
+            notebook_path: ${policy.workspace_notebook_root}/${source.task_name}${policy.notebook_suffix}
+            base_parameters:
+              ${source.param_key}: ${source.param_value}
+          job_cluster_key: job_cluster_${derived.cluster_tier}
+          timeout_seconds: ${derived.policy_validated_timeout}
+          max_retries: ${source.max_retries | default: 0}
+          # min_retry_interval_millis: 60000              # Enhancement: Retry — add backoff interval
+          depends_on:
+            - task_key: ${source.dependency_task | sanitize_key}
+      job_clusters:
+        - job_cluster_key: job_cluster_${derived.cluster_tier}
+          new_cluster:
+            # policy_id: ${config.cluster_policy_id}      # Enhancement: Cluster Policies — attach governance policy
+            spark_version: ${derived.spark_runtime}
+            node_type_id: ${derived.node_type_id}
+            num_workers: ${source.num_workers}
+            # autoscale:                                   # Enhancement: Autoscaling — replaces num_workers
+            #   min_workers: ${derived.min_workers}
+            #   max_workers: ${derived.max_workers}
+      schedule:
+        quartz_cron_expression: ${derived.cron_expression}
+        timezone_id: ${source.timezone | default: "UTC"}
+      tags:
+        environment: production
+        source_platform: ${source.platform}
+        converted: "true"
+        # owner: ${config.owner}                          # Enhancement: Job Tags — cost tracking
+        # team: ${config.team}                            # Enhancement: Job Tags — ownership
+        # cost_center: ${config.cost_center}              # Enhancement: Job Tags — billing
+        # project: ${config.project}                      # Enhancement: Job Tags — project allocation
+
+# Placeholder resolution:
+# ${source.*}  — Read directly from input workflow JSON/YAML
+# ${derived.*} — Computed by converter (compute mapping, timeout, cron)
+# ${policy.*}  — Governance constraints (timeout caps, notebook root)
+# | sanitize_key — Lowercase, replace spaces/special chars with underscores
+# | default: value — Fallback if source field absent

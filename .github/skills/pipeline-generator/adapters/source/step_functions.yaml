@@ -1,0 +1,143 @@
+adapter:
+  name: step_functions
+  type: source
+  platform: AWS
+  description: >
+    AWS Step Functions source adapter.
+    Parses Step Functions state machine JSON (Amazon States Language) and extracts
+    states, transitions, parallel branches, and error handling into the normalized workflow schema.
+
+  detection:
+    file_formats: [".json"]
+    indicators:
+      - '"StartAt"'
+      - '"States"'
+      - '"Type": "Task"'
+      - '"Type": "Parallel"'
+      - '"Type": "Choice"'
+      - '"Type": "Wait"'
+      - '"Resource"'
+      - '"arn:aws:states"'
+      - '"Next"'
+      - '"End"'
+    structural_markers:
+      root_keys: ["StartAt", "States"]
+      nested_keys: ["States.*.Type", "States.*.Next"]
+
+  parsing:
+    workflow_name: "$.Comment OR derived from filename"
+    tasks_path: "$.States"
+    start_state: "$.StartAt"
+
+    task_extraction:
+      task_id: "state_key (object key name in States)"
+      task_type_field: "$.States.*.Type"
+      task_config: "$.States.*"
+      next_state_field: "$.States.*.Next"
+      end_field: "$.States.*.End"
+      parameters_field: "$.States.*.Parameters"
+      timeout_field: "$.States.*.TimeoutSeconds"
+      retry_field: "$.States.*.Retry"
+      catch_field: "$.States.*.Catch"
+
+    type_mapping:
+      Task:
+        normalized_type: "task_dispatch"
+        config_keys:
+          resource_arn: "Resource"
+          parameters: "Parameters"
+          result_path: "ResultPath"
+          result_selector: "ResultSelector"
+        sub_types:
+          "arn:aws:lambda": "lambda_function"
+          "arn:aws:glue": "spark_job"
+          "arn:aws:ecs": "container_task"
+          "arn:aws:sagemaker": "ml_task"
+          "arn:aws:databrew": "data_quality"
+      Parallel:
+        normalized_type: "parallel_group"
+        config_keys:
+          branches: "Branches"
+        handling: |
+          Each branch is a sub-state-machine with its own StartAt and States.
+          Flatten all branch tasks, mark them as parallel: true in normalized output.
+      Choice:
+        normalized_type: "conditional_branch"
+        config_keys:
+          choices: "Choices"
+          default: "Default"
+        handling: |
+          Each choice has a condition (Variable + comparison) and a Next.
+          Map to conditional dependencies in normalized output.
+      Wait:
+        normalized_type: "delay"
+        config_keys:
+          seconds: "Seconds"
+          timestamp: "Timestamp"
+      Map:
+        normalized_type: "for_each"
+        config_keys:
+          items_path: "ItemsPath"
+          iterator: "Iterator"
+          max_concurrency: "MaxConcurrency"
+      Pass:
+        normalized_type: "passthrough"
+        config_keys:
+          result: "Result"
+      Succeed:
+        normalized_type: "end_marker"
+      Fail:
+        normalized_type: "error_handler"
+        config_keys:
+          error: "Error"
+          cause: "Cause"
+
+  dependencies:
+    extraction_method: "state_machine_traversal"
+    traversal_rules: |
+      1. Start from StartAt state
+      2. Follow Next pointers to build linear chain
+      3. For Parallel states: each Branch is independent (parallel: true)
+      4. For Choice states: each Choice.Next is a conditional branch
+      5. End is marked by "End": true or terminal states (Succeed, Fail)
+      6. Build dependency graph: each state depends on its predecessor(s)
+    condition_mapping:
+      Next: "success"
+      Catch: "failure"
+      Default: "default"
+
+  triggers:
+    extraction: |
+      Step Functions triggers are external:
+      - EventBridge rules
+      - API Gateway invocations
+      - Direct SDK calls
+      Triggers are NOT embedded in the state machine JSON.
+    schedule_format: "eventbridge_cron"
+    note: |
+      If EventBridge rule is provided separately, extract:
+      ScheduleExpression: "cron(0 10 * * ? *)" or "rate(1 day)"
+
+  parameters:
+    format: "json_path_interpolation"
+    structure: |
+      Step Functions uses JsonPath references in Parameters:
+      {
+        "ParamName.$": "$.input.field"
+      }
+      The .$ suffix indicates a JsonPath reference.
+    normalization: |
+      Strip ".$ " suffix and JsonPath references.
+      Convert to flat key-value for normalized format.
+
+  timeout:
+    format: "seconds"
+    parsing: |
+      TimeoutSeconds is directly in seconds.
+      HeartbeatSeconds is the health check interval (separate from timeout).
+
+  compute:
+    extraction: |
+      Step Functions does not define compute directly.
+      Compute is defined on the target service (Lambda memory, ECS task def, Glue worker type).
+      Extract Resource ARN for compute inference.

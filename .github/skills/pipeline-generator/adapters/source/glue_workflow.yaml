@@ -1,0 +1,128 @@
+adapter:
+  name: glue_workflow
+  type: source
+  platform: AWS
+  description: >
+    AWS Glue Workflow source adapter.
+    Parses Glue Workflow JSON and extracts jobs, triggers, dependencies, and arguments
+    into the normalized workflow schema.
+
+  detection:
+    file_formats: [".json"]
+    indicators:
+      - '"Actions"'
+      - '"Triggers"'
+      - '"Name"'
+      - '"JobName"'
+      - '"Arguments"'
+      - '"Type": "SCHEDULED"'
+      - '"Type": "CONDITIONAL"'
+      - '"--'
+    structural_markers:
+      root_keys: ["Name", "Actions"]
+      nested_keys: ["Actions[].JobName", "Triggers[].Type"]
+
+  parsing:
+    workflow_name: "$.Name"
+    tasks_path: "$.Actions"
+    triggers_path: "$.Triggers"
+
+    task_extraction:
+      task_id: "$.Actions[*].JobName"
+      task_type_field: "inferred_as_glue_job"
+      task_config: "$.Actions[*]"
+      parameters_field: "$.Actions[*].Arguments"
+      timeout_field: "$.Actions[*].Timeout"
+
+    type_mapping:
+      glue_job:
+        normalized_type: "spark_job"
+        config_keys:
+          job_name: "JobName"
+          arguments: "Arguments"
+      glue_crawler:
+        normalized_type: "crawler"
+        config_keys:
+          crawler_name: "CrawlerName"
+
+  dependencies:
+    extraction_method: "dual_source"
+    sources:
+      graph_edges: |
+        Glue Workflow Graph.Edges: array of {SourceId, DestinationId}
+        Resolve node IDs to job names via Graph.Nodes lookup.
+      conditional_triggers: |
+        Triggers with Type=CONDITIONAL contain predicate conditions
+        referencing upstream job names.
+        Extract job names from Conditions[].JobName or predicate string.
+    merge_rule: |
+      UNION edges from Graph.Edges AND CONDITIONAL triggers.
+      DEDUPLICATE by (source_task, target_task) pair.
+    condition_mapping:
+      SUCCEEDED: "success"
+      FAILED: "failure"
+      STOPPED: "completed"
+
+  triggers:
+    extraction: |
+      Glue triggers are inline in the workflow JSON.
+      Types: SCHEDULED, CONDITIONAL, ON_DEMAND
+    schedule_format: "cron"
+    fields:
+      type: "$.Triggers[*].Type"
+      schedule: "$.Triggers[*].Schedule"
+      cron: "$.Triggers[*].Schedule"
+    cron_format: |
+      Glue cron: 6 fields — minute hour day-of-month month day-of-week year
+      Example: "cron(0 10 * * ? *)" = daily at 10:00 UTC
+
+  parameters:
+    format: "double_dash_prefix"
+    structure: |
+      {
+        "--param_name": "value"
+      }
+    normalization: |
+      Strip leading "--" from keys when converting to normalized format.
+      Add "--" prefix when converting FROM normalized format.
+
+  timeout:
+    format: "minutes"
+    parsing: |
+      Glue uses minutes directly.
+      Convert: minutes × 60 = seconds for normalized format.
+
+  compute:
+    extraction:
+      worker_type_field: "WorkerType"
+      num_workers_field: "NumberOfWorkers"
+      glue_version_field: "GlueVersion"
+    worker_types:
+      "Standard":
+        vcpu: 4
+        memory_gb: 16
+        tier: "small"
+      "G.1X":
+        vcpu: 4
+        memory_gb: 16
+        tier: "small"
+      "G.2X":
+        vcpu: 8
+        memory_gb: 32
+        tier: "medium"
+      "G.4X":
+        vcpu: 16
+        memory_gb: 64
+        tier: "large"
+      "G.8X":
+        vcpu: 32
+        memory_gb: 128
+        tier: "xlarge"
+      "Z.2X":
+        vcpu: 8
+        memory_gb: 64
+        tier: "medium"
+    glue_version_to_spark:
+      "2.0": "2.4"
+      "3.0": "3.1"
+      "4.0": "3.3"

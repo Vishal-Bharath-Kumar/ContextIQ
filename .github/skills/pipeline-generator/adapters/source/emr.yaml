@@ -1,0 +1,155 @@
+adapter:
+  name: emr
+  type: source
+  platform: AWS
+  description: >
+    AWS EMR (Elastic MapReduce) source adapter.
+    Parses EMR Step Functions state machine JSON (Amazon States Language) orchestrating
+    EMR Serverless or EMR on EC2 job runs. Extracts states, transitions, compute specs,
+    and EventBridge trigger schedules into the normalized workflow schema.
+
+  detection:
+    file_formats: [".json"]
+    indicators:
+      - '"StartAt"'
+      - '"States"'
+      - '"arn:aws:states:::emr-serverless"'
+      - '"arn:aws:states:::emr:addStep"'
+      - '"emr-serverless:startJobRun"'
+      - '"ApplicationId"'
+      - '"ExecutionRoleArn"'
+      - '"SparkSubmit"'
+      - '"EntryPoint"'
+      - '"emr"'
+    structural_markers:
+      root_keys: ["StartAt", "States"]
+      nested_keys: ["States.*.Resource", "States.*.Parameters.ApplicationId"]
+    priority_note: >
+      EMR state machines are distinguished from generic Step Functions by the presence
+      of EMR-specific resource ARNs (arn:aws:states:::emr-serverless or arn:aws:states:::emr).
+      If no EMR ARN is found, route to the step_functions source adapter instead.
+
+  parsing:
+    workflow_name: "$.Comment OR derived from filename"
+    tasks_path: "$.States"
+    start_state: "$.StartAt"
+
+    task_extraction:
+      task_id: "state_key (object key name in States)"
+      task_type_field: "$.States.*.Type"
+      task_config: "$.States.*"
+      next_state_field: "$.States.*.Next"
+      end_field: "$.States.*.End"
+      parameters_field: "$.States.*.Parameters"
+      timeout_field: "$.States.*.TimeoutSeconds"
+      retry_field: "$.States.*.Retry[0].MaxAttempts"
+
+    type_mapping:
+      emr_serverless_job:
+        normalized_type: "spark_job"
+        detection: "Resource contains 'emr-serverless:startJobRun'"
+        config_keys:
+          application_id: "Parameters.ApplicationId"
+          execution_role: "Parameters.ExecutionRoleArn"
+          entry_point: "Parameters.JobDriver.SparkSubmit.EntryPoint"
+          arguments: "Parameters.JobDriver.SparkSubmit.EntryPointArguments"
+          spark_params: "Parameters.JobDriver.SparkSubmit.SparkSubmitParameters"
+      emr_ec2_step:
+        normalized_type: "spark_job"
+        detection: "Resource contains 'emr:addStep'"
+        config_keys:
+          cluster_id: "Parameters.ClusterId"
+          step_name: "Parameters.Step.Name"
+          jar_path: "Parameters.Step.HadoopJarStep.Jar"
+          arguments: "Parameters.Step.HadoopJarStep.Args"
+      athena_query:
+        normalized_type: "sql_task"
+        detection: "Resource contains 'athena:startQueryExecution'"
+        config_keys:
+          query: "Parameters.QueryString"
+          workgroup: "Parameters.WorkGroup"
+          output_location: "Parameters.ResultConfiguration.OutputLocation"
+      sub_state_machine:
+        normalized_type: "sub_pipeline"
+        detection: "Resource contains 'states:startExecution'"
+        config_keys:
+          state_machine_arn: "Parameters.StateMachineArn"
+          input: "Parameters.Input"
+      parallel_state:
+        normalized_type: "parallel_group"
+        detection: "Type == 'Parallel'"
+        config_keys:
+          branches: "Branches"
+      choice_state:
+        normalized_type: "conditional_branch"
+        detection: "Type == 'Choice'"
+        config_keys:
+          choices: "Choices"
+          default: "Default"
+      wait_state:
+        normalized_type: "delay"
+        detection: "Type == 'Wait'"
+        config_keys:
+          seconds: "Seconds"
+
+  dependencies:
+    extraction_method: "state_machine_traversal"
+    traversal_rules: |
+      1. Start from StartAt state
+      2. Follow Next pointers to build linear execution chain
+      3. For Parallel states: each Branch is independent (parallel: true)
+      4. For Choice states: each Choice.Next is a conditional branch
+      5. End is marked by "End": true or terminal states (Succeed, Fail)
+      6. Build dependency graph: each state depends on its predecessor(s)
+    condition_mapping:
+      Next: "success"
+      Catch: "failure"
+      Default: "default"
+
+  triggers:
+    extraction: |
+      EMR Step Functions triggers are external EventBridge rules (not embedded in state machine JSON).
+      If a companion EventBridge rule JSON is provided, extract:
+        ScheduleExpression: "cron(0 10 * * ? *)" or "rate(1 day)"
+      If no EventBridge rule is found, treat as manual trigger.
+    schedule_format: "eventbridge_cron"
+    fields:
+      schedule_expression: "$.ScheduleExpression"
+      state: "$.State"
+    cron_format: |
+      EventBridge cron: 6 fields — minute hour day-of-month month day-of-week year
+      Example: "cron(0 10 * * ? *)" = daily at 10:00 UTC
+      Rate expression: "rate(1 day)" = every 24 hours
+
+  parameters:
+    format: "json_path_or_flat"
+    structure: |
+      EMR Serverless receives parameters as EntryPointArguments list:
+      ["--param_name", "value"]
+      Or as SparkSubmitParameters string:
+      "--conf spark.executor.cores=4 --conf spark.executor.memory=8g"
+    normalization: |
+      Convert EntryPointArguments list to flat key-value pairs:
+        ["--param_name", "value"] → {"param_name": "value"}
+      Strip "--" prefix from keys.
+
+  timeout:
+    format: "seconds"
+    parsing: |
+      TimeoutSeconds is directly in seconds.
+      HeartbeatSeconds is the health check interval (separate from timeout — ignore for normalization).
+
+  compute:
+    extraction: |
+      EMR Serverless compute is defined in Parameters.ConfigurationOverrides or application config.
+      Extract from SparkSubmitParameters if present:
+        --conf spark.executor.cores → executor_vcpu
+        --conf spark.executor.memory → executor_memory
+        --conf spark.executor.instances → num_workers
+      If not present, infer tier from application type:
+        Default tier: "medium"
+    worker_specs:
+      small:   { vcpu: 4,  memory_gb: 16 }
+      medium:  { vcpu: 8,  memory_gb: 32 }
+      large:   { vcpu: 16, memory_gb: 64 }
+      xlarge:  { vcpu: 32, memory_gb: 128 }

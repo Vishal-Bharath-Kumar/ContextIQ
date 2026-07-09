@@ -1,0 +1,156 @@
+adapter:
+  name: adf
+  type: target
+  platform: Azure
+  description: >
+    Azure Data Factory / Synapse Pipeline target adapter.
+    Generates ADF Pipeline JSON from the normalized workflow schema.
+
+  output_format:
+    type: "json"
+    extension: ".json"
+    template_ref: "templates/adf.json"
+
+  generation:
+    structure: |
+      {
+        "name": "{workflow_name}",
+        "properties": {
+          "activities": [],
+          "parameters": {},
+          "annotations": [],
+          "lastPublishTime": "{timestamp}"
+        }
+      }
+
+    task_generation:
+      task_structure: |
+        {
+          "name": "{task_id}",
+          "type": "{adf_activity_type}",
+          "dependsOn": [],
+          "policy": {
+            "timeout": "{timeout_iso}",
+            "retry": {retry_count},
+            "retryIntervalInSeconds": 30
+          },
+          "typeProperties": {}
+        }
+
+      type_mapping:
+        notebook:
+          adf_type: "DatabricksNotebook"
+          type_properties:
+            notebookPath: "{config.notebook_path}"
+            baseParameters: "{parameters}"
+          linked_service: "AzureDatabricks"
+        spark_job:
+          adf_type: "DatabricksSparkPython"
+          type_properties:
+            pythonFile: "{config.main_file}"
+            parameters: "{parameters}"
+          linked_service: "AzureDatabricks"
+        data_copy:
+          adf_type: "Copy"
+          type_properties:
+            source: "{config.source}"
+            sink: "{config.sink}"
+        sub_pipeline:
+          adf_type: "ExecutePipeline"
+          type_properties:
+            pipeline:
+              referenceName: "{config.pipeline_ref}"
+              type: "PipelineReference"
+            parameters: "{parameters}"
+        sql_task:
+          adf_type: "SqlServerStoredProcedure"
+          type_properties:
+            storedProcedureName: "{config.procedure}"
+            storedProcedureParameters: "{parameters}"
+        http_task:
+          adf_type: "WebActivity"
+          type_properties:
+            url: "{config.url}"
+            method: "{config.method}"
+        lookup:
+          adf_type: "Lookup"
+          type_properties:
+            source: "{config.source}"
+        parallel_group:
+          handling: |
+            ADF does not have a native parallel container.
+            Flatten parallel tasks as independent activities with shared upstream dependsOn.
+        conditional_branch:
+          adf_type: "IfCondition"
+          type_properties:
+            expression: "{condition}"
+            ifTrueActivities: []
+            ifFalseActivities: []
+
+  dependencies:
+    generation: |
+      FOR each normalized dependency:
+        ADD to activity.dependsOn array:
+        {
+          "activity": "{source_task_id}",
+          "dependencyConditions": ["{condition_mapped}"]
+        }
+      Condition mapping:
+        success → "Succeeded"
+        failure → "Failed"
+        completed → "Completed"
+        skipped → "Skipped"
+
+  triggers:
+    generation:
+      schedule_structure: |
+        {
+          "name": "{trigger_name}",
+          "properties": {
+            "type": "ScheduleTrigger",
+            "typeProperties": {
+              "recurrence": {
+                "frequency": "{frequency}",
+                "interval": {interval},
+                "startTime": "{start_time}",
+                "timeZone": "{timezone}",
+                "schedule": {
+                  "hours": [{hours}],
+                  "minutes": [{minutes}]
+                }
+              }
+            }
+          }
+        }
+      conversion_rules: |
+        FROM normalized trigger:
+          IF type == "cron":
+            Parse cron fields → map to ADF recurrence (frequency, interval, schedule)
+          IF type == "event":
+            Generate BlobEventsTrigger or CustomEventsTrigger
+          IF type == "manual":
+            No trigger generated (manual execution)
+
+  parameters:
+    generation: |
+      Convert normalized parameters to ADF typed format:
+      {
+        "param_name": {
+          "type": "String",
+          "defaultValue": "value"
+        }
+      }
+      Place under properties.parameters.
+
+  timeout:
+    generation: |
+      Convert seconds → ISO 8601 duration:
+        3600s → "01:00:00"
+        86400s → "1.00:00:00"
+      Format: "[days.]HH:MM:SS"
+
+  compute:
+    generation: |
+      ADF uses linked services for compute.
+      Generate linkedServiceName reference for Databricks/HDInsight activities.
+      Compute details are in the linked service, not the pipeline JSON.

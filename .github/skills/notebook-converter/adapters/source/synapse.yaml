@@ -1,0 +1,100 @@
+adapter:
+  name: synapse
+  type: source
+  platform: Azure
+  description: >
+    Azure Synapse Analytics source adapter. Reads data from ADLS Gen2,
+    Synapse SQL pools, and Spark tables via mssparkutils.
+
+  detection:
+    indicators:
+      - "mssparkutils"
+      - "abfss://"
+      - "synapse"
+      - "com.microsoft.azure"
+      - "TokenLibrary"
+      - "linkedService"
+      - "mssparkutils.fs"
+      - "mssparkutils.credentials"
+      - "spark.read.synapsesql"
+    file_patterns:
+      - "*.ipynb"
+      - "*.py"
+      - "*.sql"
+    storage_prefix: "abfss://"
+
+  read:
+    mode: full
+    include_cells: true
+    include_metadata: true
+
+  rules:
+    - do_not_detect_source
+    - read_complete_notebook
+
+  connection:
+    parameters:
+      - name: storage_account
+        type: string
+        description: "ADLS Gen2 storage account name"
+      - name: container
+        type: string
+        description: "ADLS Gen2 container name"
+      - name: linked_service
+        type: string
+        description: "Synapse linked service name"
+      - name: sql_pool
+        type: string
+        description: "Dedicated or serverless SQL pool name"
+      - name: database
+        type: string
+        description: "Synapse database name"
+
+  read_logic:
+    spark:
+      initialization: |
+        # Spark session pre-initialized by Synapse runtime
+      catalog_read: |
+        df = spark.read.synapsesql("{database}.{schema}.{table}")
+      path_read: |
+        df = spark.read.parquet("abfss://{container}@{storage_account}.dfs.core.windows.net/{path}")
+      finalization: |
+        # No explicit finalization required
+    sql:
+      read: |
+        SELECT * FROM {database}.{schema}.{table}
+
+  parameters:
+    extraction: |
+      value = mssparkutils.env.getJobId()
+      # or notebook parameters via widget-style input
+    format: "mssparkutils"
+
+  secrets:
+    method: "mssparkutils_credentials"
+    read: |
+      value = mssparkutils.credentials.getSecret("{vault_url}", "{secret_name}", "{linked_service}")
+
+  imports:
+    remove:
+      - "from notebookutils import mssparkutils"
+    keep:
+      - "pyspark.*"
+      - "datetime"
+      - "uuid"
+      - "re"
+      - "delta.*"
+      - "pandas"
+      - "numpy"
+      - "com.microsoft.spark.sqlanalytics.*"
+
+  catalog:
+    operations:
+      - source: "spark.read.synapsesql"
+        normalized: "spark.read.table"
+      - source: "df.write.synapsesql"
+        normalized: "df.write.saveAsTable"
+
+  storage:
+    prefix: "abfss://"
+    path_format: "abfss://{container}@{storage_account}.dfs.core.windows.net/{path}"

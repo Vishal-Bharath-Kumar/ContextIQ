@@ -1,0 +1,35 @@
+@startuml
+skinparam backgroundColor white
+skinparam defaultFontName "Segoe UI"
+skinparam defaultFontSize 13
+skinparam shadowing false
+skinparam ArrowColor #333333
+skinparam SequenceArrowThickness 2
+skinparam ParticipantBorderColor #005A9E
+skinparam ParticipantBackgroundColor #E8F0FE
+
+title Azure AD B2C — OAuth 2.0 Authorization Code Flow
+
+actor "User" as user
+participant "Angular SPA" as spa #LightBlue
+participant "Azure AD B2C" as b2c #LightGreen
+participant ".NET API\n(App Service)" as api #LightYellow
+database "Azure SQL" as db #LightGray
+
+user -> spa : Click Login
+spa -> b2c : Redirect to /authorize\n(PKCE + client_id)
+b2c -> user : Show Login UI
+user -> b2c : Enter Credentials
+b2c -> spa : Authorization Code
+spa -> b2c : Exchange Code → Access Token\n(PKCE verifier)
+b2c --> spa : JWT Access Token + ID Token
+
+spa -> api : GET /api/data\nBearer <JWT>
+api -> b2c : Validate token\n(JWKS endpoint)
+b2c --> api : Token valid ✅
+api -> db : Query user data
+db --> api : Results
+api --> spa : 200 OK + JSON
+spa -> user : Render dashboard
+
+@enduml

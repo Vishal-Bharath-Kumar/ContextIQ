@@ -1,0 +1,145 @@
+adapter:
+  name: fabric_pipeline
+  type: target
+  platform: Azure
+  description: >
+    Microsoft Fabric Pipeline target adapter.
+    Generates Fabric pipeline JSON from the normalized workflow schema.
+    Fabric pipelines are similar to ADF but run within the Fabric workspace.
+
+  output_format:
+    type: "json"
+    extension: ".json"
+
+  generation:
+    structure: |
+      {
+        "name": "{workflow_name}",
+        "objectType": "pipeline",
+        "properties": {
+          "activities": [],
+          "parameters": {},
+          "annotations": []
+        }
+      }
+
+    task_generation:
+      task_structure: |
+        {
+          "name": "{task_id}",
+          "type": "{fabric_activity_type}",
+          "dependsOn": [],
+          "policy": {
+            "timeout": "{timeout_iso}",
+            "retry": {retry_count}
+          },
+          "typeProperties": {}
+        }
+
+      type_mapping:
+        notebook:
+          fabric_type: "TridentNotebook"
+          type_properties:
+            notebookId: "{resolved_notebook_id}"
+            workspaceId: "{workspace_id}"
+            parameters: "{parameters_typed}"
+          note: "Fabric uses TridentNotebook type for Spark notebooks"
+        spark_job:
+          fabric_type: "SparkJob"
+          type_properties:
+            sparkJob:
+              referenceName: "{config.main_file}"
+              type: "SparkJobDefinitionReference"
+        data_copy:
+          fabric_type: "Copy"
+          type_properties:
+            source: "{config.source}"
+            sink: "{config.sink}"
+          note: "Fabric Copy activity supports OneLake, ADLS, Warehouse sources/sinks"
+        sub_pipeline:
+          fabric_type: "ExecutePipeline"
+          type_properties:
+            pipeline:
+              referenceName: "{config.pipeline_ref}"
+              type: "PipelineReference"
+        sql_task:
+          fabric_type: "Script"
+          type_properties:
+            scriptBlockEntries:
+              - text: "{config.query}"
+                type: "Query"
+            connection:
+              type: "Warehouse"
+              referenceName: "{warehouse_name}"
+        lookup:
+          fabric_type: "Lookup"
+          type_properties:
+            source: "{config.source}"
+        parallel_group:
+          handling: |
+            Fabric supports ForEach activity for parallel execution.
+            Alternatively, flatten parallel tasks as independent activities.
+        conditional_branch:
+          fabric_type: "IfCondition"
+          type_properties:
+            expression: "{condition}"
+            ifTrueActivities: []
+            ifFalseActivities: []
+
+  dependencies:
+    generation: |
+      Same dependency format as ADF:
+      {
+        "activity": "{source_task_id}",
+        "dependencyConditions": ["{condition_mapped}"]
+      }
+      Condition mapping:
+        success → "Succeeded"
+        failure → "Failed"
+        completed → "Completed"
+
+  triggers:
+    generation:
+      schedule_structure: |
+        {
+          "name": "{trigger_name}",
+          "properties": {
+            "type": "ScheduleTrigger",
+            "typeProperties": {
+              "recurrence": {
+                "frequency": "{frequency}",
+                "interval": {interval},
+                "startTime": "{start_time}",
+                "timeZone": "{timezone}"
+              }
+            }
+          }
+        }
+      conversion_rules: |
+        FROM normalized trigger:
+          IF type == "cron":
+            Parse cron → ADF-style recurrence
+          IF type == "event":
+            OneLake event trigger (Fabric-specific)
+          IF type == "manual":
+            No trigger generated
+
+  parameters:
+    generation: |
+      Fabric pipeline parameters follow ADF typed format:
+      {
+        "param_name": {
+          "type": "string",
+          "defaultValue": "value"
+        }
+      }
+
+  timeout:
+    generation: |
+      Convert seconds → ISO 8601 duration (same as ADF).
+
+  compute:
+    generation: |
+      Fabric automatically manages compute via Spark pools.
+      No explicit cluster definition needed in pipeline JSON.
+      Notebook activities use workspace default Spark pool.

@@ -1,0 +1,95 @@
+adapter:
+  name: synapse
+  type: target
+  platform: Azure
+  description: >
+    Azure Synapse Analytics target adapter. Writes data to ADLS Gen2,
+    Synapse SQL pools, and Spark tables via Synapse-native APIs.
+
+  runtime:
+    spark_session: "pre-initialized"
+    initialization: |
+      # Spark session pre-initialized by Synapse runtime — no manual creation needed
+    spark_config_migration: |
+      spark.conf.set("{config_key}", "{config_value}")
+
+  write_logic:
+    spark:
+      catalog_write: |
+        df.write.synapsesql("{database}.{schema}.{table}", Constants.INTERNAL)
+      path_write: |
+        df.write.mode("overwrite") \
+            .parquet("abfss://{container}@{storage_account}.dfs.core.windows.net/{path}")
+      delta_write: |
+        df.write.format("delta") \
+            .mode("overwrite") \
+            .save("abfss://{container}@{storage_account}.dfs.core.windows.net/{path}")
+    sql:
+      write: |
+        CREATE TABLE {database}.{schema}.{table}
+        WITH (
+            DISTRIBUTION = ROUND_ROBIN,
+            CLUSTERED COLUMNSTORE INDEX
+        )
+        AS SELECT * FROM temp_view;
+
+  parameters:
+    definition: |
+      # Synapse notebook parameters are defined via the pipeline parameter panel
+      # or passed at runtime via mssparkutils.notebook.run():
+      # mssparkutils.notebook.run("{notebook_name}", timeout, {"param_name": "{default_value}"})
+    extraction: |
+      value = mssparkutils.notebook.entry("{param_name}")
+      # or for job-level context:
+      # value = mssparkutils.env.getJobId()
+    format: "mssparkutils"
+
+  secrets:
+    method: "mssparkutils_credentials"
+    write: |
+      value = mssparkutils.credentials.getSecret("{vault_url}", "{secret_name}", "{linked_service}")
+
+  imports:
+    add:
+      - "from pyspark.sql import SparkSession"
+      - "from com.microsoft.spark.sqlanalytics.utils import Constants"
+    platform_specific:
+      - "mssparkutils"
+
+  storage:
+    prefix: "abfss://"
+    path_format: "abfss://{container}@{storage_account}.dfs.core.windows.net/{path}"
+
+  notebook_format:
+    type: "ipynb"
+    header_cell: |
+      # Synapse notebook
+      # Converted by PropelIQ Adapter Engine
+    metadata:
+      kernel: "synapse_pyspark"
+      language: "python"
+
+  catalog:
+    operations:
+      - normalized: "spark.read.table"
+        target: "spark.read.synapsesql(\"{database}.{schema}.{table}\")"
+      - normalized: "df.write.saveAsTable"
+        target: "df.write.synapsesql(\"{database}.{schema}.{table}\", Constants.INTERNAL)"
+
+  enhancements:
+    - "Synapse SQL pool integration"
+    - "ADLS Gen2 native access"
+    - "Linked service credential passthrough"
+    - "Serverless SQL pool for ad-hoc queries"
+
+  transformations:
+    - convert_magic_commands
+    - replace_platform_utils
+    - adjust_imports
+    - convert_storage_paths
+    - convert_catalog_operations
+    - convert_parameters
+    - convert_secrets
+
+  output:
+    format: ipynb

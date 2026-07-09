@@ -1,0 +1,165 @@
+adapter:
+  name: databricks_workflow
+  type: target
+  platform: Multi-Cloud
+  description: >
+    Databricks Workflow / DAB target adapter.
+    Generates Databricks Asset Bundle (DAB) YAML from the normalized workflow schema.
+
+  output_format:
+    type: "yaml"
+    extension: ".yaml"
+    template_ref: "templates/databricks-dab.yaml"
+
+  generation:
+    structure: |
+      resources:
+        jobs:
+          {job_key}:
+            name: "{workflow_name}"
+            tasks: []
+            job_clusters: []
+            schedule: {}
+            max_concurrent_runs: 1
+            tags: {}
+
+    dab_wrapper: |
+      The output MUST be wrapped under resources.jobs.<key> with exactly one entry.
+      The <key> is derived from the workflow name: lowercase, underscores, alphanumeric only.
+
+    task_generation:
+      task_structure: |
+        - task_key: "{task_id}"
+          job_cluster_key: "{cluster_key}"
+          notebook_task:
+            notebook_path: "{notebook_path}"
+            base_parameters: {parameters}
+          timeout_seconds: {timeout}
+          max_retries: {retries}
+          depends_on:
+            - task_key: "{dependency_task_id}"
+
+      type_mapping:
+        notebook:
+          target_key: "notebook_task"
+          fields:
+            notebook_path: "{policy.workspace_notebook_root}/{task_id}{policy.notebook_suffix}"
+            base_parameters: "{normalized_task.parameters}"
+        spark_job:
+          target_key: "spark_python_task"
+          fields:
+            python_file: "{normalized_task.config.main_file}"
+            parameters: "{normalized_task.parameters}"
+        sql_task:
+          target_key: "sql_task"
+          fields:
+            query: "{normalized_task.config.query}"
+            warehouse_id: "{warehouse_id}"
+        dlt_pipeline:
+          target_key: "pipeline_task"
+          fields:
+            pipeline_id: "{normalized_task.config.pipeline_id}"
+        data_copy:
+          target_key: "notebook_task"
+          note: "Convert data copy to a notebook task that performs the copy operation"
+        sub_pipeline:
+          target_key: "run_job_task"
+          fields:
+            job_id: "{resolved_job_id}"
+        parallel_group:
+          handling: |
+            Flatten parallel tasks into top-level tasks with no depends_on between them.
+            All parallel tasks share the same upstream dependency.
+        conditional_branch:
+          handling: |
+            Convert to condition_task with conditions mapped from choice rules.
+            Fallback: flatten all branches as independent tasks.
+
+    task_key_sanitization: |
+      1. Convert to lowercase
+      2. Replace spaces and hyphens with underscores
+      3. Remove non-alphanumeric characters (except underscores)
+      4. Truncate to 100 characters
+      5. Ensure uniqueness (append _N if duplicate)
+
+  dependencies:
+    generation: |
+      FOR each normalized dependency:
+        IF condition == "success":
+          ADD to depends_on: [{task_key: "{source_task_id}"}]
+        IF condition == "failure" or "completed":
+          ADD to depends_on with outcome field (Databricks feature)
+      Omit empty depends_on arrays (root tasks).
+
+  triggers:
+    generation:
+      schedule_structure: |
+        schedule:
+          quartz_cron_expression: "{cron_expression}"
+          timezone_id: "{timezone}"
+          pause_status: "UNPAUSED"
+      conversion_rules: |
+        FROM normalized trigger:
+          IF type == "cron":
+            Convert normalized cron → Quartz 6-field format (sec min hour dom month dow)
+            Prepend "0 " if source doesn't specify seconds
+          IF type == "event":
+            Generate file_arrival trigger (Databricks-specific)
+          IF type == "manual":
+            Omit schedule section entirely
+
+  parameters:
+    generation: |
+      Flatten normalized parameters to simple key-value:
+      {
+        "param_name": "default_value"
+      }
+      Place under notebook_task.base_parameters or spark_python_task.parameters.
+
+  timeout:
+    generation: |
+      Use timeout_seconds directly from normalized format (already in seconds).
+      Apply policy caps per layer:
+        bronze: min(timeout, policy.layer_timeout.bronze)
+        silver: min(timeout, policy.layer_timeout.silver)
+        gold: min(timeout, policy.layer_timeout.gold)
+        default: min(timeout, policy.layer_timeout.default)
+
+  compute:
+    generation:
+      cluster_structure: |
+        job_clusters:
+          - job_cluster_key: "{cluster_key}"
+            new_cluster:
+              spark_version: "{spark_version}"
+              node_type_id: "{node_type}"
+              num_workers: {num_workers}
+      node_type_mapping:
+        small:
+          azure: "Standard_DS3_v2"
+          aws: "m5.xlarge"
+        medium:
+          azure: "Standard_DS4_v2"
+          aws: "m5.2xlarge"
+        large:
+          azure: "Standard_DS5_v2"
+          aws: "m5.4xlarge"
+        xlarge:
+          azure: "Standard_E32s_v3"
+          aws: "r5.8xlarge"
+      default_spark_version: "13.3.x-scala2.12"
+
+  tags:
+    generation: |
+      tags:
+        environment: "production"
+        source_platform: "{source_adapter_name}"
+        converted_by: "propeliq-adapter-engine"
+        conversion_date: "{timestamp}"
+
+  enhancements:
+    - "Autoscaling (min/max workers)"
+    - "Retry logic (max_retries + min_retry_interval_millis)"
+    - "Email/webhook notifications on failure"
+    - "Cluster policies (policy_id)"
+    - "Job tags for cost tracking"

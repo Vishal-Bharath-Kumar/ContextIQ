@@ -1,0 +1,21 @@
+{
+  "_comment": "AWS Glue Workflow Template — all ${...} resolved from source workflow",
+  "Name": "${source.workflow_name}",
+  "Actions": [
+    {
+      "_comment": "Repeat for each task in source workflow",
+      "JobName": "${source.task_name}",
+      "Arguments": {
+        "--${source.param_key}": "${source.param_value}"
+      }
+    }
+  ],
+  "Triggers": [
+    {
+      "Name": "${source.workflow_name}_trigger",
+      "Type": "SCHEDULED",
+      "Schedule": "cron(${derived.glue_cron_expression})"
+    }
+  ],
+  "Crawlers": []
+}

@@ -1,0 +1,16 @@
+# Source files copied by prepare.js
+# These are temporary copies from parent directory - don't track them
+.github/
+.vscode/
+.propel/
+.env.example
+
+# Node modules
+node_modules/
+
+# Generated package files
+*.tgz
+
+# Logs
+*.log
+npm-debug.log*

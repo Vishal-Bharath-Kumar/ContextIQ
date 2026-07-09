@@ -1,0 +1,104 @@
+adapter:
+  name: databricks
+  type: target
+  platform: Multi-Cloud
+  description: >
+    Databricks target adapter. Writes data to Unity Catalog tables,
+    Delta Lake paths, and DBFS. Supports Azure Databricks and AWS Databricks.
+
+  runtime:
+    spark_session: "pre-initialized"
+    initialization: |
+      # SparkSession already provided by the Databricks runtime — no manual creation needed
+    spark_config_migration: |
+      # Extract Spark configs from source initialization and apply individually:
+      spark.conf.set("{config_key}", "{config_value}")
+
+  write_logic:
+    spark:
+      catalog_write: |
+        df.write.format("delta") \
+            .mode("overwrite") \
+            .saveAsTable("{catalog}.{schema}.{table}")
+      path_write: |
+        df.write.format("delta") \
+            .mode("overwrite") \
+            .save("{target_path}")
+      merge_write: |
+        from delta.tables import DeltaTable
+        target = DeltaTable.forName(spark, "{catalog}.{schema}.{table}")
+        target.alias("t").merge(
+            df.alias("s"),
+            "t.{key} = s.{key}"
+        ).whenMatchedUpdateAll().whenNotMatchedInsertAll().execute()
+    sql:
+      write: |
+        CREATE TABLE IF NOT EXISTS {catalog}.{schema}.{table}
+        USING DELTA
+        AS SELECT * FROM temp_view;
+
+  parameters:
+    definition: |
+      dbutils.widgets.text("{param_name}", "{default_value}", "{label}")
+    extraction: |
+      value = dbutils.widgets.get("{param_name}")
+    format: "dbutils.widgets"
+
+  secrets:
+    method: "dbutils_secrets"
+    write: |
+      value = dbutils.secrets.get(scope="{scope}", key="{key}")
+
+  imports:
+    add:
+      - "# Databricks notebook — no explicit SparkSession import needed"
+    platform_specific: []
+
+  storage:
+    azure:
+      prefix: "abfss://"
+      path_format: "abfss://{container}@{storage_account}.dfs.core.windows.net/{path}"
+    aws:
+      prefix: "s3://"
+      path_format: "s3://{bucket}/{path}"
+    dbfs:
+      prefix: "dbfs:/"
+      path_format: "dbfs:/{path}"
+    unity_catalog:
+      format: "{catalog}.{schema}.{table}"
+
+  notebook_format:
+    type: "ipynb"
+    cell_separator: "# COMMAND ----------"
+    magic_prefix: "# MAGIC"
+    header_cell: |
+      # Databricks notebook source
+      # Converted by PropelIQ Adapter Engine
+    metadata:
+      kernel: "python3"
+      language: "python"
+
+  catalog:
+    operations:
+      - normalized: "spark.read.table"
+        target: "spark.table(\"{catalog}.{schema}.{table}\")"
+      - normalized: "df.write.saveAsTable"
+        target: "df.write.format(\"delta\").mode(\"overwrite\").saveAsTable(\"{catalog}.{schema}.{table}\")"
+
+  enhancements:
+    - "Unity Catalog integration for governance"
+    - "Delta Lake optimization (OPTIMIZE, ZORDER)"
+    - "Photon acceleration for SQL workloads"
+    - "Structured Streaming checkpoint migration"
+
+  transformations:
+    - convert_magic_commands
+    - replace_platform_utils
+    - adjust_imports
+    - convert_storage_paths
+    - convert_catalog_operations
+    - convert_parameters
+    - convert_secrets
+
+  output:
+    format: ipynb

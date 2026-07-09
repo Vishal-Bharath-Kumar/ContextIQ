@@ -1,0 +1,125 @@
+adapter:
+  name: adf
+  type: source
+  platform: Azure
+  description: >
+    Azure Data Factory / Synapse Pipeline source adapter.
+    Parses ADF pipeline JSON and extracts tasks, dependencies, triggers, and parameters
+    into the normalized workflow schema.
+
+  detection:
+    file_formats: [".json"]
+    indicators:
+      - '"properties"'
+      - '"activities"'
+      - '"Microsoft.DataFactory"'
+      - '"typeProperties"'
+      - '"dependsOn"'
+      - '"type": "DatabricksNotebook"'
+      - '"type": "Copy"'
+      - '"type": "ExecutePipeline"'
+      - '"type": "SparkJob"'
+      - '"pipeline"'
+    structural_markers:
+      root_keys: ["name", "properties"]
+      nested_keys: ["properties.activities", "properties.parameters"]
+
+  parsing:
+    workflow_name: "$.name"
+    tasks_path: "$.properties.activities"
+    parameters_path: "$.properties.parameters"
+    triggers_path: "$.properties.triggers OR separate trigger resource"
+
+    task_extraction:
+      task_id: "$.activities[*].name"
+      task_type_field: "$.activities[*].type"
+      task_config: "$.activities[*].typeProperties"
+      depends_on_field: "$.activities[*].dependsOn[*].activity"
+      parameters_field: "$.activities[*].typeProperties.baseParameters"
+      timeout_field: "$.activities[*].policy.timeout"
+      retry_field: "$.activities[*].policy.retry"
+
+    type_mapping:
+      DatabricksNotebook:
+        normalized_type: "notebook"
+        config_keys:
+          notebook_path: "typeProperties.notebookPath"
+          base_parameters: "typeProperties.baseParameters"
+      Copy:
+        normalized_type: "data_copy"
+        config_keys:
+          source: "typeProperties.source"
+          sink: "typeProperties.sink"
+      ExecutePipeline:
+        normalized_type: "sub_pipeline"
+        config_keys:
+          pipeline_ref: "typeProperties.pipeline.referenceName"
+          parameters: "typeProperties.parameters"
+      SparkJob:
+        normalized_type: "spark_job"
+        config_keys:
+          main_file: "typeProperties.file"
+          arguments: "typeProperties.args"
+      SqlServerStoredProcedure:
+        normalized_type: "sql_task"
+        config_keys:
+          procedure: "typeProperties.storedProcedureName"
+          parameters: "typeProperties.storedProcedureParameters"
+      WebActivity:
+        normalized_type: "http_task"
+        config_keys:
+          url: "typeProperties.url"
+          method: "typeProperties.method"
+      Lookup:
+        normalized_type: "lookup"
+        config_keys:
+          source: "typeProperties.source"
+          query: "typeProperties.source.sqlReaderQuery"
+
+  dependencies:
+    extraction_method: "direct"
+    source_field: "dependsOn"
+    format: |
+      Each activity has a dependsOn array:
+      [{"activity": "task_name", "dependencyConditions": ["Succeeded"]}]
+    condition_mapping:
+      Succeeded: "success"
+      Failed: "failure"
+      Completed: "completed"
+      Skipped: "skipped"
+
+  triggers:
+    extraction: |
+      ADF triggers are either inline or separate resources.
+      Support: ScheduleTrigger, TumblingWindowTrigger, BlobEventsTrigger
+    schedule_format: "recurrence"
+    fields:
+      type: "$.type"
+      recurrence: "$.recurrence"
+      interval: "$.recurrence.interval"
+      frequency: "$.recurrence.frequency"
+      hours: "$.recurrence.schedule.hours"
+      minutes: "$.recurrence.schedule.minutes"
+      time_zone: "$.recurrence.timeZone"
+
+  parameters:
+    format: "typed_with_default"
+    structure: |
+      {
+        "param_name": {
+          "type": "String",
+          "defaultValue": "value"
+        }
+      }
+
+  timeout:
+    format: "iso8601"
+    parsing: |
+      ADF uses ISO 8601 duration: "01:00:00" = 3600s, "1.00:00:00" = 86400s
+      Parse: days.hours:minutes:seconds → total seconds
+
+  compute:
+    extraction: |
+      ADF does not define compute directly — compute is defined on the linked service
+      (Databricks workspace, HDInsight cluster, etc.)
+      Extract linked service reference for compute mapping if available.

@@ -1,0 +1,24 @@
+# =============================================================================
+# Python dependencies for skills
+# Install: pip install -r .propel/requirements.txt
+# =============================================================================
+
+# --- markitdown skill: Universal document-to-Markdown conversion ---
+# [all] extra enables PDF, DOCX, PPTX, images, audio, OCR support
+markitdown[all]>=0.1.0
+openai>=1.0.0
+
+# --- docx skills: OOXML document manipulation and validation ---
+defusedxml>=0.7.0
+lxml>=4.9.0
+
+# --- pdf skill: PDF reading, writing, form filling, and image conversion ---
+pypdf>=3.0.0
+pdfplumber>=0.10.0
+reportlab>=4.0.0
+pdf2image>=1.16.0
+pandas>=2.0.0
+
+# --- markitdown & docx skills: Document format conversion ---
+pandoc>=2.4
+

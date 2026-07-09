@@ -1,0 +1,50 @@
+{
+  "_comment": "ADF Pipeline Template — all ${...} resolved from source workflow",
+  "name": "${source.workflow_name}",
+  "properties": {
+    "activities": [
+      {
+        "_comment": "Repeat for each task in source workflow",
+        "name": "${source.task_name}",
+        "type": "${derived.adf_activity_type}",
+        "typeProperties": {
+          "notebookPath": "${source.notebook_path}",
+          "baseParameters": {
+            "${source.param_key}": "${source.param_value}"
+          }
+        },
+        "linkedServiceName": {
+          "referenceName": "${source.linked_service}",
+          "type": "LinkedServiceReference"
+        },
+        "dependsOn": [
+          {
+            "activity": "${source.dependency_task}",
+            "dependencyConditions": ["Succeeded"]
+          }
+        ]
+      }
+    ],
+    "parameters": {
+      "${source.param_name}": {
+        "type": "String",
+        "defaultValue": "${source.param_default}"
+      }
+    },
+    "annotations": [],
+    "triggers": [
+      {
+        "type": "ScheduleTrigger",
+        "recurrence": {
+          "frequency": "${derived.frequency}",
+          "interval": "${derived.interval}",
+          "schedule": {
+            "hours": ["${derived.hours}"],
+            "minutes": ["${derived.minutes}"]
+          },
+          "timeZone": "${source.timezone | default: UTC}"
+        }
+      }
+    ]
+  }
+}
