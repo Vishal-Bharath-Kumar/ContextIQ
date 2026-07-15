@@ -1,0 +1,17 @@
+# helm/charts/keycloak/values-prod-tls.yaml
+# Production overlay: restrict Keycloak (Quarkus/JVM) TLS listener to TLS 1.3 only.
+# Apply after values-prod.yaml: helm upgrade keycloak ... -f values.yaml -f values-prod.yaml -f values-prod-tls.yaml
+keycloak:
+  extraEnv:
+    # AC-4: JVM system properties restrict TLS to 1.3 only
+    - name: JAVA_OPTS_APPEND
+      value: >-
+        -Djdk.tls.client.protocols=TLSv1.3
+        -Djdk.tls.server.protocols=TLSv1.3
+        -Dhttps.protocols=TLSv1.3
+        -Djdk.tls.ephemeralDHKeySize=2048
+
+  # Keycloak Quarkus TLS mode (HTTPS listener on 8443)
+  extraEnvFrom:
+    - secretRef:
+        name: keycloak-tls-secret    # contains tls.crt and tls.key from cert-manager (TASK-US048-01)

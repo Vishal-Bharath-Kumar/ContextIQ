@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<title>REPLAY-003 — Phase Detail Drawer · ContextIQ Wireframe</title>
+<link rel="stylesheet" href="_wireframe-base.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="topbar-logo"><div class="topbar-logo-icon">C</div>ContextIQ</div>
+  <div class="topbar-sep"></div>
+  <nav class="topbar-breadcrumb"><a>Replay Explorer</a> <span>›</span> trace-abc-002 <span>›</span> GENERATE phase</nav>
+  <div class="topbar-actions"><div class="topbar-search">🔍 Search</div><button class="topbar-icon-btn">🔔</button></div>
+</header>
+<nav class="sidebar" aria-label="Main navigation">
+  <div class="sidebar-nav">
+    <a class="nav-item"><span class="icon">⊞</span>Dashboard</a>
+    <div class="nav-section">Data Sources</div>
+    <a class="nav-item"><span class="icon">⬡</span>Connectors</a><a class="nav-item"><span class="icon">🗄</span>Knowledge Sources</a>
+    <div class="nav-section">Governance</div><a class="nav-item"><span class="icon">🛡</span>Policies</a>
+    <div class="nav-section">Observability</div>
+    <a class="nav-item active" aria-current="page"><span class="icon">▶</span>Replay Explorer</a>
+    <a class="nav-item"><span class="icon">📋</span>Audit Log</a><a class="nav-item"><span class="icon">📊</span>Observability</a>
+    <div class="nav-section">Platform</div><a class="nav-item"><span class="icon">👥</span>Users</a><a class="nav-item"><span class="icon">💻</span>Models</a><a class="nav-item"><span class="icon">⚙</span>Settings</a>
+  </div>
+  <div class="sidebar-user"><div class="user-avatar">DA</div><div class="user-info"><div class="user-name">Dave Auditor</div><div class="user-role">Auditor</div></div></div>
+</nav>
+
+<!-- Background REPLAY-002 (dimmed) -->
+<main class="main-content" role="main" style="opacity:0.25;pointer-events:none;user-select:none">
+  <div style="background:var(--danger-900);border-radius:6px;padding:12px 16px;margin-bottom:20px;display:flex;align-items:center;gap:16px">
+    <span class="badge badge-danger">✗ DENIED</span>
+    <div class="mono" style="font-size:13px">trace-abc-002</div>
+  </div>
+  <div class="card mb-6">
+    <div class="gantt" style="opacity:0.5">
+      <div class="gantt-row"><div class="gantt-label">PLAN</div><div class="gantt-track"><div class="gantt-bar phase-normal" style="left:0;width:3.4%"></div></div></div>
+      <div class="gantt-row"><div class="gantt-label">RETRIEVE</div><div class="gantt-track"><div class="gantt-bar phase-normal" style="left:3.4%;width:25%"></div></div></div>
+      <div class="gantt-row"><div class="gantt-label">REASON</div><div class="gantt-track"><div class="gantt-bar phase-normal" style="left:28.4%;width:22.6%"></div></div></div>
+      <div class="gantt-row"><div class="gantt-label" style="color:var(--danger-400)">GENERATE ✗</div><div class="gantt-track" style="outline:2px solid var(--brand-blue-500)"><div class="gantt-bar phase-deny" style="left:51%;width:47.9%">DENY</div></div></div>
+      <div class="gantt-row"><div class="gantt-label">EVAL</div><div class="gantt-track"><div class="gantt-bar phase-normal" style="left:98.9%;width:1.1%"></div></div></div>
+    </div>
+  </div>
+</main>
+
+<!-- Drawer overlay -->
+<div class="drawer-overlay"></div>
+
+<!-- Phase detail drawer -->
+<div class="drawer" role="dialog" aria-modal="true" aria-labelledby="phase-drawer-title">
+  <div class="drawer-header" style="background:var(--danger-900);border-bottom-color:oklch(0.28 0.12 25)">
+    <div>
+      <div class="drawer-title" id="phase-drawer-title" style="color:var(--danger-400)">GENERATE Phase Detail</div>
+      <div style="font-size:12px;color:var(--neutral-500)">Status: <span style="color:var(--danger-400)">DENY ✗</span> · Latency: 594ms</div>
+    </div>
+    <button class="btn btn-ghost btn-icon" style="color:var(--neutral-400)">×</button>
+  </div>
+
+  <div style="border-bottom:1px solid var(--neutral-800);display:flex">
+    <div class="tab active" style="font-size:12px;padding:8px 14px">Input</div>
+    <div class="tab" style="font-size:12px;padding:8px 14px">Output</div>
+    <div class="tab" style="font-size:12px;padding:8px 14px">Decisions</div>
+    <div class="tab" style="font-size:12px;padding:8px 14px">Errors</div>
+  </div>
+
+  <div class="drawer-body">
+    <!-- Policy Decision -->
+    <div style="margin-bottom:16px">
+      <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:var(--neutral-600);margin-bottom:6px">Policy Decision</div>
+      <div style="background:var(--danger-900);border:1px solid oklch(0.28 0.12 25);border-radius:6px;padding:10px 12px;font-size:12px">
+        <div style="color:var(--danger-400);font-weight:600;margin-bottom:4px">DENY — pii-redaction v3</div>
+        <div style="color:var(--neutral-500)">Matched: <span class="mono" style="font-size:11px">input.text ⊇ "SSN"</span></div>
+      </div>
+    </div>
+
+    <!-- Input JSON -->
+    <div style="margin-bottom:16px">
+      <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:var(--neutral-600);margin-bottom:6px">Input (truncated)</div>
+      <div style="position:relative">
+        <div class="code-block" style="max-height:100px;overflow:auto;font-size:11px"><span style="color:var(--neutral-600)">{</span>
+  <span style="color:var(--neutral-500)">"prompt"</span>: <span style="color:var(--success-400)">"...[1024 tokens]..."</span>,
+  <span style="color:var(--neutral-500)">"context_window"</span>: <span style="color:var(--warning-400)">4096</span>,
+  <span style="color:var(--neutral-500)">"model"</span>: <span style="color:var(--success-400)">"gpt-4o"</span>
+<span style="color:var(--neutral-600)">}</span></div>
+        <button class="btn btn-ghost btn-sm" style="position:absolute;top:6px;right:6px;font-size:10px">Copy</button>
+      </div>
+    </div>
+
+    <!-- Output -->
+    <div style="margin-bottom:16px">
+      <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:var(--neutral-600);margin-bottom:6px">Output</div>
+      <div style="background:var(--danger-900);border:1px solid oklch(0.28 0.12 25);border-radius:4px;padding:10px;font-size:12px;color:var(--danger-400);font-family:'IBM Plex Mono',monospace">
+        [BLOCKED — pii-redaction policy denied output]
+      </div>
+    </div>
+
+    <!-- Embedding Vector -->
+    <div>
+      <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:var(--neutral-600);margin-bottom:6px">Embedding Vector (first 8 dims)</div>
+      <div style="position:relative">
+        <div class="code-block" style="font-size:11px">[0.12, -0.33, 0.07, 0.91, -0.14, 0.55, 0.03, -0.78, ...]</div>
+        <button class="btn btn-ghost btn-sm" style="position:absolute;top:6px;right:6px;font-size:10px">Copy</button>
+      </div>
+    </div>
+
+    <!-- Timing -->
+    <div style="margin-top:16px;font-size:12px">
+      <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:var(--neutral-600);margin-bottom:6px">Timing</div>
+      <div style="display:flex;justify-content:space-between;color:var(--neutral-400)">
+        <span>Start</span><span class="mono">14:28:15.382</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;color:var(--neutral-400)">
+        <span>End</span><span class="mono">14:28:15.976</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;color:var(--neutral-400)">
+        <span>Duration</span><span class="mono" style="color:var(--danger-400)">594ms</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<aside class="annotation-panel">
+  <div class="ann-screen-id">REPLAY-003</div>
+  <div class="ann-route">Drawer overlay over REPLAY-002</div>
+  <div class="ann-guard">Guard: same as REPLAY-002</div>
+  <div class="ann-divider"></div>
+  <div class="ann-section">Components</div>
+  <div class="ann-item"><div class="ann-component">&lt;Drawer width={480}&gt;</div><div class="ann-note">floating elevation · Escape closes · returns focus to clicked gantt bar</div></div>
+  <div class="ann-item"><div class="ann-component">&lt;Tabs&gt;</div><div class="ann-note">Input · Output · Decisions · Errors</div></div>
+  <div class="ann-item"><div class="ann-component">&lt;CodeViewer&gt;</div><div class="ann-note">IBM Plex Mono · collapsible sections · copy button</div></div>
+  <div class="ann-divider"></div>
+  <div class="ann-section">Header State</div>
+  <div class="ann-note">DENY: danger-900 header bg<br>ALLOW: default neutral bg<br>WARN: warning tinted bg</div>
+</aside>
+</body>
+</html>

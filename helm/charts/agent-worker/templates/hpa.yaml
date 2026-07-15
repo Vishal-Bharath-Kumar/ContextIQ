@@ -1,0 +1,45 @@
+{{- if .Values.hpa.enabled }}
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ include "contextiq-common.fullname" . }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "contextiq-common.labels" . | nindent 4 }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ include "contextiq-common.fullname" . }}
+  minReplicas: {{ .Values.hpa.minReplicas }}
+  maxReplicas: {{ .Values.hpa.maxReplicas }}
+  metrics:
+    {{- if .Values.hpa.customMetric.enabled }}
+    # AC-2: primary scale signal — contextiq_active_requests per pod
+    - type: Pods
+      pods:
+        metric:
+          name: {{ .Values.hpa.customMetric.name }}
+        target:
+          type:         AverageValue
+          averageValue: {{ .Values.hpa.customMetric.targetAverageValue }}
+    {{- end }}
+    {{- if .Values.hpa.cpuFallback.enabled }}
+    # CPU fallback: fires when the custom metric is unavailable or CPU is high
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type:               Utilization
+          averageUtilization: {{ .Values.hpa.cpuFallback.targetAverageUtilization }}
+    {{- end }}
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: {{ .Values.hpa.behavior.scaleUp.stabilizationWindowSeconds }}
+      policies:
+        {{- toYaml .Values.hpa.behavior.scaleUp.policies | nindent 8 }}
+    scaleDown:
+      stabilizationWindowSeconds: {{ .Values.hpa.behavior.scaleDown.stabilizationWindowSeconds }}
+      policies:
+        {{- toYaml .Values.hpa.behavior.scaleDown.policies | nindent 8 }}
+{{- end }}

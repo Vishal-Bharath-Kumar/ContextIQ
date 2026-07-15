@@ -1,0 +1,13 @@
+# Minimal ServiceAccount for the migration Job.
+# Vault Kubernetes auth binds this SA to the admin-api policy (TASK-US047-02).
+# No Kubernetes API permissions are needed — the Job only runs Alembic against PostgreSQL.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: db-migration
+  namespace: contextiq-data
+  labels:
+    app.kubernetes.io/part-of:    contextiq
+    app.kubernetes.io/component:  db-migration
+  annotations:
+    vault.hashicorp.com/role: "admin-api"

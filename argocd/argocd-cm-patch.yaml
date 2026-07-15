@@ -1,0 +1,17 @@
+# Kustomize patch applied to the argocd ConfigMap to configure OIDC SSO via Keycloak.
+# Apply with: kubectl apply -k argocd/
+# Requires the argocd-secret to contain the key oidc.keycloak.clientSecret.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-cm
+  namespace: argocd
+data:
+  url: https://argocd.contextiq.internal
+  oidc.config: |
+    name: Keycloak
+    issuer: https://contextiq.internal/auth/realms/contextiq
+    clientID: argocd
+    clientSecret: $oidc.keycloak.clientSecret
+    requestedScopes: ["openid", "profile", "email", "groups"]
+    groupsClaim: groups

@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DASH-001 — Executive Overview · ContextIQ Wireframe</title>
+<link rel="stylesheet" href="_wireframe-base.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-logo"><div class="topbar-logo-icon">C</div>ContextIQ</div>
+  <div class="topbar-sep"></div>
+  <nav class="topbar-breadcrumb">Dashboard</nav>
+  <div class="topbar-actions">
+    <div class="topbar-search">🔍 Search <span style="margin-left:auto;font-size:10px;opacity:0.5">⌘K</span></div>
+    <button class="topbar-icon-btn">🔔</button>
+    <button class="topbar-icon-btn">☀️</button>
+  </div>
+</header>
+
+<nav class="sidebar" aria-label="Main navigation">
+  <div class="sidebar-nav">
+    <a class="nav-item active" aria-current="page"><span class="icon">⊞</span>Dashboard</a>
+    <div class="nav-section">Data Sources</div>
+    <a class="nav-item"><span class="icon">⬡</span>Connectors</a>
+    <a class="nav-item"><span class="icon">🗄</span>Knowledge Sources</a>
+    <div class="nav-section">Governance</div>
+    <a class="nav-item"><span class="icon">🛡</span>Policies</a>
+    <div class="nav-section">Observability</div>
+    <a class="nav-item"><span class="icon">▶</span>Replay Explorer</a>
+    <a class="nav-item"><span class="icon">📋</span>Audit Log</a>
+    <a class="nav-item"><span class="icon">📊</span>Observability</a>
+    <div class="nav-section">Platform</div>
+    <a class="nav-item"><span class="icon">👥</span>Users</a>
+    <a class="nav-item"><span class="icon">💻</span>Models</a>
+    <a class="nav-item"><span class="icon">⚙</span>Settings</a>
+  </div>
+  <div class="sidebar-user">
+    <div class="user-avatar">AA</div>
+    <div class="user-info"><div class="user-name">Alice Admin</div><div class="user-role">Admin</div></div>
+  </div>
+</nav>
+
+<main class="main-content" role="main">
+  <div class="page-header">
+    <div><div class="page-title">Dashboard</div></div>
+    <button class="btn btn-secondary btn-sm">Export PDF</button>
+  </div>
+
+  <!-- Stat bar (5 KPI tiles) -->
+  <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:20px">
+    <div class="stat-card">
+      <div class="stat-value tabular">14,280</div>
+      <div class="stat-label">Requests (24h)</div>
+      <div class="stat-trend up">↑ 12% vs yesterday</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value tabular">47</div>
+      <div class="stat-label">Active Sessions</div>
+      <div class="stat-trend up">↑ 3</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value tabular">$18.40</div>
+      <div class="stat-label">AI Cost (24h)</div>
+      <div class="stat-trend down">↑ 8%</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value tabular">284ms</div>
+      <div class="stat-label">Avg Latency</div>
+      <div class="stat-trend up">↓ 14ms</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value tabular" style="color:var(--danger-400)">3</div>
+      <div class="stat-label">Policy Violations</div>
+      <div class="stat-trend down">↑ 2 vs yesterday</div>
+    </div>
+  </div>
+
+  <!-- Charts row -->
+  <div class="grid-3 mb-6">
+    <div class="card" style="grid-column:span 2">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <div class="card-title" style="margin-bottom:0">Requests Over Time</div>
+        <div style="display:flex;gap:4px">
+          <button class="btn btn-sm" style="background:var(--brand-blue-900);color:var(--brand-blue-400);border:1px solid var(--brand-blue-700);font-size:10px;padding:2px 8px;border-radius:3px">24h</button>
+          <button class="btn btn-ghost btn-sm" style="font-size:10px;padding:2px 8px">7d</button>
+        </div>
+      </div>
+      <div class="chart-placeholder" style="height:140px">
+        <div class="chart-lines"><div class="chart-line"></div><div class="chart-line"></div><div class="chart-line"></div><div class="chart-line"></div></div>
+        <div class="chart-series">
+          <div class="chart-bar-wf" style="height:60%"></div><div class="chart-bar-wf" style="height:75%"></div><div class="chart-bar-wf" style="height:55%"></div>
+          <div class="chart-bar-wf" style="height:80%"></div><div class="chart-bar-wf" style="height:90%"></div><div class="chart-bar-wf" style="height:70%"></div>
+          <div class="chart-bar-wf" style="height:85%"></div><div class="chart-bar-wf" style="height:95%"></div><div class="chart-bar-wf" style="height:88%"></div>
+          <div class="chart-bar-wf" style="height:72%"></div><div class="chart-bar-wf" style="height:100%"></div><div class="chart-bar-wf" style="height:82%"></div>
+        </div>
+        <span style="position:relative;z-index:1;font-size:11px;color:var(--neutral-600)">Requests / hour · brand-blue-500 line</span>
+      </div>
+      <div style="display:flex;gap:16px;margin-top:8px">
+        <span style="font-size:11px;color:var(--neutral-500)"><span style="color:var(--brand-blue-400)">●</span> Total requests</span>
+        <span style="font-size:11px;color:var(--neutral-500)"><span style="color:var(--danger-400)">●</span> Policy blocks</span>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">Model Usage</div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div>
+          <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px">
+            <span>gpt-4o</span><span class="tabular" style="color:var(--neutral-400)">8,240</span>
+          </div>
+          <div class="progress-track"><div class="progress-fill" style="width:78%"></div></div>
+        </div>
+        <div>
+          <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px">
+            <span>claude-3-sonnet</span><span class="tabular" style="color:var(--neutral-400)">4,120</span>
+          </div>
+          <div class="progress-track"><div class="progress-fill" style="width:39%;background:var(--brand-blue-400)"></div></div>
+        </div>
+        <div>
+          <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px">
+            <span>llama3-70b</span><span class="tabular" style="color:var(--neutral-400)">1,920</span>
+          </div>
+          <div class="progress-track"><div class="progress-fill" style="width:18%;background:var(--brand-blue-300)"></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bottom row -->
+  <div class="grid-2">
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <div class="card-title" style="margin-bottom:0">Connector Health</div>
+        <a style="font-size:12px;color:var(--brand-blue-400);cursor:pointer">View all →</a>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;align-items:center;justify-content:space-between;font-size:13px">
+          <span><span class="status-dot healthy"></span>sql-prod</span>
+          <span class="badge badge-success">HEALTHY</span>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;font-size:13px">
+          <span><span class="status-dot healthy"></span>rest-ext-api</span>
+          <span class="badge badge-success">HEALTHY</span>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;font-size:13px">
+          <span><span class="status-dot degraded"></span>grpc-ml</span>
+          <span class="badge badge-warning">DEGRADED</span>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;font-size:13px">
+          <span><span class="status-dot offline"></span>file-s3</span>
+          <span class="badge badge-danger">OFFLINE</span>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <div class="card-title" style="margin-bottom:0">Recent Audit Events</div>
+        <a style="font-size:12px;color:var(--brand-blue-400);cursor:pointer">View log →</a>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <div style="display:flex;justify-content:space-between;font-size:12px">
+          <span><span class="badge badge-brand" style="margin-right:6px">POLICY_UPDATED</span>alice@co.com</span>
+          <span class="text-muted">2m ago</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:12px">
+          <span><span class="badge badge-neutral" style="margin-right:6px">CONNECTOR_EDITED</span>bob@co.com</span>
+          <span class="text-muted">5m ago</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:12px">
+          <span><span class="badge badge-warning" style="margin-right:6px">USER_ROLE_CHANGED</span>carol@co.com</span>
+          <span class="text-muted">12m ago</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:12px">
+          <span><span class="badge badge-neutral" style="margin-right:6px">MODEL_ACTIVATED</span>bob@co.com</span>
+          <span class="text-muted">1h ago</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<aside class="annotation-panel">
+  <div class="ann-screen-id">DASH-001</div>
+  <div class="ann-route">Route: /</div>
+  <div class="ann-guard">Guard: any authenticated</div>
+  <div class="ann-divider"></div>
+  <div class="ann-section">Components</div>
+  <div class="ann-item"><div class="ann-component">&lt;StatTile&gt; ×5</div><div class="ann-note">type-display value · tabular-nums · trend arrow</div></div>
+  <div class="ann-item"><div class="ann-component">&lt;LineChart&gt; / &lt;BarChart&gt;</div><div class="ann-note">Recharts · brand-blue-500 · ARIA role="img" + figcaption</div></div>
+  <div class="ann-item"><div class="ann-component">&lt;ConnectorHealthList&gt;</div><div class="ann-note">StatusBadge + connector name · link to CONN-001</div></div>
+  <div class="ann-item"><div class="ann-component">&lt;RecentAuditFeed&gt;</div><div class="ann-note">Top 5 events · relative timestamp · link to AUDIT-001</div></div>
+  <div class="ann-divider"></div>
+  <div class="ann-section">States</div>
+  <span class="state-chip">loading skeletons</span>
+  <span class="state-chip">empty (no data)</span>
+  <span class="state-chip">error banner</span>
+  <div class="ann-divider"></div>
+  <div class="ann-section">Policy Violations KPI</div>
+  <div class="ann-note">Color: danger-400 when &gt; 0 · neutral-200 when 0</div>
+</aside>
+
+</body>
+</html>

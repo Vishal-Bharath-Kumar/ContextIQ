@@ -1,0 +1,8 @@
+# AC-2: staging — mirrors prod topology at reduced scale
+replicaCount: 2
+hpa:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 5
+env:
+  LOG_LEVEL: INFO

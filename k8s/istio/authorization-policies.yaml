@@ -1,0 +1,97 @@
+# Least-privilege service-to-service AuthorizationPolicies.
+# Baseline: deny-all in contextiq-data, then explicitly allow each permitted caller.
+---
+# Deny all traffic in contextiq-data by default
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: deny-all
+  namespace: contextiq-data
+spec: {}    # empty spec = deny all
+
+---
+# Allow permitted service accounts to reach PostgreSQL on port 5432
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: allow-postgres-clients
+  namespace: contextiq-data
+spec:
+  selector:
+    matchLabels:
+      app: postgres
+  action: ALLOW
+  rules:
+    - from:
+        - source:
+            principals:
+              - cluster.local/ns/contextiq-gateway/sa/mcp-gateway
+              - cluster.local/ns/contextiq-agents/sa/agent-worker
+              - cluster.local/ns/contextiq-agents/sa/indexing-service
+              - cluster.local/ns/contextiq-admin/sa/admin-api
+              - cluster.local/ns/contextiq-security/sa/vault       # Vault DB secrets engine
+              - cluster.local/ns/contextiq-security/sa/keycloak
+      to:
+        - operation:
+            ports: ["5432"]
+
+---
+# Allow mcp-gateway and agent-worker to reach Redis on port 6379
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: allow-redis-clients
+  namespace: contextiq-data
+spec:
+  selector:
+    matchLabels:
+      app: redis
+  action: ALLOW
+  rules:
+    - from:
+        - source:
+            principals:
+              - cluster.local/ns/contextiq-gateway/sa/mcp-gateway
+              - cluster.local/ns/contextiq-agents/sa/agent-worker
+      to:
+        - operation:
+            ports: ["6379"]
+
+---
+# Allow agent-worker to reach Neo4j on Bolt port 7687
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: allow-neo4j-clients
+  namespace: contextiq-data
+spec:
+  selector:
+    matchLabels:
+      app: neo4j
+  action: ALLOW
+  rules:
+    - from:
+        - source:
+            principals:
+              - cluster.local/ns/contextiq-agents/sa/agent-worker
+      to:
+        - operation:
+            ports: ["7687"]    # Bolt protocol
+
+---
+# Allow NGINX Ingress Controller to reach mcp-gateway
+# NGINX handles external TLS termination; Istio manages internal routing
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: allow-gateway-from-ingress
+  namespace: contextiq-gateway
+spec:
+  selector:
+    matchLabels:
+      app: mcp-gateway
+  action: ALLOW
+  rules:
+    - from:
+        - source:
+            namespaces: ["ingress-nginx"]

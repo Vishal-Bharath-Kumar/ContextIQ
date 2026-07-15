@@ -1,0 +1,9 @@
+apiVersion: v2
+name:        postgresql
+description: PostgreSQL 15 for ContextIQ (Bitnami chart wrapper)
+type:        application
+version:     0.1.0
+dependencies:
+  - name:       postgresql
+    version:    "15.5.28"    # pinned — tracks PostgreSQL 15; update to next patch after testing
+    repository: https://charts.bitnami.com/bitnami

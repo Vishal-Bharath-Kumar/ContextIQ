@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<title>CONN-002 — Add Connector · ContextIQ Wireframe</title>
+<link rel="stylesheet" href="_wireframe-base.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-logo"><div class="topbar-logo-icon">C</div>ContextIQ</div>
+  <div class="topbar-sep"></div>
+  <nav class="topbar-breadcrumb"><a>Connectors</a> <span>›</span> Add Connector</nav>
+  <div class="topbar-actions">
+    <div class="topbar-search">🔍 Search</div>
+    <button class="topbar-icon-btn">🔔</button><button class="topbar-icon-btn">☀️</button>
+  </div>
+</header>
+
+<nav class="sidebar" aria-label="Main navigation">
+  <div class="sidebar-nav">
+    <a class="nav-item"><span class="icon">⊞</span>Dashboard</a>
+    <div class="nav-section">Data Sources</div>
+    <a class="nav-item active" aria-current="page"><span class="icon">⬡</span>Connectors</a>
+    <a class="nav-item"><span class="icon">🗄</span>Knowledge Sources</a>
+    <div class="nav-section">Governance</div>
+    <a class="nav-item"><span class="icon">🛡</span>Policies</a>
+    <div class="nav-section">Observability</div>
+    <a class="nav-item"><span class="icon">▶</span>Replay Explorer</a>
+    <a class="nav-item"><span class="icon">📋</span>Audit Log</a>
+    <a class="nav-item"><span class="icon">📊</span>Observability</a>
+    <div class="nav-section">Platform</div>
+    <a class="nav-item"><span class="icon">👥</span>Users</a>
+    <a class="nav-item"><span class="icon">💻</span>Models</a>
+    <a class="nav-item"><span class="icon">⚙</span>Settings</a>
+  </div>
+  <div class="sidebar-user"><div class="user-avatar">AA</div><div class="user-info"><div class="user-name">Alice Admin</div><div class="user-role">Admin</div></div></div>
+</nav>
+
+<!-- Background page (dimmed) -->
+<main class="main-content" role="main" style="opacity:0.3;pointer-events:none;user-select:none">
+  <div class="page-header">
+    <div class="page-title">Connectors</div>
+    <button class="btn btn-primary">+ Add Connector</button>
+  </div>
+  <div class="table-wrapper" style="margin-top:16px">
+    <div class="skeleton skeleton-row"></div>
+    <div class="skeleton skeleton-row"></div>
+    <div class="skeleton skeleton-row" style="opacity:0.6"></div>
+  </div>
+</main>
+
+<!-- Drawer overlay -->
+<div class="drawer-overlay"></div>
+
+<!-- Drawer -->
+<div class="drawer" role="dialog" aria-modal="true" aria-labelledby="drawer-title">
+  <div class="drawer-header">
+    <div class="drawer-title" id="drawer-title">Add Connector</div>
+    <button class="btn btn-ghost btn-icon" title="Close (Escape)">×</button>
+  </div>
+
+  <div class="drawer-body">
+    <!-- Connector Type -->
+    <div class="form-group">
+      <label class="form-label required">Connector Type</label>
+      <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px">
+        <div style="border:2px solid var(--brand-blue-500);border-radius:6px;padding:10px;text-align:center;cursor:pointer;background:var(--brand-blue-900)">
+          <div style="font-size:20px;margin-bottom:4px">🗄</div>
+          <div style="font-size:12px;color:var(--brand-blue-400)">SQL Database</div>
+        </div>
+        <div style="border:1px solid var(--neutral-700);border-radius:6px;padding:10px;text-align:center;cursor:pointer">
+          <div style="font-size:20px;margin-bottom:4px">🌐</div>
+          <div style="font-size:12px;color:var(--neutral-500)">REST API</div>
+        </div>
+        <div style="border:1px solid var(--neutral-700);border-radius:6px;padding:10px;text-align:center;cursor:pointer">
+          <div style="font-size:20px;margin-bottom:4px">⚡</div>
+          <div style="font-size:12px;color:var(--neutral-500)">gRPC</div>
+        </div>
+        <div style="border:1px solid var(--neutral-700);border-radius:6px;padding:10px;text-align:center;cursor:pointer">
+          <div style="font-size:20px;margin-bottom:4px">📁</div>
+          <div style="font-size:12px;color:var(--neutral-500)">File / S3</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="separator"></div>
+
+    <!-- Basic Info -->
+    <div class="form-group">
+      <label class="form-label required">Connector Name</label>
+      <input class="input-wf" style="width:100%" type="text" placeholder="e.g. sql-prod">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Description</label>
+      <input class="input-wf" style="width:100%" type="text" placeholder="Optional description">
+    </div>
+
+    <div class="separator"></div>
+
+    <!-- Connection Details (SQL Database shown) -->
+    <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:var(--neutral-600);margin-bottom:10px">Connection Details — SQL Database</div>
+
+    <div style="display:grid;grid-template-columns:1fr auto;gap:8px">
+      <div class="form-group" style="margin-bottom:0">
+        <label class="form-label required">Host</label>
+        <input class="input-wf" style="width:100%" type="text" placeholder="db.internal.company.com">
+      </div>
+      <div class="form-group" style="margin-bottom:0;width:80px">
+        <label class="form-label">Port</label>
+        <input class="input-wf" type="number" value="5432" style="width:80px">
+      </div>
+    </div>
+    <div style="height:8px"></div>
+    <div class="form-group">
+      <label class="form-label required">Database</label>
+      <input class="input-wf" style="width:100%" type="text" placeholder="contextiq_prod">
+    </div>
+    <div class="form-group">
+      <label class="form-label required">Username</label>
+      <input class="input-wf" style="width:100%" type="text" autocomplete="off">
+    </div>
+    <div class="form-group">
+      <label class="form-label required">Password</label>
+      <div style="display:flex;gap:6px">
+        <input class="input-wf" style="flex:1" type="password" placeholder="••••••••••••">
+        <button class="btn btn-secondary btn-sm" style="flex-shrink:0">👁</button>
+      </div>
+      <div class="form-hint">Never stored in plain text — encrypted at rest</div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Schema</label>
+      <select class="select-wf" style="width:100%"><option>public</option><option>analytics</option><option>raw</option></select>
+    </div>
+
+    <!-- Advanced accordion -->
+    <div style="border:1px solid var(--neutral-800);border-radius:6px;margin-top:8px">
+      <div style="padding:10px 14px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;font-size:13px;color:var(--neutral-400)">
+        <span>SSL / TLS Settings</span><span>▶</span>
+      </div>
+    </div>
+    <div style="border:1px solid var(--neutral-800);border-top:none;border-radius:0 0 6px 6px;margin-top:-1px">
+      <div style="padding:10px 14px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;font-size:13px;color:var(--neutral-400)">
+        <span>Connection Pooling</span><span>▶</span>
+      </div>
+    </div>
+
+    <div style="height:16px"></div>
+
+    <!-- Test Connection -->
+    <button class="btn btn-outline" style="width:100%">Test Connection</button>
+    <!-- Success state (shown after test) -->
+    <div class="alert alert-success" style="margin-top:8px;margin-bottom:0">
+      ✓ Connection successful — latency 4ms
+    </div>
+  </div>
+
+  <div class="drawer-footer">
+    <button class="btn btn-ghost">Cancel</button>
+    <button class="btn btn-primary">Save Connector</button>
+  </div>
+</div>
+
+<aside class="annotation-panel">
+  <div class="ann-screen-id">CONN-002</div>
+  <div class="ann-route">Route: /connectors/new</div>
+  <div class="ann-guard">Guard: PLATFORM_ENGINEER, ADMIN</div>
+  <div class="ann-divider"></div>
+  <div class="ann-section">Components</div>
+  <div class="ann-item"><div class="ann-component">&lt;SlideOverDrawer width={480}&gt;</div><div class="ann-note">role="dialog" · focus trap · Escape closes</div></div>
+  <div class="ann-item"><div class="ann-component">&lt;RadioGroup variant="tile"&gt;</div><div class="ann-note">Connector type selection · 2-col tile grid</div></div>
+  <div class="ann-item"><div class="ann-component">&lt;PasswordInput&gt;</div><div class="ann-note">Visibility toggle · never echoed to server logs</div></div>
+  <div class="ann-item"><div class="ann-component">&lt;Accordion&gt;</div><div class="ann-note">SSL + pooling · collapsed by default</div></div>
+  <div class="ann-item"><div class="ann-component">&lt;Button&gt; Test Connection</div><div class="ann-note">POST /connectors/test · inline result badge</div></div>
+  <div class="ann-divider"></div>
+  <div class="ann-section">Dynamic Fields</div>
+  <div class="ann-note">SQL: host/port/db/user/pass/schema<br>REST: base-URL + auth scheme picker<br>gRPC: endpoint + cert upload<br>File/S3: bucket + region + key</div>
+  <div class="ann-divider"></div>
+  <div class="ann-section">Save State</div>
+  <div class="ann-note">Save btn disabled until test passes OR user explicitly overrides warning</div>
+  <div class="ann-divider"></div>
+  <div class="ann-section">States</div>
+  <span class="state-chip">idle</span>
+  <span class="state-chip">testing</span>
+  <span class="state-chip">test OK</span>
+  <span class="state-chip">test FAIL</span>
+  <span class="state-chip">saving</span>
+  <span class="state-chip">validation errors</span>
+</aside>
+
+</body>
+</html>

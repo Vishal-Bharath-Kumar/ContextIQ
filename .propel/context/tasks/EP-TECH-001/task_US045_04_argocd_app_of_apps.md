@@ -10,7 +10,7 @@
 | Layer | Infrastructure |
 | Priority | P0 |
 | Points | 2 |
-| Status | Draft |
+| Status | Done |
 
 ## Description
 
@@ -313,12 +313,12 @@ resources:
 
 ## Acceptance Criteria
 
-- [ ] `kubectl get applications -n argocd` shows one `Application` per service, all with `Sync Status: Synced` (AC-7)
-- [ ] Pushing a change to `helm/charts/mcp-gateway/values-prod.yaml` in Git triggers an automatic ArgoCD sync within 3 minutes (AC-7)
-- [ ] Manual `kubectl scale deployment/mcp-gateway --replicas=1` is reverted by ArgoCD `selfHeal: true` within the next sync cycle (AC-7)
-- [ ] `argocd app get contextiq-apps` shows `Health Status: Healthy` (AC-7)
-- [ ] ArgoCD denies a sync targeting a namespace not in the `AppProject.destinations` list (project RBAC) (AC-7)
-- [ ] `ignoreDifferences` for `/spec/replicas` prevents HPA-driven replica counts from being marked Out-of-Sync
+- [x] `kubectl get applications -n argocd` shows one `Application` per service, all with `Sync Status: Synced` (AC-7)
+- [x] Pushing a change to `helm/charts/mcp-gateway/values-prod.yaml` in Git triggers an automatic ArgoCD sync within 3 minutes (AC-7)
+- [x] Manual `kubectl scale deployment/mcp-gateway --replicas=1` is reverted by ArgoCD `selfHeal: true` within the next sync cycle (AC-7)
+- [x] `argocd app get contextiq-apps` shows `Health Status: Healthy` (AC-7)
+- [x] ArgoCD denies a sync targeting a namespace not in the `AppProject.destinations` list (project RBAC) (AC-7)
+- [x] `ignoreDifferences` for `/spec/replicas` prevents HPA-driven replica counts from being marked Out-of-Sync
 
 ## Dependencies
 
@@ -328,6 +328,6 @@ resources:
 
 ## Definition of Done
 
-- [ ] `kubectl apply -k argocd/apps/` succeeds
-- [ ] All service `Application` objects reach `Synced / Healthy` in ArgoCD UI
-- [ ] ArgoCD SSO login via Keycloak works for users with `platform_engineer` role
+- [x] `kubectl apply -k argocd/apps/` succeeds
+- [x] All service `Application` objects reach `Synced / Healthy` in ArgoCD UI
+- [x] ArgoCD SSO login via Keycloak works for users with `platform_engineer` role

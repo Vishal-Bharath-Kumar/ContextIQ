@@ -1,0 +1,40 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: contextiq-staging
+  namespace: argocd
+  # BUG FIX: finalizers were missing from the spec.  All Applications in this
+  # project use resources-finalizer.argocd.argoproj.io so that ArgoCD performs
+  # a cascade delete of all managed resources when the Application is removed.
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: contextiq
+  # Single-source with helm.valueFiles is correct here because both the chart
+  # and the values files live in the same Git repository.  The multi-source
+  # pattern is only required for external Helm chart registries.
+  source:
+    # SETUP: replace with the actual repository URL.
+    repoURL:        https://github.com/YOUR_ORG/contextiq.git
+    targetRevision: main    # always track main — CI commits updated image tags here
+    path:           helm/contextiq
+    helm:
+      valueFiles:
+        - values.yaml
+        - values-staging.yaml    # contains the CI-updated image tags
+  destination:
+    server:    https://kubernetes.default.svc
+    namespace: contextiq-gateway    # umbrella chart deploys across namespaces
+  syncPolicy:
+    automated:
+      prune:    true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false
+      - ApplyOutOfSyncOnly=true    # only sync changed resources — reduces sync time (AC-7)
+    retry:
+      limit: 3
+      backoff:
+        duration:    5s
+        maxDuration: 3m
+        factor:      2

@@ -10,7 +10,7 @@
 | Layer | Backend / Infrastructure |
 | Priority | P0 |
 | Points | 2 |
-| Status | Draft |
+| Status | Done |
 
 ## Description
 
@@ -329,13 +329,13 @@ spec:
 
 ## Acceptance Criteria
 
-- [ ] `AuditArchiveService.archive_day()` uploads a gzip NDJSON object to the `contextiq-audit-archive` bucket at the correct key `audit-log/{YYYY}/{MM}/{DD}.ndjson.gz` (AC-3)
-- [ ] Object includes `row_hash` field so archived entries can be verified against the chain (AC-6)
-- [ ] Each archived row is AES-256 server-side encrypted (`ServerSideEncryption: AES256`) (OWASP A02)
-- [ ] `run_archive.py` exits with code 0 on success, non-zero on failure (CronJob alerting)
-- [ ] CronJob schedule is `"0 2 * * *"` (02:00 UTC daily); `concurrencyPolicy: Forbid` (AC-3)
-- [ ] MinIO lifecycle policy sets expiration at day 1096 (3 years + 1 leap-year day) (AC-3)
-- [ ] `_fetch_rows()` uses chunked pagination (`CHUNK_SIZE=1000`) — no unbounded memory load
+- [x] `AuditArchiveService.archive_day()` uploads a gzip NDJSON object to the `contextiq-audit-archive` bucket at the correct key `audit-log/{YYYY}/{MM}/{DD}.ndjson.gz` (AC-3)
+- [x] Object includes `row_hash` field so archived entries can be verified against the chain (AC-6)
+- [x] Each archived row is AES-256 server-side encrypted (`ServerSideEncryption: AES256`) (OWASP A02)
+- [x] `run_archive.py` exits with code 0 on success, non-zero on failure (CronJob alerting)
+- [x] CronJob schedule is `"0 2 * * *"` (02:00 UTC daily); `concurrencyPolicy: Forbid` (AC-3)
+- [x] MinIO lifecycle policy sets expiration at day 1096 (3 years + 1 leap-year day) (AC-3)
+- [x] `_fetch_rows()` uses chunked pagination (`CHUNK_SIZE=1000`) — no unbounded memory load
 
 ## Dependencies
 
@@ -345,6 +345,6 @@ spec:
 
 ## Definition of Done
 
-- [ ] `pytest tests/audit/test_archive_service.py` passes using `moto[s3]>=5.0` mock (see TASK-US044-05)
-- [ ] `kubectl apply -f k8s/audit/archive-cronjob.yaml` succeeds in staging
-- [ ] `mypy --strict src/audit/admin_audit_log/archive_service.py scripts/audit/run_archive.py` passes
+- [x] `pytest tests/audit/test_archive_service.py` passes using `moto[s3]>=5.0` mock (see TASK-US044-05)
+- [x] `kubectl apply -f k8s/audit/archive-cronjob.yaml` succeeds in staging
+- [x] `mypy --strict src/audit/admin_audit_log/archive_service.py scripts/audit/run_archive.py` passes

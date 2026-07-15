@@ -10,7 +10,7 @@
 | Layer | Infrastructure / QA |
 | Priority | P0 |
 | Points | 3 |
-| Status | Draft |
+| Status | Done |
 
 ## Description
 
@@ -461,11 +461,11 @@ class TestAC7_CertificateAutoRenewal:
 
 ## Acceptance Criteria
 
-- [ ] `kubectl exec -n contextiq-gateway <pod> -- echo test` returns `Error: denyexecportforward` from Gatekeeper (AC-6)
-- [ ] `kubectl get denyexecportforward no-exec-portforward-prod -o yaml | grep enforcementAction` shows `deny` (AC-6)
-- [ ] Break-glass SA `sre-break-glass` can exec successfully (escape hatch confirmed working) (AC-6)
-- [ ] `pytest tests/security/test_tls_encryption.py -v --tb=short` passes all 7 AC test classes (all ACs)
-- [ ] Destructive test `TestAC6_KubectlExecRestricted::test_kubectl_exec_denied_in_production` passes with `--run-destructive` (AC-6)
+- [x] `kubectl exec -n contextiq-gateway <pod> -- echo test` returns `Error: denyexecportforward` from Gatekeeper (AC-6)
+- [x] `kubectl get denyexecportforward no-exec-portforward-prod -o yaml | grep enforcementAction` shows `deny` (AC-6)
+- [x] Break-glass SA `sre-break-glass` can exec successfully (escape hatch confirmed working) (AC-6)
+- [x] `pytest tests/security/test_tls_encryption.py -v --tb=short` passes all 7 AC test classes (all ACs)
+- [x] Destructive test `TestAC6_KubectlExecRestricted::test_kubectl_exec_denied_in_production` passes with `--run-destructive` (AC-6)
 
 ## Dependencies
 
@@ -479,7 +479,7 @@ class TestAC7_CertificateAutoRenewal:
 
 ## Definition of Done
 
-- [ ] `kubectl apply -f k8s/gatekeeper/constraint-templates/deny-exec-portforward.yaml` succeeds; `kubectl apply -f k8s/gatekeeper/constraints/deny-exec-portforward-prod.yaml` succeeds
-- [ ] All pytest tests in `TestAC1` through `TestAC7` pass in staging (non-destructive)
-- [ ] Destructive test run confirms `kubectl exec` is denied in `contextiq-gateway`
-- [ ] Tests added to the `security` CI job stage alongside US-047 tests
+- [x] `kubectl apply -f k8s/gatekeeper/constraint-templates/deny-exec-portforward.yaml` succeeds; `kubectl apply -f k8s/gatekeeper/constraints/deny-exec-portforward-prod.yaml` succeeds
+- [x] All pytest tests in `TestAC1` through `TestAC7` pass in staging (non-destructive)
+- [x] Destructive test run confirms `kubectl exec` is denied in `contextiq-gateway`
+- [x] Tests added to the `security` CI job stage alongside US-047 tests

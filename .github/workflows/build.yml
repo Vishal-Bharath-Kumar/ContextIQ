@@ -1,0 +1,134 @@
+name: Build Docker Image
+
+on:
+  workflow_call:
+    inputs:
+      push:
+        description: "Push image to GHCR (true on merge; false on draft PRs)"
+        type:    bool
+        default: true
+      # NOTE: tag-suffix was removed — it was declared in the spec but never
+      # referenced in the docker/metadata-action tags block.  PR tagging is
+      # already handled by type=ref,event=pr,prefix=pr- in the metadata action.
+    outputs:
+      image-ref:
+        # NOTE: with a matrix strategy, this output is non-deterministic —
+        # it resolves to the last-completing matrix instance's value.
+        # Callers that need a specific service image (e.g. Trivy for contextiq-api)
+        # should construct the image-ref directly:
+        #   ghcr.io/${{ github.repository }}/contextiq-api:${{ github.sha }}
+        description: "Image tags from the last-completing matrix build"
+        value:        ${{ jobs.build.outputs.image-ref }}
+      image-digest:
+        description: "Image digest from the last-completing matrix build"
+        value:        ${{ jobs.build.outputs.image-digest }}
+
+jobs:
+  build:
+    name: Build & Push (${{ matrix.service.name }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12    # AC-7: build must complete well within the 15 min deploy budget
+
+    strategy:
+      fail-fast: false
+      matrix:
+        # Build each backend service image independently for layer cache efficiency
+        service:
+          - name:       contextiq-api
+            context:    .
+            dockerfile: Dockerfile
+          - name:       contextiq-agent-worker
+            context:    .
+            dockerfile: Dockerfile.agent
+          - name:       contextiq-indexing
+            context:    .
+            dockerfile: Dockerfile.indexing
+
+    permissions:
+      contents: read
+      packages: write    # required to push to ghcr.io
+
+    outputs:
+      image-ref:    ${{ steps.meta.outputs.tags }}
+      image-digest: ${{ steps.build.outputs.digest }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # BUG FIX: QEMU must be registered BEFORE Buildx creates the builder.
+      # BuildKit detects available binfmt_misc handlers at startup time — if
+      # QEMU is registered after the builder is created, arm64 builds silently
+      # fall back to software emulation using the host binary, producing the
+      # wrong architecture.  Spec had Buildx first, QEMU second — order fixed.
+      - name: Set up QEMU (arm64 emulation on amd64 runners)
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: linux/amd64,linux/arm64
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          driver-opts: |
+            image=moby/buildkit:v0.15.0
+            network=host
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}    # GITHUB_TOKEN has packages:write on the repo
+
+      # Generate image tags: SHA (always), branch name, PR prefix, latest (main only)
+      - name: Extract image metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/${{ matrix.service.name }}
+          tags: |
+            # AC-2: image tag = git SHA (immutable, used by ArgoCD for deployment tracking)
+            type=sha,format=long,prefix=
+            # Branch name tag (human-readable for debugging)
+            type=ref,event=branch
+            # PR tag — used by Trivy scan (TASK-US049-02)
+            type=ref,event=pr,prefix=pr-
+            # latest tag — only on pushes to main
+            type=raw,value=latest,enable={{is_default_branch}}
+          labels: |
+            org.opencontainers.image.title=${{ matrix.service.name }}
+            org.opencontainers.image.vendor=ContextIQ
+            org.opencontainers.image.revision=${{ github.sha }}
+
+      # AC-2: Build multi-arch image and push
+      - name: Build and push
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context:    ${{ matrix.service.context }}
+          file:       ${{ matrix.service.dockerfile }}
+          platforms:  linux/amd64,linux/arm64
+          push:       ${{ inputs.push }}
+          tags:       ${{ steps.meta.outputs.tags }}
+          labels:     ${{ steps.meta.outputs.labels }}
+          # AC-7: GHA layer cache — critical for meeting the 12 min timeout on re-runs
+          cache-from: type=gha,scope=${{ matrix.service.name }}
+          cache-to:   type=gha,scope=${{ matrix.service.name }},mode=max
+          # Build args: bake git metadata into the image for runtime version reporting
+          build-args: |
+            GIT_SHA=${{ github.sha }}
+            GIT_REF=${{ github.ref_name }}
+
+      # Attest build provenance (SLSA level 3) — OWASP supply chain best practice
+      - name: Attest image provenance
+        if: ${{ inputs.push }}
+        uses: actions/attest-build-provenance@v1
+        with:
+          subject-name:     ghcr.io/${{ github.repository_owner }}/${{ matrix.service.name }}
+          subject-digest:   ${{ steps.build.outputs.digest }}
+          push-to-registry: true
+
+      - name: Output image details
+        run: |
+          echo "Image:  ghcr.io/${{ github.repository_owner }}/${{ matrix.service.name }}"
+          echo "Tags:   ${{ steps.meta.outputs.tags }}"
+          echo "Digest: ${{ steps.build.outputs.digest }}"

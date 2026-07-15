@@ -10,7 +10,7 @@
 | Layer | Infrastructure / Backend / QA |
 | Priority | P0 |
 | Points | 3 |
-| Status | Draft |
+| Status | Done |
 
 ## Description
 
@@ -435,12 +435,12 @@ class TestAC6_ReadReplicas:
 
 ## Acceptance Criteria
 
-- [ ] `kubectl get statefulset postgresql-read -n contextiq-data` shows `READY 2/2` replicas (AC-6)
-- [ ] `psql -h postgresql-read.contextiq-data.svc.cluster.local -c "SELECT pg_is_in_recovery();"` returns `t` on both replica pods (AC-6)
-- [ ] `audit_log` endpoint latency reduced by ≥ 20% under concurrent load compared to primary-only baseline (AC-6)
-- [ ] `pytest tests/integration/test_postgres_setup.py -v` passes all 6 AC test classes (all ACs)
-- [ ] `TestAC2_CoreTables` confirms all 8 tables present; `TestAC3_MigrationJob` confirms Job succeeded (AC-2, AC-3)
-- [ ] `TestAC6_ReadReplicas::test_replica_is_in_recovery` returns `True` — confirms routing target is a real standby (AC-6)
+- [x] `kubectl get statefulset postgresql-read -n contextiq-data` shows `READY 2/2` replicas (AC-6)
+- [x] `psql -h postgresql-read.contextiq-data.svc.cluster.local -c "SELECT pg_is_in_recovery();"` returns `t` on both replica pods (AC-6)
+- [x] `audit_log` endpoint latency reduced by ≥ 20% under concurrent load compared to primary-only baseline (AC-6)
+- [x] `pytest tests/integration/test_postgres_setup.py -v` passes all 6 AC test classes (all ACs)
+- [x] `TestAC2_CoreTables` confirms all 8 tables present; `TestAC3_MigrationJob` confirms Job succeeded (AC-2, AC-3)
+- [x] `TestAC6_ReadReplicas::test_replica_is_in_recovery` returns `True` — confirms routing target is a real standby (AC-6)
 
 ## Dependencies
 
@@ -451,7 +451,7 @@ class TestAC6_ReadReplicas:
 
 ## Definition of Done
 
-- [ ] `helm upgrade postgresql bitnami/postgresql -n contextiq-data -f values.yaml -f values-prod.yaml` starts 2 replica pods
-- [ ] `src/data/database.py` updated with dual-engine; `src/data/dependencies.py` exposes `get_read_db()`
-- [ ] Audit log and cost analytics routes switched to `Depends(get_read_db)`
-- [ ] All integration tests pass in staging environment
+- [x] `helm upgrade postgresql bitnami/postgresql -n contextiq-data -f values.yaml -f values-prod.yaml` starts 2 replica pods
+- [x] `src/data/database.py` updated with dual-engine; `src/data/dependencies.py` exposes `get_read_db()`
+- [x] Audit log and cost analytics routes switched to `Depends(get_read_db)`
+- [x] All integration tests pass in staging environment

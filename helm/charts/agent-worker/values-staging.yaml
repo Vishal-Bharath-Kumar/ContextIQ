@@ -1,0 +1,12 @@
+replicaCount: 2
+hpa:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 8    # reduced max in staging to control cost
+  customMetric:
+    enabled:            true
+    targetAverageValue: "5"
+  cpuFallback:
+    enabled: true
+env:
+  LOG_LEVEL: INFO

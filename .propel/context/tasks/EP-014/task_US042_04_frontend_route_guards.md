@@ -10,7 +10,7 @@
 | Layer | Frontend |
 | Priority | P0 |
 | Points | 1 |
-| Status | Draft |
+| Status | Done |
 
 ## Description
 
@@ -270,14 +270,14 @@ hasAnyRole: (roles) => hasAnyRole(user?.roles ?? [], roles),
 
 ## Acceptance Criteria
 
-- [ ] `RequireRoles({ allowedRoles: ["auditor"] })` redirects to `/403` for a user with only `DEVELOPER` role (AC-1)
-- [ ] `RequireRoles` with any list redirects to `/login` when `user` is `null` (unauthenticated)
-- [ ] `ADMIN` role passes every `RequireRoles` check regardless of `allowedRoles` list (ADMIN super-role — AC-1)
-- [ ] Role comparison is case-insensitive — `"SECURITY_OFFICER"` and `"security_officer"` both grant access to `RequireSecurityOfficer` (AC-4)
-- [ ] `/connectors`, `/models`, and `/models/weights` render only for `PLATFORM_ENGINEER` or `ADMIN` users (AC-2)
-- [ ] `/policies` and `/policies/:id` render only for `SECURITY_OFFICER` or `ADMIN` users (AC-2)
-- [ ] `/traces` and `/traces/:id` render only for `AUDITOR`, `DEVOPS_SRE`, `SECURITY_OFFICER`, or `ADMIN` (AC-2)
-- [ ] `ForbiddenPage` has `aria-labelledby` referencing the `<h1>` (WCAG 2.1 AA)
+- [x] `RequireRoles({ allowedRoles: ["auditor"] })` redirects to `/403` for a user with only `DEVELOPER` role (AC-1)
+- [x] `RequireRoles` with any list redirects to `/login` when `user` is `null` (unauthenticated)
+- [x] `ADMIN` role passes every `RequireRoles` check regardless of `allowedRoles` list (ADMIN super-role — AC-1)
+- [x] Role comparison is case-insensitive — `"SECURITY_OFFICER"` and `"security_officer"` both grant access to `RequireSecurityOfficer` (AC-4)
+- [x] `/connectors`, `/models`, and `/models/weights` render only for `PLATFORM_ENGINEER` or `ADMIN` users (AC-2)
+- [x] `/policies` and `/policies/:id` render only for `SECURITY_OFFICER` or `ADMIN` users (AC-2)
+- [x] `/traces` and `/traces/:id` render only for `AUDITOR`, `DEVOPS_SRE`, `SECURITY_OFFICER`, or `ADMIN` (AC-2)
+- [x] `ForbiddenPage` has `aria-labelledby` referencing the `<h1>` (WCAG 2.1 AA)
 
 ## Dependencies
 
@@ -287,5 +287,5 @@ hasAnyRole: (roles) => hasAnyRole(user?.roles ?? [], roles),
 
 ## Definition of Done
 
-- [ ] `pnpm build` succeeds with no TypeScript errors
-- [ ] React Testing Library tests: guard redirects to /403, guard redirects to /login, ADMIN passes all guards
+- [x] `pnpm build` succeeds with no TypeScript errors
+- [x] React Testing Library tests: guard redirects to /403, guard redirects to /login, ADMIN passes all guards

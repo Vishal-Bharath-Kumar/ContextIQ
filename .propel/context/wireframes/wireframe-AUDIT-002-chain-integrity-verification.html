@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<title>AUDIT-002 — Chain Integrity · ContextIQ Wireframe</title>
+<link rel="stylesheet" href="_wireframe-base.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="topbar-logo"><div class="topbar-logo-icon">C</div>ContextIQ</div>
+  <div class="topbar-sep"></div>
+  <nav class="topbar-breadcrumb"><a>Audit Log</a> <span>›</span> Chain Integrity</nav>
+  <div class="topbar-actions"><div class="topbar-search">🔍 Search</div><button class="topbar-icon-btn">🔔</button></div>
+</header>
+<nav class="sidebar" aria-label="Main navigation">
+  <div class="sidebar-nav">
+    <a class="nav-item"><span class="icon">⊞</span>Dashboard</a>
+    <div class="nav-section">Data Sources</div><a class="nav-item"><span class="icon">⬡</span>Connectors</a><a class="nav-item"><span class="icon">🗄</span>Knowledge Sources</a>
+    <div class="nav-section">Governance</div><a class="nav-item"><span class="icon">🛡</span>Policies</a>
+    <div class="nav-section">Observability</div><a class="nav-item"><span class="icon">▶</span>Replay Explorer</a>
+    <a class="nav-item active" aria-current="page"><span class="icon">📋</span>Audit Log</a>
+    <a class="nav-item"><span class="icon">📊</span>Observability</a>
+    <div class="nav-section">Platform</div><a class="nav-item"><span class="icon">👥</span>Users</a><a class="nav-item"><span class="icon">💻</span>Models</a><a class="nav-item"><span class="icon">⚙</span>Settings</a>
+  </div>
+  <div class="sidebar-user"><div class="user-avatar">DA</div><div class="user-info"><div class="user-name">Dave Auditor</div><div class="user-role">Auditor</div></div></div>
+</nav>
+<main class="main-content" role="main">
+  <div class="page-header"><div class="page-title">Audit Log Integrity Verification</div></div>
+
+  <div style="max-width:720px">
+    <!-- Info card -->
+    <div class="card mb-6">
+      <div class="card-title">About Chain Verification</div>
+      <p style="font-size:13px;color:var(--neutral-400);line-height:1.6;margin-bottom:14px">
+        This tool re-computes the SHA-256 hash chain across every audit log entry and confirms
+        no row has been tampered with, deleted, or inserted out of sequence. For large audit logs
+        this may take several seconds.
+      </p>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:14px">
+        <div><div style="font-size:11px;color:var(--neutral-600);margin-bottom:2px">Last Verified</div><div style="font-size:13px;color:var(--neutral-400)">Never</div></div>
+        <div><div style="font-size:11px;color:var(--neutral-600);margin-bottom:2px">Rows in Chain</div><div style="font-size:13px;color:var(--neutral-200)" class="tabular">1,204</div></div>
+        <div><div style="font-size:11px;color:var(--neutral-600);margin-bottom:2px">Genesis Hash</div><div class="mono" style="font-size:11px;color:var(--neutral-600)">00000000…</div></div>
+      </div>
+      <button class="btn btn-primary">Run Verification</button>
+    </div>
+
+    <!-- VALID result (shown after run) -->
+    <div class="alert alert-success" role="alert" aria-live="assertive" style="border-radius:8px;padding:20px">
+      <div style="font-size:20px">✓</div>
+      <div>
+        <div style="font-size:16px;font-weight:600;color:var(--success-400);margin-bottom:4px">Chain Valid — 1,204 rows verified</div>
+        <div style="font-size:13px;color:var(--neutral-500)">No tampering detected. All SHA-256 hashes are consistent.</div>
+        <div style="margin-top:8px;font-size:12px;color:var(--neutral-600)">
+          Verified at: <span class="mono">2026-07-14 14:45:01 UTC</span>
+          · Last row hash: <span class="mono" style="color:var(--neutral-700)">a1b2c3d4e5f67890…</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAMPERED result (alternate state — shown below for spec reference) -->
+    <div style="margin-top:20px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:var(--neutral-600);margin-bottom:8px">↓ Tampered state (alternate UI shown for spec reference)</div>
+    <div class="alert alert-danger" role="alert" style="border-radius:8px;padding:20px;margin-bottom:14px">
+      <div style="font-size:20px">✗</div>
+      <div style="flex:1">
+        <div style="font-size:16px;font-weight:600;color:var(--danger-400);margin-bottom:4px">Integrity Failure — Tampering Detected</div>
+        <div style="font-size:13px;color:var(--neutral-500)">First mismatch detected at row 847. The chain has been tampered with or corrupted.</div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">Tamper Evidence</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;font-size:12px;margin-bottom:14px">
+        <div><div style="color:var(--neutral-600);margin-bottom:2px">Row Index</div><div class="tabular" style="color:var(--danger-400);font-size:18px;font-weight:600">847</div></div>
+        <div><div style="color:var(--neutral-600);margin-bottom:2px">Row ID</div><div class="mono" style="color:var(--neutral-400);font-size:11px">audit-00847-a1b2c3d4</div></div>
+        <div><div style="color:var(--neutral-600);margin-bottom:2px">Expected Hash</div><div class="mono" style="color:var(--neutral-600);font-size:11px">f1e2d3c4…</div></div>
+        <div><div style="color:var(--neutral-600);margin-bottom:2px">Stored Hash</div><div class="mono" style="color:var(--danger-400);font-size:11px">99aa1122…</div></div>
+      </div>
+      <button class="btn btn-outline btn-sm">↓ Download Incident Report (JSON)</button>
+    </div>
+  </div>
+</main>
+<aside class="annotation-panel">
+  <div class="ann-screen-id">AUDIT-002</div>
+  <div class="ann-route">Route: /audit-log/verify</div>
+  <div class="ann-guard">Guard: AUDITOR, SECURITY_OFFICER, ADMIN</div>
+  <div class="ann-divider"></div>
+  <div class="ann-section">Components</div>
+  <div class="ann-item"><div class="ann-component">&lt;InfoCard&gt;</div><div class="ann-note">Description + row count + last-verified + Run button</div></div>
+  <div class="ann-item"><div class="ann-component">&lt;IntegrityResultCard variant="success"&gt;</div><div class="ann-note">success-900 bg · role="alert" aria-live="assertive"</div></div>
+  <div class="ann-item"><div class="ann-component">&lt;IntegrityResultCard variant="error"&gt;</div><div class="ann-note">danger-900 bg · first divergent row details</div></div>
+  <div class="ann-item"><div class="ann-component">&lt;Button&gt; Download Evidence</div><div class="ann-note">Only rendered on TAMPERED result</div></div>
+  <div class="ann-divider"></div>
+  <div class="ann-section">Backend</div>
+  <div class="ann-note">GET /api/v1/audit-log/verify<br>Returns: { valid, row_count, first_mismatch? }</div>
+  <div class="ann-divider"></div>
+  <div class="ann-section">States</div>
+  <span class="state-chip">idle</span><span class="state-chip">loading</span>
+  <span class="state-chip">VALID</span><span class="state-chip">TAMPERED</span>
+</aside>
+</body>
+</html>

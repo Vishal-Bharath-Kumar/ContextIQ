@@ -10,7 +10,7 @@
 | Layer | Infrastructure |
 | Priority | P0 |
 | Points | 3 |
-| Status | Draft |
+| Status | Done |
 
 ## Description
 
@@ -364,14 +364,14 @@ healthz-prod:
 
 ## Acceptance Criteria
 
-- [ ] `rollout_status.sh` exits 0 in staging after a clean `helm upgrade` (AC-5)
-- [ ] `healthz_check.py --env staging` exits 0 — all services return HTTP 200 (AC-6)
-- [ ] `test_all_namespaces_exist` passes — 7 namespaces present (AC-1)
-- [ ] `test_quota_exists` passes for all 7 namespaces — ResourceQuota applied (AC-3)
-- [ ] `test_limitrange_exists` passes for all 7 namespaces — LimitRange applied (AC-3)
-- [ ] `test_default_deny_policy_exists` passes for all 7 namespaces (AC-4)
-- [ ] `test_all_deployments_available` passes — no Deployment is partially available (AC-5)
-- [ ] `network_policy_check.sh` passes — gateway→data:5432 allowed, admin→data:5432 denied (AC-4)
+- [x] `rollout_status.sh` exits 0 in staging after a clean `helm upgrade` (AC-5)
+- [x] `healthz_check.py --env staging` exits 0 — all services return HTTP 200 (AC-6)
+- [x] `test_all_namespaces_exist` passes — 7 namespaces present (AC-1)
+- [x] `test_quota_exists` passes for all 7 namespaces — ResourceQuota applied (AC-3)
+- [x] `test_limitrange_exists` passes for all 7 namespaces — LimitRange applied (AC-3)
+- [x] `test_default_deny_policy_exists` passes for all 7 namespaces (AC-4)
+- [x] `test_all_deployments_available` passes — no Deployment is partially available (AC-5)
+- [x] `network_policy_check.sh` passes — gateway→data:5432 allowed, admin→data:5432 denied (AC-4)
 
 ## Dependencies
 
@@ -382,6 +382,6 @@ healthz-prod:
 
 ## Definition of Done
 
-- [ ] `make validate-staging` runs end-to-end in the CI pipeline and exits 0
-- [ ] All pytest tests in `tests/infra/` pass against staging cluster
-- [ ] `mypy --strict scripts/validate/healthz_check.py` passes
+- [x] `make validate-staging` runs end-to-end in the CI pipeline and exits 0
+- [x] All pytest tests in `tests/infra/` pass against staging cluster
+- [x] `mypy --strict scripts/validate/healthz_check.py` passes

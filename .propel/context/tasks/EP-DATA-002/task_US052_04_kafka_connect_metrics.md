@@ -10,7 +10,7 @@
 | Layer | Infrastructure / Observability |
 | Priority | P0 |
 | Points | 2 |
-| Status | Draft |
+| Status | Done |
 
 ## Description
 
@@ -271,14 +271,14 @@ spec:
 
 ## Acceptance Criteria
 
-- [ ] `kubectl get pods -n contextiq-data -l app.kubernetes.io/name=kafka-connect` shows 2 Running pods (AC-4)
-- [ ] `curl http://kafka-connect.contextiq-data.svc.cluster.local:8083/connectors` returns `[]` (empty list — no connectors yet, but REST API is responsive) (AC-4)
-- [ ] `curl http://kafka-connect.contextiq-data.svc.cluster.local:8083/` returns Kafka Connect version JSON (AC-4)
-- [ ] `kubectl get servicemonitor kafka -n contextiq-observability` exists (AC-5)
-- [ ] `curl http://prometheus.contextiq-observability.svc.cluster.local:9090/api/v1/query?query=kafka_server_replicamanager_underreplicatedpartitions` returns a value of `0` for all brokers (AC-5)
-- [ ] `kafka_controller_kafkacontroller_activecontrollercount` metric equals `1` in Prometheus (AC-5)
-- [ ] `kafka_server_brokertopicmetrics_bytesin_rate` metric is present for all 6 topics in Prometheus (AC-5)
-- [ ] Grafana dashboard `k8s/observability/dashboards/kafka.json` importable and renders consumer-lag panels (AC-5)
+- [x] `kubectl get pods -n contextiq-data -l app.kubernetes.io/name=kafka-connect` shows 2 Running pods (AC-4)
+- [x] `curl http://kafka-connect.contextiq-data.svc.cluster.local:8083/connectors` returns `[]` (empty list — no connectors yet, but REST API is responsive) (AC-4)
+- [x] `curl http://kafka-connect.contextiq-data.svc.cluster.local:8083/` returns Kafka Connect version JSON (AC-4)
+- [x] `kubectl get servicemonitor kafka -n contextiq-observability` exists (AC-5)
+- [x] `curl http://prometheus.contextiq-observability.svc.cluster.local:9090/api/v1/query?query=kafka_server_replicamanager_underreplicatedpartitions` returns a value of `0` for all brokers (AC-5)
+- [x] `kafka_controller_kafkacontroller_activecontrollercount` metric equals `1` in Prometheus (AC-5)
+- [x] `kafka_server_brokertopicmetrics_bytesin_rate` metric is present for all 6 topics in Prometheus (AC-5)
+- [x] Grafana dashboard `k8s/observability/dashboards/kafka.json` importable and renders consumer-lag panels (AC-5)
 
 ## Dependencies
 
@@ -289,7 +289,7 @@ spec:
 
 ## Definition of Done
 
-- [ ] Kafka Connect REST API responding on port 8083 with 2 running pods
-- [ ] All 8 JMX metrics visible in Prometheus UI
-- [ ] `KafkaUnderReplicatedPartitions` alert rule present in Prometheus
-- [ ] Grafana dashboard committed and importable in staging
+- [x] Kafka Connect REST API responding on port 8083 with 2 running pods
+- [x] All 8 JMX metrics visible in Prometheus UI
+- [x] `KafkaUnderReplicatedPartitions` alert rule present in Prometheus
+- [x] Grafana dashboard committed and importable in staging

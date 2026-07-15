@@ -10,7 +10,7 @@
 | Layer | Infrastructure |
 | Priority | P0 |
 | Points | 2 |
-| Status | Draft |
+| Status | Done |
 
 ## Description
 
@@ -187,12 +187,12 @@ vault:
 
 ## Acceptance Criteria
 
-- [ ] Vault Agent init-container (`vault-agent-init`) is present in running pods: `kubectl describe pod <pod> -n contextiq-gateway | grep vault-agent` (AC-3)
-- [ ] `/vault/secrets/postgres.env` exists inside the mcp-gateway container and contains valid `export USERNAME=...` lines (AC-3)
-- [ ] `vault list sys/leases/lookup/database/postgres/creds/mcp-gateway` shows active leases — one per running pod (AC-4)
-- [ ] Sidecar (`vault-agent`) remains running alongside the app container and renews the lease before 1h TTL — verifiable by watching `vault lease lookup <lease_id>` for a `ttl` reset (AC-4)
-- [ ] Deleting a pod and letting it restart generates a new, unique PostgreSQL username in `/vault/secrets/postgres.env` (AC-2, AC-4)
-- [ ] `vault.enabled: false` in dev values results in no Vault annotations in rendered templates
+- [x] Vault Agent init-container (`vault-agent-init`) is present in running pods: `kubectl describe pod <pod> -n contextiq-gateway | grep vault-agent` (AC-3)
+- [x] `/vault/secrets/postgres.env` exists inside the mcp-gateway container and contains valid `export USERNAME=...` lines (AC-3)
+- [x] `vault list sys/leases/lookup/database/postgres/creds/mcp-gateway` shows active leases — one per running pod (AC-4)
+- [x] Sidecar (`vault-agent`) remains running alongside the app container and renews the lease before 1h TTL — verifiable by watching `vault lease lookup <lease_id>` for a `ttl` reset (AC-4)
+- [x] Deleting a pod and letting it restart generates a new, unique PostgreSQL username in `/vault/secrets/postgres.env` (AC-2, AC-4)
+- [x] `vault.enabled: false` in dev values results in no Vault annotations in rendered templates
 
 ## Dependencies
 
@@ -202,6 +202,6 @@ vault:
 
 ## Definition of Done
 
-- [ ] `helm template helm/charts/mcp-gateway/ | grep vault.hashicorp.com/agent-inject` returns `"true"` (when `vault.enabled: true`)
-- [ ] Pod in staging starts successfully and application logs show no database connection errors
-- [ ] `kubectl exec -n contextiq-gateway <pod> -- cat /vault/secrets/postgres.env` shows live credentials
+- [x] `helm template helm/charts/mcp-gateway/ | grep vault.hashicorp.com/agent-inject` returns `"true"` (when `vault.enabled: true`)
+- [x] Pod in staging starts successfully and application logs show no database connection errors
+- [x] `kubectl exec -n contextiq-gateway <pod> -- cat /vault/secrets/postgres.env` shows live credentials

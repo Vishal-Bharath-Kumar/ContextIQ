@@ -1,0 +1,19 @@
+# Global defaults (overridden per environment values file)
+global:
+  imageRegistry: ""
+  environment: development
+
+mcp-gateway:
+  replicaCount: 2
+
+agent-worker:
+  replicaCount: 2
+
+admin-portal:
+  replicaCount: 2
+
+keycloak:
+  replicaCount: 2
+
+jaeger:
+  replicaCount: 1

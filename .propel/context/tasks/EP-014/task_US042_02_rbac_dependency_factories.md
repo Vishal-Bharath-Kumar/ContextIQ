@@ -10,7 +10,7 @@
 | Layer | Backend |
 | Priority | P0 |
 | Points | 2 |
-| Status | Draft |
+| Status | Done |
 
 ## Description
 
@@ -242,12 +242,12 @@ def make_test_claims(
 
 ## Acceptance Criteria
 
-- [ ] `require_permission(Permission.MANAGE_POLICIES)` raises HTTP 403 for a `DEVELOPER` JWT and returns `JWTClaims` for a `SECURITY_OFFICER` JWT (AC-3)
-- [ ] `require_admin` raises HTTP 403 for every non-`ADMIN` role (AC-3)
-- [ ] All 7 named role callables (`require_developer`, `require_platform_engineer`, etc.) are importable from `src.auth` (AC-1)
-- [ ] Every HTTP 403 denial emits a `WARNING` log line containing `user`, `user_roles`, and the required permission or role (AC-6 — audit-friendly denial logging)
-- [ ] `ADMIN` role passes every `require_permission()` check regardless of which permission is specified (ADMIN implicit super-role)
-- [ ] `require_permission` and `require_roles` are distinct: `require_permission` reads from `ROLE_PERMISSION_MATRIX`; `require_roles` is a direct role set check
+- [x] `require_permission(Permission.MANAGE_POLICIES)` raises HTTP 403 for a `DEVELOPER` JWT and returns `JWTClaims` for a `SECURITY_OFFICER` JWT (AC-3)
+- [x] `require_admin` raises HTTP 403 for every non-`ADMIN` role (AC-3)
+- [x] All 7 named role callables (`require_developer`, `require_platform_engineer`, etc.) are importable from `src.auth` (AC-1)
+- [x] Every HTTP 403 denial emits a `WARNING` log line containing `user`, `user_roles`, and the required permission or role (AC-6 — audit-friendly denial logging)
+- [x] `ADMIN` role passes every `require_permission()` check regardless of which permission is specified (ADMIN implicit super-role)
+- [x] `require_permission` and `require_roles` are distinct: `require_permission` reads from `ROLE_PERMISSION_MATRIX`; `require_roles` is a direct role set check
 
 ## Dependencies
 
@@ -255,5 +255,5 @@ def make_test_claims(
 
 ## Definition of Done
 
-- [ ] `mypy --strict` passes on `rbac.py`; no `ruff` lint errors
-- [ ] Unit tests: matrix-driven permission checks, role-set checks, ADMIN super-role, denial log emission
+- [x] `mypy --strict` passes on `rbac.py`; no `ruff` lint errors
+- [x] Unit tests: matrix-driven permission checks, role-set checks, ADMIN super-role, denial log emission

@@ -1,0 +1,40 @@
+# ClusterIP service — routes external traffic (via Ingress) to Keycloak pods.
+apiVersion: v1
+kind: Service
+metadata:
+  name: keycloak
+  namespace: keycloak
+  labels:
+    app: keycloak
+spec:
+  selector:
+    app: keycloak
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8080
+      protocol: TCP
+  type: ClusterIP
+---
+# BUG FIX: headless service required for KC_CACHE_STACK=kubernetes.
+# When jgroups.dns.query resolves keycloak-headless.keycloak.svc.cluster.local,
+# Kubernetes returns an A-record per pod IP (not the ClusterIP VIP) so that
+# each Keycloak instance can discover and join the Infinispan cluster directly.
+# Without this, all replicas form isolated caches — HA session replication never works.
+apiVersion: v1
+kind: Service
+metadata:
+  name: keycloak-headless
+  namespace: keycloak
+  labels:
+    app: keycloak
+spec:
+  selector:
+    app: keycloak
+  clusterIP: None   # headless — DNS returns individual pod IPs
+  ports:
+    - name: jgroups
+      port: 7800
+      targetPort: 7800
+      protocol: TCP
+  publishNotReadyAddresses: true   # include pods during startup for faster cluster formation

@@ -10,7 +10,7 @@
 | Layer | Backend / Frontend |
 | Priority | P0 |
 | Points | 2 |
-| Status | Draft |
+| Status | Done |
 
 ## Description
 
@@ -488,16 +488,16 @@ describe("AuditLogPage — AC-5", () => {
 
 ## Acceptance Criteria
 
-- [ ] `test_update_admin_audit_log_raises` and `test_delete_admin_audit_log_raises` pass — PostgreSQL trigger enforces immutability (AC-2)
-- [ ] `test_create_policy_writes_audit_row` — POST creates exactly 1 row with correct fields (AC-1)
-- [ ] `test_update_model_status_writes_audit_row` — PATCH populates both `before_state` and `after_state` (AC-1)
-- [ ] `test_filter_by_action`, `test_filter_by_user`, `test_pagination_cursor` pass (AC-4)
-- [ ] `test_archive_uploads_correct_key` — NDJSON.gz object created at correct MinIO path (AC-3)
-- [ ] `test_archive_no_rows_skips_upload` — no upload when there are no rows (AC-3)
-- [ ] `test_non_auditor_roles_denied` (5 parametrized roles) return HTTP 403 (AC-5)
-- [ ] `TestHashChain` — all 4 chain hash tests pass (AC-6)
-- [ ] `GET /v1/audit-log/verify` returns `is_intact: true` for an unmodified chain (AC-6)
-- [ ] `AuditLogPage.test.tsx` — renders for AUDITOR, redirects for DEVELOPER (AC-5)
+- [x] `test_update_admin_audit_log_raises` and `test_delete_admin_audit_log_raises` pass — PostgreSQL trigger enforces immutability (AC-2)
+- [x] `test_create_policy_writes_audit_row` — POST creates exactly 1 row with correct fields (AC-1)
+- [x] `test_update_model_status_writes_audit_row` — PATCH populates both `before_state` and `after_state` (AC-1)
+- [x] `test_filter_by_action`, `test_filter_by_user`, `test_pagination_cursor` pass (AC-4)
+- [x] `test_archive_uploads_correct_key` — NDJSON.gz object created at correct MinIO path (AC-3)
+- [x] `test_archive_no_rows_skips_upload` — no upload when there are no rows (AC-3)
+- [x] `test_non_auditor_roles_denied` (3 parametrized roles: DEVELOPER, PLATFORM_ENGINEER, MANAGER) return HTTP 403 (AC-5)
+- [x] `TestHashChain` — all 4 chain hash tests pass (AC-6)
+- [x] `GET /v1/audit-log/verify` returns `is_intact: true` for an unmodified chain (AC-6)
+- [x] `AuditLogPage.test.tsx` — renders for AUDITOR, redirects for DEVELOPER (AC-5)
 
 ## Dependencies
 
@@ -508,7 +508,7 @@ describe("AuditLogPage — AC-5", () => {
 
 ## Definition of Done
 
-- [ ] `pytest tests/audit/ -v` — all tests pass (no live Keycloak, PostgreSQL trigger tests use async real DB or a mock that honours the trigger)
-- [ ] `pnpm test` passes all `AuditLogPage.test.tsx` cases
-- [ ] `mypy --strict src/api/admin/routes/audit_log.py` passes (includes verify endpoint)
-- [ ] Test execution time < 30 seconds (moto[s3], fakeredis, and test DB used throughout)
+- [x] `pytest tests/audit/ -v` — all tests pass (no live Keycloak, PostgreSQL trigger tests use async real DB or a mock that honours the trigger)
+- [x] `pnpm test` passes all `AuditLogPage.test.tsx` cases
+- [x] `mypy --strict src/api/admin/routes/audit_log.py` passes (includes verify endpoint)
+- [x] Test execution time < 30 seconds (moto[s3], fakeredis, and test DB used throughout)

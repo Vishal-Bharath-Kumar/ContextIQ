@@ -10,7 +10,7 @@
 | Layer | Backend |
 | Priority | P0 |
 | Points | 2 |
-| Status | Draft |
+| Status | Done |
 
 ## Description
 
@@ -453,18 +453,18 @@ class TestSamlBrokerIdempotency:
 
 ## Acceptance Criteria
 
-- [ ] `test_decode_valid_token` — valid RS256-signed JWT decoded successfully (AC-3)
-- [ ] `test_decode_expired_token_raises` — expired token raises `JWTError` (AC-6)
-- [ ] `test_decode_wrong_audience_raises` — wrong `aud` claim rejected (AC-3)
-- [ ] `test_jwks_cache_prevents_repeated_fetch` — JWKS endpoint called at most twice for 5 sequential decodes (TASK-US043-03 cache)
-- [ ] `test_unknown_kid_triggers_refresh` — unknown key triggers exactly one refresh, then fails (TASK-US043-03)
-- [ ] `test_missing_auth_header_returns_401` — middleware returns 401 for missing header (AC-3)
-- [ ] `test_expired_token_returns_401` — middleware returns 401 for expired token (AC-6)
-- [ ] `test_health_endpoint_skips_auth` — `/healthz` returns 200 without any Authorization header (AC-3 skip-paths)
-- [ ] `test_refresh_token_lifetime_configured_in_realm_bootstrap` — bootstrap script contains `ssoSessionMaxLifespan=28800` (AC-6)
-- [ ] `test_create_called_when_idp_absent` (both Entra and SAML) — first run creates IdP (AC-2, AC-7)
-- [ ] `test_update_called_when_idp_exists` (both Entra and SAML) — second run updates, not duplicates (AC-2, AC-7)
-- [ ] `test_mapper_not_duplicated_if_already_exists` — mapper idempotency guard works (AC-4)
+- [x] `test_decode_valid_token` — valid RS256-signed JWT decoded successfully (AC-3)
+- [x] `test_decode_expired_token_raises` — expired token raises `JWTError` (AC-6)
+- [x] `test_decode_wrong_audience_raises` — wrong `aud` claim rejected (AC-3)
+- [x] `test_jwks_cache_prevents_repeated_fetch` — JWKS endpoint called at most twice for 5 sequential decodes (TASK-US043-03 cache)
+- [x] `test_unknown_kid_triggers_refresh` — unknown key triggers exactly one refresh, then fails (TASK-US043-03)
+- [x] `test_missing_auth_header_returns_401` — middleware returns 401 for missing header (AC-3)
+- [x] `test_expired_token_returns_401` — middleware returns 401 for expired token (AC-6)
+- [x] `test_health_endpoint_skips_auth` — `/healthz` returns 200 without any Authorization header (AC-3 skip-paths)
+- [x] `test_refresh_token_lifetime_configured_in_realm_bootstrap` — bootstrap script contains `ssoSessionMaxLifespan=28800` (AC-6)
+- [x] `test_create_called_when_idp_absent` (both Entra and SAML) — first run creates IdP (AC-2, AC-7)
+- [x] `test_update_called_when_idp_exists` (both Entra and SAML) — second run updates, not duplicates (AC-2, AC-7)
+- [x] `test_mapper_not_duplicated_if_already_exists` — mapper idempotency guard works (AC-4)
 
 ## Dependencies
 
@@ -475,6 +475,6 @@ class TestSamlBrokerIdempotency:
 
 ## Definition of Done
 
-- [ ] `pytest tests/auth/ -v` passes all tests in this task (no live Keycloak required)
-- [ ] `mypy --strict tests/auth/conftest.py tests/auth/test_jwks_client.py tests/auth/test_jwt_middleware.py` passes
-- [ ] Test execution time < 10 seconds (all mocked — no network I/O)
+- [x] `pytest tests/auth/ -v` passes all tests in this task (no live Keycloak required)
+- [x] `mypy --strict tests/auth/conftest.py tests/auth/test_jwks_client.py tests/auth/test_jwt_middleware.py` passes
+- [x] Test execution time < 10 seconds (all mocked — no network I/O)

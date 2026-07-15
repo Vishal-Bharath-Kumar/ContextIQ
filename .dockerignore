@@ -1,0 +1,53 @@
+# .dockerignore — files excluded from the Docker build context
+# Keeping the build context lean reduces transfer time and prevents
+# accidental inclusion of secrets or test artefacts in the image.
+
+# Version control
+.git/
+.gitignore
+
+# CI/CD and GitHub configuration — not needed at runtime
+.github/
+
+# Python caches and type-check artefacts
+.mypy_cache/
+.ruff_cache/
+.uv-cache/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Test suite — never include in production images
+tests/
+
+# Documentation
+docs/
+*.md
+*.rst
+
+# Local secrets and environment overrides — must never enter an image
+*.env
+*.env.*
+.env.local
+.env.*.local
+secrets/
+
+# Infrastructure definitions — not needed at runtime
+helm/
+k8s/
+argocd/
+scripts/
+infra/
+
+# Editor and OS artefacts
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Build outputs
+dist/
+build/
+*.egg-info/

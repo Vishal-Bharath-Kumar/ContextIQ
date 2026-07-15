@@ -1,0 +1,28 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "contextiq-common.fullname" . }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "contextiq-common.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "contextiq-common.selectorLabels" . | nindent 6 }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  template:
+    metadata:
+      labels:
+        {{- include "contextiq-common.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: agent-worker
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port:   "9000"
+        prometheus.io/path:   "/metrics"
+        # AC-3: Vault Agent Injector annotations
+        {{- include "contextiq-common.vault.annotations" . | nindent 8 }}

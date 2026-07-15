@@ -1,0 +1,38 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: opensearch
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: contextiq
+  # Multi-source: upstream OpenSearch Helm chart + custom values from git ($values)
+  sources:
+    # Source 1: upstream OpenSearch Helm chart
+    - repoURL:        https://opensearch-project.github.io/helm-charts
+      chart:          opensearch
+      targetRevision: "2.14.0"    # pinned; matches Chart.yaml dependency version
+      helm:
+        valueFiles:
+          - $values/helm/charts/opensearch/values.yaml
+          - $values/helm/charts/opensearch/values-prod.yaml
+    # Source 2: git repo supplying the custom values files (referenced as $values above)
+    - repoURL:        https://github.com/your-org/contextiq.git
+      targetRevision: HEAD
+      ref:            values
+  destination:
+    server:    https://kubernetes.default.svc
+    namespace: contextiq-data
+  syncPolicy:
+    automated:
+      prune:    false    # never auto-prune a stateful data store
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false    # namespace managed by TASK-US045-01
+      - ApplyOutOfSyncOnly=true
+  ignoreDifferences:
+    - group: apps
+      kind:  StatefulSet
+      jsonPointers:
+        - /spec/replicas    # ignore manual replica adjustments

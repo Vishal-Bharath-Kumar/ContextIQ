@@ -10,7 +10,7 @@
 | Layer | Backend |
 | Priority | P0 |
 | Points | 2 |
-| Status | Draft |
+| Status | Done |
 
 ## Description
 
@@ -311,13 +311,13 @@ def create_app() -> FastAPI:
 
 ## Acceptance Criteria
 
-- [ ] `JWKSClient.decode()` raises `JWTError` for an expired token (exp in the past) — enforcing 5-min access token TTL (AC-6)
-- [ ] `JWKSClient.decode()` raises `JWTError` for a token signed by an unknown key (rotated key scenario) — one automatic JWKS refresh attempted (AC-3)
-- [ ] `JWTAuthMiddleware` returns HTTP 401 for requests with no Authorization header on protected paths (AC-3)
-- [ ] `JWTAuthMiddleware` returns HTTP 401 for tokens with an expired `exp` claim (AC-6)
-- [ ] `JWTAuthMiddleware` stores valid `JWTClaims` on `request.state.jwt_claims` — consumed by RBAC dependencies (AC-3)
-- [ ] `KeycloakSettings` reads all values from env vars; no hard-coded URLs in code (OWASP A05)
-- [ ] JWKS cache TTL is `_JWKS_TTL_SECONDS = 300` — aligns with Keycloak key rotation cadence
+- [x] `JWKSClient.decode()` raises `JWTError` for an expired token (exp in the past) — enforcing 5-min access token TTL (AC-6)
+- [x] `JWKSClient.decode()` raises `JWTError` for a token signed by an unknown key (rotated key scenario) — one automatic JWKS refresh attempted (AC-3)
+- [x] `JWTAuthMiddleware` returns HTTP 401 for requests with no Authorization header on protected paths (AC-3)
+- [x] `JWTAuthMiddleware` returns HTTP 401 for tokens with an expired `exp` claim (AC-6)
+- [x] `JWTAuthMiddleware` stores valid `JWTClaims` on `request.state.jwt_claims` — consumed by RBAC dependencies (AC-3)
+- [x] `KeycloakSettings` reads all values from env vars; no hard-coded URLs in code (OWASP A05)
+- [x] JWKS cache TTL is `_JWKS_TTL_SECONDS = 300` — aligns with Keycloak key rotation cadence
 
 ## Dependencies
 
@@ -326,6 +326,6 @@ def create_app() -> FastAPI:
 
 ## Definition of Done
 
-- [ ] `pytest tests/auth/test_jwks_client.py` passes (see TASK-US043-05)
-- [ ] `mypy --strict src/auth/jwks_client.py src/auth/middleware.py src/auth/keycloak_settings.py` passes
-- [ ] `pip install python-jose[cryptography]` added to `requirements.txt` / `pyproject.toml`
+- [x] `pytest tests/auth/test_jwks_client.py` passes (see TASK-US043-05)
+- [x] `mypy --strict src/auth/jwks_client.py src/auth/middleware.py src/auth/keycloak_settings.py` passes
+- [x] `pip install python-jose[cryptography]` added to `requirements.txt` / `pyproject.toml`

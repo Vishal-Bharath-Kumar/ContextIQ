@@ -1,0 +1,137 @@
+# AC-1: Vault HA Raft — 3 nodes, AWS KMS auto-unseal, Vault Agent Injector enabled.
+# Values follow the hashicorp/vault Helm chart schema (0.28.x).
+# Replace ACCOUNT_ID with your AWS account ID before deploying.
+global:
+  enabled:    true
+  tlsDisable: false   # TLS between Vault nodes and clients (US-048)
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Vault Agent Injector — required for AC-3 per-pod sidecar injection
+# ──────────────────────────────────────────────────────────────────────────────
+injector:
+  enabled:  true
+  replicas: 2   # HA: two injector pods so pod creation works during rolling upgrade
+  resources:
+    requests:
+      cpu:    "250m"
+      memory: "256Mi"
+    limits:
+      cpu:    "500m"
+      memory: "512Mi"
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Vault server
+# ──────────────────────────────────────────────────────────────────────────────
+server:
+  image:
+    repository: hashicorp/vault
+    tag:        "1.16.2"   # pin to specific release for reproducibility
+
+  # Service account with AWS IRSA annotation for KMS access (no static credentials)
+  serviceAccount:
+    create: true
+    name:   vault
+    annotations:
+      eks.amazonaws.com/role-arn: "arn:aws:iam::ACCOUNT_ID:role/contextiq-vault-unseal"
+
+  # HA Raft configuration — 3 nodes (AC-1)
+  ha:
+    enabled:  true
+    replicas: 3
+    raft:
+      enabled:   true
+      setNodeId: true   # injects the pod name as node_id automatically
+      config: |
+        ui = true
+
+        listener "tcp" {
+          tls_disable        = 0
+          address            = "[::]:8200"
+          cluster_address    = "[::]:8201"
+          tls_cert_file      = "/vault/userconfig/vault-tls/tls.crt"
+          tls_key_file       = "/vault/userconfig/vault-tls/tls.key"
+          tls_client_ca_file = "/vault/userconfig/vault-tls/ca.crt"
+        }
+
+        storage "raft" {
+          path    = "/vault/data"
+          node_id = "VAULT_NODE_ID"   # substituted at pod start by setNodeId: true
+
+          retry_join {
+            leader_api_addr     = "https://vault-0.vault-internal:8200"
+            leader_ca_cert_file = "/vault/userconfig/vault-tls/ca.crt"
+          }
+          retry_join {
+            leader_api_addr     = "https://vault-1.vault-internal:8200"
+            leader_ca_cert_file = "/vault/userconfig/vault-tls/ca.crt"
+          }
+          retry_join {
+            leader_api_addr     = "https://vault-2.vault-internal:8200"
+            leader_ca_cert_file = "/vault/userconfig/vault-tls/ca.crt"
+          }
+        }
+
+        # AC-1: auto-unseal via AWS KMS — prevents manual unseal on pod restart.
+        # Credentials provided via Pod IAM role (IRSA) — never hard-coded.
+        seal "awskms" {
+          region     = "us-east-1"
+          kms_key_id = "alias/contextiq-vault-unseal"
+        }
+
+        service_registration "kubernetes" {}
+
+  # Persistent storage for Raft state
+  dataStorage:
+    enabled:      true
+    size:         "10Gi"
+    storageClass: "gp3"   # AWS gp3; replace with cloud-specific high-IOPS class
+
+  # AC-1 HA: spread Vault pods across distinct cluster nodes
+  affinity: |
+    podAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        - labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: vault
+              component: server
+          topologyKey: kubernetes.io/hostname
+
+  resources:
+    requests:
+      cpu:    "500m"
+      memory: "1Gi"
+    limits:
+      cpu:    "2"
+      memory: "4Gi"
+
+  # Run as non-root; IPC_LOCK is required by Vault to prevent secret memory from being swapped
+  securityContext:
+    runAsNonRoot:             true
+    runAsUser:                100
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop: ["ALL"]
+      add:  ["IPC_LOCK"]
+
+  # Vault is ready only when unsealed and active/standby
+  readinessProbe:
+    exec:
+      command:
+        - /bin/sh
+        - -ec
+        - vault status -tls-skip-verify
+    initialDelaySeconds: 5
+    periodSeconds:       5
+    failureThreshold:    2
+
+  # AC-1 HA: at least 2 nodes available during voluntary disruptions
+  podDisruptionBudget:
+    enabled:      true
+    minAvailable: 2
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Vault UI — exposed via Ingress at /vault path
+# ──────────────────────────────────────────────────────────────────────────────
+ui:
+  enabled:     true
+  serviceType: ClusterIP

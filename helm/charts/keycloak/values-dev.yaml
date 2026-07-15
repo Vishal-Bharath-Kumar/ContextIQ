@@ -1,0 +1,5 @@
+replicaCount: 1
+hpa:
+  enabled: false
+pdb:
+  enabled: false

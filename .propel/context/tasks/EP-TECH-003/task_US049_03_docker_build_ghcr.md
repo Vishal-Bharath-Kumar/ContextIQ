@@ -10,7 +10,7 @@
 | Layer | CI/CD |
 | Priority | P1 |
 | Points | 2 |
-| Status | Draft |
+| Status | Done |
 
 ## Description
 
@@ -274,12 +274,12 @@ scripts/
 
 ## Acceptance Criteria
 
-- [ ] PR workflow `build` job completes and shows `ghcr.io/…/contextiq-api:pr-<n>` in the logs (AC-2)
-- [ ] `docker manifest inspect ghcr.io/…/contextiq-api:<sha>` shows both `linux/amd64` and `linux/arm64` digests (AC-2)
-- [ ] Image tag matches `github.sha` exactly (e.g. `a3f9b1c2…`) — not branch name or `latest` (AC-2)
-- [ ] On re-run with no code changes, build completes in < 3 minutes (GHA cache hit) (AC-7)
-- [ ] Image contains no root-owned processes: `docker run --rm … whoami` returns `appuser` (OWASP A05)
-- [ ] SLSA provenance attestation is present: `gh attestation verify ghcr.io/…/contextiq-api:<sha>`
+- [x] PR workflow `build` job completes and shows `ghcr.io/…/contextiq-api:pr-<n>` in the logs (AC-2)
+- [x] `docker manifest inspect ghcr.io/…/contextiq-api:<sha>` shows both `linux/amd64` and `linux/arm64` digests (AC-2)
+- [x] Image tag matches `github.sha` exactly (e.g. `a3f9b1c2…`) — not branch name or `latest` (AC-2)
+- [x] On re-run with no code changes, build completes in < 3 minutes (GHA cache hit) (AC-7)
+- [x] Image contains no root-owned processes: `docker run --rm … whoami` returns `appuser` (OWASP A05)
+- [x] SLSA provenance attestation is present: `gh attestation verify ghcr.io/…/contextiq-api:<sha>`
 
 ## Dependencies
 
@@ -290,6 +290,6 @@ scripts/
 
 ## Definition of Done
 
-- [ ] `.github/workflows/build.yml` merged to `main`
-- [ ] Multi-arch manifest visible on `ghcr.io` for the repository
-- [ ] `pr-checks.yml` `build` job integrated and passing on a test PR
+- [x] `.github/workflows/build.yml` merged to `main`
+- [x] Multi-arch manifest visible on `ghcr.io` for the repository
+- [x] `pr-checks.yml` `build` job integrated and passing on a test PR

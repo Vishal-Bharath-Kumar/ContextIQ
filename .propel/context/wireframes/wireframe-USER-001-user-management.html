@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<title>USER-001 — User Management · ContextIQ Wireframe</title>
+<link rel="stylesheet" href="_wireframe-base.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="topbar-logo"><div class="topbar-logo-icon">C</div>ContextIQ</div>
+  <div class="topbar-sep"></div>
+  <nav class="topbar-breadcrumb">Users</nav>
+  <div class="topbar-actions"><div class="topbar-search">🔍 Search</div><button class="topbar-icon-btn">🔔</button></div>
+</header>
+<nav class="sidebar" aria-label="Main navigation">
+  <div class="sidebar-nav">
+    <a class="nav-item"><span class="icon">⊞</span>Dashboard</a>
+    <div class="nav-section">Data Sources</div><a class="nav-item"><span class="icon">⬡</span>Connectors</a><a class="nav-item"><span class="icon">🗄</span>Knowledge Sources</a>
+    <div class="nav-section">Governance</div><a class="nav-item"><span class="icon">🛡</span>Policies</a>
+    <div class="nav-section">Observability</div><a class="nav-item"><span class="icon">▶</span>Replay Explorer</a><a class="nav-item"><span class="icon">📋</span>Audit Log</a><a class="nav-item"><span class="icon">📊</span>Observability</a>
+    <div class="nav-section">Platform</div>
+    <a class="nav-item active" aria-current="page"><span class="icon">👥</span>Users</a>
+    <a class="nav-item"><span class="icon">💻</span>Models</a><a class="nav-item"><span class="icon">⚙</span>Settings</a>
+  </div>
+  <div class="sidebar-user"><div class="user-avatar">AA</div><div class="user-info"><div class="user-name">Alice Admin</div><div class="user-role">Admin</div></div></div>
+</nav>
+<main class="main-content" role="main">
+  <div class="page-header">
+    <div class="page-title">Users</div>
+    <button class="btn btn-primary">+ Invite User</button>
+  </div>
+  <div class="filter-bar">
+    <input class="input-wf" style="width:240px" placeholder="🔍  Filter by name or email…">
+    <select class="select-wf"><option>All Roles</option><option>ADMIN</option><option>SECURITY_OFFICER</option><option>AUDITOR</option><option>PLATFORM_ENGINEER</option><option>DEVOPS_SRE</option><option>DEVELOPER</option><option>MANAGER</option></select>
+  </div>
+  <div class="table-wrapper">
+    <table class="table-wf" aria-label="Users">
+      <thead><tr><th>User</th><th>Role</th><th>Team</th><th>Last Active</th><th>Actions</th></tr></thead>
+      <tbody>
+        <tr style="cursor:pointer">
+          <td>
+            <div style="display:flex;align-items:center;gap:10px">
+              <div class="user-avatar" style="width:32px;height:32px;font-size:13px">AA</div>
+              <div><div>Alice Admin</div><div style="font-size:11px;color:var(--neutral-600)">alice@company.com</div></div>
+            </div>
+          </td>
+          <td><span class="badge" style="background:var(--brand-blue-600);color:white">ADMIN</span></td>
+          <td>Platform</td>
+          <td class="text-muted">just now</td>
+          <td><button class="btn btn-ghost btn-sm btn-icon" title="Edit role" aria-label="Edit role for Alice Admin">✏</button></td>
+        </tr>
+        <tr style="cursor:pointer">
+          <td>
+            <div style="display:flex;align-items:center;gap:10px">
+              <div class="user-avatar" style="background:var(--success-900);color:var(--success-400);width:32px;height:32px;font-size:13px">BP</div>
+              <div><div>Bob PE</div><div style="font-size:11px;color:var(--neutral-600)">bob@company.com</div></div>
+            </div>
+          </td>
+          <td><span class="badge" style="background:var(--success-600);color:white">PLATFORM_ENGINEER</span></td>
+          <td>Engineering</td>
+          <td class="text-muted">5m ago</td>
+          <td><button class="btn btn-ghost btn-sm btn-icon" aria-label="Edit role for Bob PE">✏</button></td>
+        </tr>
+        <tr style="cursor:pointer">
+          <td>
+            <div style="display:flex;align-items:center;gap:10px">
+              <div class="user-avatar" style="background:var(--danger-900);color:var(--danger-400);width:32px;height:32px;font-size:13px">CS</div>
+              <div><div>Carol Sec</div><div style="font-size:11px;color:var(--neutral-600)">carol@company.com</div></div>
+            </div>
+          </td>
+          <td><span class="badge" style="background:var(--danger-600);color:white">SECURITY_OFFICER</span></td>
+          <td>Security</td>
+          <td class="text-muted">1h ago</td>
+          <td><button class="btn btn-ghost btn-sm btn-icon" aria-label="Edit role for Carol Sec">✏</button></td>
+        </tr>
+        <tr style="cursor:pointer">
+          <td>
+            <div style="display:flex;align-items:center;gap:10px">
+              <div class="user-avatar" style="background:var(--warning-600);color:white;width:32px;height:32px;font-size:13px">DA</div>
+              <div><div>Dave Auditor</div><div style="font-size:11px;color:var(--neutral-600)">dave@company.com</div></div>
+            </div>
+          </td>
+          <td><span class="badge" style="background:var(--warning-600);color:white">AUDITOR</span></td>
+          <td>Compliance</td>
+          <td class="text-muted">2h ago</td>
+          <td><button class="btn btn-ghost btn-sm btn-icon" aria-label="Edit role for Dave Auditor">✏</button></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</main>
+<aside class="annotation-panel">
+  <div class="ann-screen-id">USER-001</div>
+  <div class="ann-route">Route: /users</div>
+  <div class="ann-guard">Guard: ADMIN</div>
+  <div class="ann-divider"></div>
+  <div class="ann-section">Role Badge Colors</div>
+  <div class="ann-note">ADMIN: brand-blue-600<br>SECURITY_OFFICER: danger-600<br>AUDITOR: warning-600<br>PLATFORM_ENGINEER: success-600<br>DEVOPS_SRE: info-600<br>DEVELOPER: neutral-400<br>MANAGER: neutral-700</div>
+  <div class="ann-divider"></div>
+  <div class="ann-section">Row Click</div>
+  <div class="ann-note">Opens USER-002 drawer (role assignment)</div>
+</aside>
+</body>
+</html>

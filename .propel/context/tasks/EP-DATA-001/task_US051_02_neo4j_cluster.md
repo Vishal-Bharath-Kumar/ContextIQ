@@ -10,7 +10,7 @@
 | Layer | Infrastructure / Backend |
 | Priority | P0 |
 | Points | 3 |
-| Status | Draft |
+| Status | Done |
 
 ## Description
 
@@ -307,13 +307,13 @@ spec:
 
 ## Acceptance Criteria
 
-- [ ] `kubectl get pods -n contextiq-data -l app.kubernetes.io/name=neo4j` shows 3 pods Running (AC-2)
-- [ ] `CALL dbms.cluster.overview()` shows 1 LEADER and 2 FOLLOWER with all peers online (AC-2)
-- [ ] `SHOW CONSTRAINTS` shows 7 constraints covering all 4 node types (AC-2)
-- [ ] `SHOW INDEXES` shows 8 indexes including the composite `index_incident_service_severity` (AC-2)
-- [ ] `CREATE (:Service {id: "dup"}) CREATE (:Service {id: "dup"})` raises `ConstraintValidationFailed` (AC-2)
-- [ ] Vault `database/neo4j/creds/agent-worker` credentials mount at `/vault/secrets/neo4j.env` (AC-6)
-- [ ] Prometheus scrapes port 2004; `neo4j_*` metrics visible in Grafana (AC-7)
+- [x] `kubectl get pods -n contextiq-data -l app.kubernetes.io/name=neo4j` shows 3 pods Running (AC-2)
+- [x] `CALL dbms.cluster.overview()` shows 1 LEADER and 2 FOLLOWER with all peers online (AC-2)
+- [x] `SHOW CONSTRAINTS` shows 7 constraints covering all 4 node types (AC-2)
+- [x] `SHOW INDEXES` shows 8 indexes including the composite `index_incident_service_severity` (AC-2)
+- [x] `CREATE (:Service {id: "dup"}) CREATE (:Service {id: "dup"})` raises `ConstraintValidationFailed` (AC-2)
+- [x] Vault `database/neo4j/creds/agent-worker` credentials mount at `/vault/secrets/neo4j.env` (AC-6)
+- [x] Prometheus scrapes port 2004; `neo4j_*` metrics visible in Grafana (AC-7)
 
 ## Dependencies
 
@@ -324,6 +324,6 @@ spec:
 
 ## Definition of Done
 
-- [ ] Neo4j Causal Cluster stable (no `CrashLoopBackOff`) for 15 minutes
-- [ ] `bootstrap_neo4j.py` runs without errors; all constraints verified
-- [ ] Cypher query `MATCH (s:Service) RETURN count(s)` executes on all 3 cluster members
+- [x] Neo4j Causal Cluster stable (no `CrashLoopBackOff`) for 15 minutes
+- [x] `bootstrap_neo4j.py` runs without errors; all constraints verified
+- [x] Cypher query `MATCH (s:Service) RETURN count(s)` executes on all 3 cluster members

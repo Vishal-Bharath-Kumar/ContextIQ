@@ -1,0 +1,8 @@
+kafka:
+  controller:
+    persistence:
+      size: 500Gi
+    resources:
+      requests: { cpu: "4",   memory: "16Gi" }
+      limits:   { cpu: "8",   memory: "32Gi" }
+  heapOpts: "-Xmx12G -Xms12G"

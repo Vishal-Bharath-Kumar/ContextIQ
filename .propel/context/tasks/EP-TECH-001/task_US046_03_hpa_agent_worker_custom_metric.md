@@ -10,7 +10,7 @@
 | Layer | Infrastructure |
 | Priority | P0 |
 | Points | 2 |
-| Status | Draft |
+| Status | Done |
 
 ## Description
 
@@ -243,12 +243,12 @@ hpa:
 
 ## Acceptance Criteria
 
-- [ ] `kubectl get hpa -n contextiq-agents` shows `MIN PODS: 2`, `MAX PODS: 20`, metric source `contextiq_active_requests` (AC-1, AC-2)
-- [ ] HPA `TARGETS` column shows `<current>/<5>` (AverageValue custom metric) (AC-2)
-- [ ] When `contextiq_active_requests` average exceeds 5 per pod, HPA adds pods within 30 s (AC-4)
-- [ ] After load drops, HPA waits 300 s before removing pods (AC-4)
-- [ ] CPU fallback metric is also present in HPA spec — `kubectl describe hpa` lists both metrics (AC-2)
-- [ ] `helm template -f values-dev.yaml | grep HPA` returns empty — HPA disabled in dev (AC-6)
+- [x] `kubectl get hpa -n contextiq-agents` shows `MIN PODS: 2`, `MAX PODS: 20`, metric source `contextiq_active_requests` (AC-1, AC-2)
+- [x] HPA `TARGETS` column shows `<current>/<5>` (AverageValue custom metric) (AC-2)
+- [x] When `contextiq_active_requests` average exceeds 5 per pod, HPA adds pods within 30 s (AC-4)
+- [x] After load drops, HPA waits 300 s before removing pods (AC-4)
+- [x] CPU fallback metric is also present in HPA spec — `kubectl describe hpa` lists both metrics (AC-2)
+- [x] `helm template -f values-dev.yaml | grep HPA` returns empty — HPA disabled in dev (AC-6)
 
 ## Dependencies
 
@@ -258,6 +258,6 @@ hpa:
 
 ## Definition of Done
 
-- [ ] `helm lint helm/charts/agent-worker/` passes
-- [ ] `kubectl describe hpa -n contextiq-agents` shows both Pods metric (`contextiq_active_requests`) and Resource metric (`cpu`) listed
-- [ ] Staging load test (TASK-US046-05) drives `contextiq_active_requests` above threshold and confirms scale-up within 30 s
+- [x] `helm lint helm/charts/agent-worker/` passes
+- [x] `kubectl describe hpa -n contextiq-agents` shows both Pods metric (`contextiq_active_requests`) and Resource metric (`cpu`) listed
+- [x] Staging load test (TASK-US046-05) drives `contextiq_active_requests` above threshold and confirms scale-up within 30 s

@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<title>KS-002 — Add Knowledge Source · ContextIQ Wireframe</title>
+<link rel="stylesheet" href="_wireframe-base.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="topbar-logo"><div class="topbar-logo-icon">C</div>ContextIQ</div>
+  <div class="topbar-sep"></div>
+  <nav class="topbar-breadcrumb"><a>Knowledge Sources</a> <span>›</span> Add Source</nav>
+  <div class="topbar-actions"><div class="topbar-search">🔍 Search</div><button class="topbar-icon-btn">🔔</button></div>
+</header>
+<nav class="sidebar" aria-label="Main navigation">
+  <div class="sidebar-nav">
+    <a class="nav-item"><span class="icon">⊞</span>Dashboard</a>
+    <div class="nav-section">Data Sources</div>
+    <a class="nav-item"><span class="icon">⬡</span>Connectors</a>
+    <a class="nav-item active" aria-current="page"><span class="icon">🗄</span>Knowledge Sources</a>
+    <div class="nav-section">Governance</div><a class="nav-item"><span class="icon">🛡</span>Policies</a>
+    <div class="nav-section">Observability</div>
+    <a class="nav-item"><span class="icon">▶</span>Replay Explorer</a><a class="nav-item"><span class="icon">📋</span>Audit Log</a><a class="nav-item"><span class="icon">📊</span>Observability</a>
+    <div class="nav-section">Platform</div><a class="nav-item"><span class="icon">👥</span>Users</a><a class="nav-item"><span class="icon">💻</span>Models</a><a class="nav-item"><span class="icon">⚙</span>Settings</a>
+  </div>
+  <div class="sidebar-user"><div class="user-avatar">BP</div><div class="user-info"><div class="user-name">Bob PE</div><div class="user-role">Platform Engineer</div></div></div>
+</nav>
+<main class="main-content" role="main" style="opacity:0.3;pointer-events:none"></main>
+<div class="drawer-overlay"></div>
+<div class="drawer" role="dialog" aria-labelledby="ks-drawer-title">
+  <div class="drawer-header">
+    <div class="drawer-title" id="ks-drawer-title">Add Knowledge Source</div>
+    <button class="btn btn-ghost btn-icon">×</button>
+  </div>
+  <div class="drawer-body">
+    <div class="form-group">
+      <label class="form-label required">Name</label>
+      <input class="input-wf" style="width:100%" placeholder="e.g. prod-docs">
+    </div>
+    <div class="form-group">
+      <label class="form-label required">Type</label>
+      <select class="select-wf" style="width:100%"><option>Markdown</option><option>OpenAPI</option><option>Confluence</option><option>Jira</option><option>Repository</option></select>
+    </div>
+    <div class="form-group">
+      <label class="form-label required">Connector</label>
+      <select class="select-wf" style="width:100%"><option>confluence-docs (HEALTHY)</option><option>rest-ext-api (HEALTHY)</option></select>
+      <div class="form-hint">Only healthy connectors shown</div>
+    </div>
+    <div class="separator"></div>
+    <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:var(--neutral-600);margin-bottom:10px">Source Details — Confluence</div>
+    <div class="form-group">
+      <label class="form-label required">Space Key</label>
+      <input class="input-wf mono" style="width:100%" placeholder="~ENG">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Include Labels</label>
+      <input class="input-wf" style="width:100%" placeholder="public, documentation">
+      <div class="form-hint">Comma-separated label names</div>
+    </div>
+    <div class="separator"></div>
+    <div class="form-group">
+      <label class="form-label">Indexing Strategy</label>
+      <select class="select-wf" style="width:100%"><option selected>Semantic + Keyword</option><option>Semantic only</option><option>Keyword only</option></select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Refresh Schedule</label>
+      <select class="select-wf" style="width:100%"><option>Every 6 hours</option><option>Every 1 hour</option><option>Every 24 hours</option><option>Manual only</option></select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Embedding Model</label>
+      <select class="select-wf" style="width:100%"><option>text-embedding-3-small</option><option>text-embedding-3-large</option></select>
+    </div>
+  </div>
+  <div class="drawer-footer">
+    <button class="btn btn-ghost">Cancel</button>
+    <button class="btn btn-primary">Save Source</button>
+  </div>
+</div>
+<aside class="annotation-panel">
+  <div class="ann-screen-id">KS-002</div>
+  <div class="ann-route">Route: /knowledge-sources/new</div>
+  <div class="ann-guard">Guard: PLATFORM_ENGINEER, ADMIN</div>
+  <div class="ann-divider"></div>
+  <div class="ann-section">Components</div>
+  <div class="ann-item"><div class="ann-component">&lt;Drawer width={480}&gt;</div><div class="ann-note">focus trap · Escape closes</div></div>
+  <div class="ann-item"><div class="ann-component">&lt;Select&gt; Connector</div><div class="ann-note">Only shows HEALTHY connectors · "No connectors" empty state with link to CONN-002</div></div>
+  <div class="ann-item"><div class="ann-component">Dynamic fields</div><div class="ann-note">Markdown: path/glob · Confluence: space + labels · Jira: project + issue types · Repo: owner/repo + branch</div></div>
+</aside>
+</body>
+</html>

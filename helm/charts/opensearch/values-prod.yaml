@@ -1,0 +1,7 @@
+opensearch:
+  javaOpts: "-Xmx6g -Xms6g"
+  resources:
+    requests: { cpu: "2",  memory: "12Gi" }
+    limits:   { cpu: "8",  memory: "16Gi" }
+  persistence:
+    size: 200Gi

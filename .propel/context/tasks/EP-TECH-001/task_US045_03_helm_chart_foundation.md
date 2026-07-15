@@ -10,7 +10,7 @@
 | Layer | Infrastructure |
 | Priority | P0 |
 | Points | 3 |
-| Status | Draft |
+| Status | Done |
 
 ## Description
 
@@ -360,12 +360,12 @@ agent-worker:
 
 ## Acceptance Criteria
 
-- [ ] `helm lint helm/charts/mcp-gateway/` passes with no errors (AC-2)
-- [ ] `helm template helm/charts/mcp-gateway/ -f values-prod.yaml` renders a Deployment with `replicaCount: 3` (AC-2)
-- [ ] All rendered Deployment specs include both `readinessProbe` and `livenessProbe` targeting `/healthz` (AC-6)
-- [ ] `helm template` with `values-dev.yaml` disables HPA and PDB (AC-2)
-- [ ] HPA template is not rendered when `hpa.enabled: false` (dev override) (AC-2)
-- [ ] `containerSecurityContext` includes `readOnlyRootFilesystem: true`, `runAsNonRoot: true`, `capabilities.drop: ["ALL"]` in every rendered Deployment (OWASP A05)
+- [x] `helm lint helm/charts/mcp-gateway/` passes with no errors (AC-2)
+- [x] `helm template helm/charts/mcp-gateway/ -f values-prod.yaml` renders a Deployment with `replicaCount: 3` (AC-2)
+- [x] All rendered Deployment specs include both `readinessProbe` and `livenessProbe` targeting `/healthz` (AC-6)
+- [x] `helm template` with `values-dev.yaml` disables HPA and PDB (AC-2)
+- [x] HPA template is not rendered when `hpa.enabled: false` (dev override) (AC-2)
+- [x] `containerSecurityContext` includes `readOnlyRootFilesystem: true`, `runAsNonRoot: true`, `capabilities.drop: ["ALL"]` in every rendered Deployment (OWASP A05)
 
 ## Dependencies
 
@@ -374,6 +374,6 @@ agent-worker:
 
 ## Definition of Done
 
-- [ ] `helm lint` passes for all 5+ service charts
-- [ ] `helm install --dry-run contextiq helm/contextiq/ -f values-staging.yaml` succeeds
-- [ ] CI pipeline renders templates for all three environments and `kubectl apply --dry-run=server` validates them
+- [x] `helm lint` passes for all 5+ service charts
+- [x] `helm install --dry-run contextiq helm/contextiq/ -f values-staging.yaml` succeeds
+- [x] CI pipeline renders templates for all three environments and `kubectl apply --dry-run=server` validates them

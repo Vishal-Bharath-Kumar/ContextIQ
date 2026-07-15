@@ -10,7 +10,7 @@
 | Layer | Infrastructure |
 | Priority | P0 |
 | Points | 2 |
-| Status | Draft |
+| Status | Done |
 
 ## Description
 
@@ -207,12 +207,12 @@ echo "PASS: All endpoints enforce TLS 1.3 only"
 
 ## Acceptance Criteria
 
-- [ ] `openssl s_client -connect api.contextiq.io:443 -tls1_3` handshake succeeds; `Protocol: TLSv1.3` shown (AC-4)
-- [ ] `openssl s_client -connect api.contextiq.io:443 -tls1_2` produces `handshake failure` — TLS 1.2 rejected (AC-4)
-- [ ] Same TLS 1.3-only result verified on `auth.contextiq.io` (Keycloak) and `admin.contextiq.io` (Admin Portal) (AC-4)
-- [ ] `kubectl get configmap ingress-nginx-controller -n ingress-nginx -o jsonpath='{.data.ssl-protocols}'` returns `TLSv1.3` (AC-4)
-- [ ] PostgreSQL `SHOW ssl_min_protocol_version;` returns `TLSv1.3` (AC-4)
-- [ ] `scripts/security/check_tls_versions.sh` exits 0 in CI pipeline (AC-4)
+- [x] `openssl s_client -connect api.contextiq.io:443 -tls1_3` handshake succeeds; `Protocol: TLSv1.3` shown (AC-4)
+- [x] `openssl s_client -connect api.contextiq.io:443 -tls1_2` produces `handshake failure` — TLS 1.2 rejected (AC-4)
+- [x] Same TLS 1.3-only result verified on `auth.contextiq.io` (Keycloak) and `admin.contextiq.io` (Admin Portal) (AC-4)
+- [x] `kubectl get configmap ingress-nginx-controller -n ingress-nginx -o jsonpath='{.data.ssl-protocols}'` returns `TLSv1.3` (AC-4)
+- [x] PostgreSQL `SHOW ssl_min_protocol_version;` returns `TLSv1.3` (AC-4)
+- [x] `scripts/security/check_tls_versions.sh` exits 0 in CI pipeline (AC-4)
 
 ## Dependencies
 
@@ -222,6 +222,6 @@ echo "PASS: All endpoints enforce TLS 1.3 only"
 
 ## Definition of Done
 
-- [ ] `kubectl apply -f k8s/ingress-nginx/configmap-patch.yaml` applies without error; NGINX controller pods rolling-restart
-- [ ] `check_tls_versions.sh` passes on all external endpoints in staging
-- [ ] PostgreSQL and Redis TLS conf patches applied; `psql "sslmode=require"` connects successfully
+- [x] `kubectl apply -f k8s/ingress-nginx/configmap-patch.yaml` applies without error; NGINX controller pods rolling-restart
+- [x] `check_tls_versions.sh` passes on all external endpoints in staging
+- [x] PostgreSQL and Redis TLS conf patches applied; `psql "sslmode=require"` connects successfully

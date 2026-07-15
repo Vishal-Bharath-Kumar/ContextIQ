@@ -10,7 +10,7 @@
 | Layer | QA / Infrastructure |
 | Priority | P0 |
 | Points | 3 |
-| Status | Draft |
+| Status | Done |
 
 ## Description
 
@@ -513,13 +513,13 @@ class TestAC6_KRaftChaos:
 
 ## Acceptance Criteria
 
-- [ ] `pytest tests/integration/test_kafka.py -v` passes all non-destructive tests (AC-1 through AC-5) (all ACs)
-- [ ] `pytest tests/integration/test_kafka.py -v --run-destructive` passes `TestAC6_KRaftChaos::test_broker_failure_interruption_under_5s` with `max_produce_gap < 5.0 s` (AC-6)
-- [ ] `ha_failover_test.sh` exits 0 with outage printed as `< 5s` (AC-6)
-- [ ] `TestAC3_ConsumerGroups::test_produce_and_consume_round_trip` confirms end-to-end produce → consume on `contextiq.state.events` (AC-3)
-- [ ] `TestAC5_BrokerMetrics::test_under_replicated_partitions_is_zero` returns 0 for all brokers in steady state (AC-5)
-- [ ] `TestAC6_KRaftChaos` is skipped in normal `pytest` runs (no `--run-destructive` flag) (AC-6)
-- [ ] After chaos test, victim pod `kafka-controller-1` rejoins quorum and `ActiveControllerCount=1` metric is restored (AC-6)
+- [x] `pytest tests/integration/test_kafka.py -v` passes all non-destructive tests (AC-1 through AC-5) (all ACs)
+- [x] `pytest tests/integration/test_kafka.py -v --run-destructive` passes `TestAC6_KRaftChaos::test_broker_failure_interruption_under_5s` with `max_produce_gap < 5.0 s` (AC-6)
+- [x] `ha_failover_test.sh` exits 0 with outage printed as `< 5s` (AC-6)
+- [x] `TestAC3_ConsumerGroups::test_produce_and_consume_round_trip` confirms end-to-end produce → consume on `contextiq.state.events` (AC-3)
+- [x] `TestAC5_BrokerMetrics::test_under_replicated_partitions_is_zero` returns 0 for all brokers in steady state (AC-5)
+- [x] `TestAC6_KRaftChaos` is skipped in normal `pytest` runs (no `--run-destructive` flag) (AC-6)
+- [x] After chaos test, victim pod `kafka-controller-1` rejoins quorum and `ActiveControllerCount=1` metric is restored (AC-6)
 
 ## Dependencies
 
@@ -531,7 +531,7 @@ class TestAC6_KRaftChaos:
 
 ## Definition of Done
 
-- [ ] Full non-destructive pytest suite passes in CI (no `--run-destructive`)
-- [ ] Chaos test validated manually in staging: `max_produce_gap < 5 s`
-- [ ] `ha_failover_test.sh` committed and executable; exits 0 in staging
-- [ ] Test file committed to `tests/integration/test_kafka.py`
+- [x] Full non-destructive pytest suite passes in CI (no `--run-destructive`)
+- [x] Chaos test validated manually in staging: `max_produce_gap < 5 s`
+- [x] `ha_failover_test.sh` committed and executable; exits 0 in staging
+- [x] Test file committed to `tests/integration/test_kafka.py`

@@ -1,0 +1,67 @@
+# k8s/namespaces/namespace-labels.yaml
+# Adds istio-injection=enabled to all contextiq-* namespaces.
+# kubectl apply merges labels — existing labels from namespaces.yaml are preserved.
+# After applying, run scripts/istio/rolling_restart_for_injection.sh to inject sidecars.
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: contextiq-data
+  labels:
+    istio-injection:             enabled
+    app.kubernetes.io/part-of:  contextiq
+    team:                        platform
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: contextiq-agents
+  labels:
+    istio-injection:             enabled
+    app.kubernetes.io/part-of:  contextiq
+    team:                        platform
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: contextiq-gateway
+  labels:
+    istio-injection:             enabled
+    app.kubernetes.io/part-of:  contextiq
+    team:                        platform
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: contextiq-admin
+  labels:
+    istio-injection:             enabled
+    app.kubernetes.io/part-of:  contextiq
+    team:                        platform
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: contextiq-observability
+  labels:
+    istio-injection:             enabled
+    app.kubernetes.io/part-of:  contextiq
+    team:                        platform
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: contextiq-security
+  labels:
+    istio-injection:             enabled
+    app.kubernetes.io/part-of:  contextiq
+    team:                        platform
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: contextiq-infra
+  labels:
+    istio-injection:             enabled
+    app.kubernetes.io/part-of:  contextiq
+    team:                        platform

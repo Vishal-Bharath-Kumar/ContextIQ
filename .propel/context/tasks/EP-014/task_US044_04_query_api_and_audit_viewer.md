@@ -10,7 +10,7 @@
 | Layer | Backend / Frontend |
 | Priority | P0 |
 | Points | 2 |
-| Status | Draft |
+| Status | Done |
 
 ## Description
 
@@ -380,13 +380,13 @@ export function AuditLogPage() {
 
 ## Acceptance Criteria
 
-- [ ] `GET /v1/audit-log` filters by `user`, `action`, `resource_type`, `resource_id`, `date_from`, `date_to` (AC-4)
-- [ ] Cursor-based pagination: `next_cursor` is the last row's UUID; `null` when no further pages (AC-4)
-- [ ] Endpoint returns HTTP 403 for callers without `AUDITOR` or `ADMIN` role (AC-5)
-- [ ] `AuditLogPage` renders only when user has `AUDITOR` or `ADMIN` role via `RequireAuditor` guard (AC-5, US-042 TASK-US042-04)
-- [ ] All AC-1 fields are visible in `AuditLogTable`: action, resource, actor, IP address, timestamp (AC-1, AC-5)
-- [ ] Filter form uses `aria-label` on every input; pagination button has `aria-label` (WCAG 2.1 AA)
-- [ ] `useAuditLog` uses TanStack Query `useInfiniteQuery` with `staleTime: 60_000`
+- [x] `GET /v1/audit-log` filters by `user`, `action`, `resource_type`, `resource_id`, `date_from`, `date_to` (AC-4)
+- [x] Cursor-based pagination: `next_cursor` is the last row's opaque cursor; `null` when no further pages (AC-4)
+- [x] Endpoint returns HTTP 403 for callers without `AUDITOR` or `ADMIN` role (AC-5)
+- [x] `AuditLogPage` renders only when user has `AUDITOR` or `ADMIN` role via `RequireAuditor` guard (AC-5, US-042 TASK-US042-04)
+- [x] All AC-1 fields are visible in `AuditLogTable`: action, resource, actor, IP address, timestamp (AC-1, AC-5)
+- [x] Filter form uses `aria-label` on every input; pagination button has `aria-label` (WCAG 2.1 AA)
+- [x] `useAuditLog` uses TanStack Query `useInfiniteQuery` with `staleTime: 60_000`
 
 ## Dependencies
 
@@ -397,6 +397,6 @@ export function AuditLogPage() {
 
 ## Definition of Done
 
-- [ ] `pytest tests/audit/test_audit_log_query_route.py` passes (see TASK-US044-05)
-- [ ] `pnpm test` passes `AuditLogPage.test.tsx` and `AuditLogFilterBar.test.tsx`
-- [ ] `mypy --strict src/audit/admin_audit_log/query_repository.py src/api/admin/routes/audit_log.py` passes
+- [x] `pytest tests/audit/test_audit_log_query_route.py` passes (see TASK-US044-05)
+- [x] `pnpm test` passes `AuditLogPage.test.tsx` and `AuditLogFilterBar.test.tsx`
+- [x] `mypy --strict src/audit/admin_audit_log/query_repository.py src/api/admin/routes/audit_log.py` passes

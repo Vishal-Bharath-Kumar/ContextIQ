@@ -1,0 +1,26 @@
+postgresql:
+  primary:
+    resources:
+      requests: { cpu: "2",  memory: "8Gi" }
+      limits:   { cpu: "8",  memory: "16Gi" }
+    persistence:
+      size: 500Gi
+
+  readReplicas:
+    replicaCount: 2    # AC-6: 2 streaming hot-standby replicas for reporting workloads
+
+    persistence:
+      storageClass: contextiq-encrypted-gp3    # TASK-US048-04: encrypted PVCs on replicas too
+      size:         500Gi
+
+    resources:
+      requests: { cpu: "1",    memory: "4Gi" }
+      limits:   { cpu: "4",    memory: "8Gi" }
+
+    # PDB: allow 1 of 2 replicas to be disrupted during rolling maintenance
+    podDisruptionBudget:
+      enabled:      true
+      minAvailable: 1
+
+  # The Bitnami chart automatically configures primary_conninfo on replica pods.
+  # primary.configuration already sets wal_level=replica and max_wal_senders=5 (TASK-US050-04).

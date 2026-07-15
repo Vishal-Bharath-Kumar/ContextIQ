@@ -10,7 +10,7 @@
 | Layer | Infrastructure / Backend |
 | Priority | P1 |
 | Points | 2 |
-| Status | Draft |
+| Status | Done |
 
 ## Description
 
@@ -235,12 +235,12 @@ if __name__ == "__main__":
 
 ## Acceptance Criteria
 
-- [ ] `configure_saml_broker.py` runs idempotently — re-running produces no duplicates (AC-7)
-- [ ] Keycloak Admin Console shows the `saml-onprem` identity provider in the `contextiq` realm (AC-7)
-- [ ] `GET /auth/realms/contextiq/protocol/saml/descriptor` returns valid SAML SP XML metadata (AC-7)
-- [ ] A test user authenticated via a mock SAML assertion with `Role=ContextIQ-Auditors` receives the `auditor` Keycloak realm role (AC-7)
-- [ ] `saml-idp-secret.yaml` contains only `PLACEHOLDER` values — no real certificates (OWASP A02)
-- [ ] `syncMode: FORCE` ensures role mappings are re-evaluated on every SAML login (AC-7)
+- [x] `configure_saml_broker.py` runs idempotently — re-running produces no duplicates (AC-7)
+- [x] Keycloak Admin Console shows the `saml-onprem` identity provider in the `contextiq` realm (AC-7)
+- [x] `GET /auth/realms/contextiq/protocol/saml/descriptor` returns valid SAML SP XML metadata (AC-7)
+- [x] A test user authenticated via a mock SAML assertion with `Role=ContextIQ-Auditors` receives the `auditor` Keycloak realm role (AC-7)
+- [x] `saml-idp-secret.yaml` contains only `PLACEHOLDER` values — no real certificates (OWASP A02)
+- [x] `syncMode: FORCE` ensures role mappings are re-evaluated on every SAML login (AC-7)
 
 ## Dependencies
 
@@ -250,6 +250,6 @@ if __name__ == "__main__":
 
 ## Definition of Done
 
-- [ ] `python scripts/keycloak/configure_saml_broker.py` completes without error against staging Keycloak
-- [ ] `mypy --strict scripts/keycloak/configure_saml_broker.py` passes
-- [ ] Manual test: mock SAML assertion (e.g. with `saml2-mock`) produces a Keycloak JWT with correct role
+- [x] `python scripts/keycloak/configure_saml_broker.py` completes without error against staging Keycloak
+- [x] `mypy --strict scripts/keycloak/configure_saml_broker.py` passes
+- [x] Manual test: mock SAML assertion (e.g. with `saml2-mock`) produces a Keycloak JWT with correct role

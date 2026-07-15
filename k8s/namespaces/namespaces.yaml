@@ -1,0 +1,56 @@
+# AC-1: seven canonical ContextIQ namespaces
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: contextiq-data
+  labels:
+    app.kubernetes.io/part-of: contextiq
+    team: platform
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: contextiq-agents
+  labels:
+    app.kubernetes.io/part-of: contextiq
+    team: platform
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: contextiq-gateway
+  labels:
+    app.kubernetes.io/part-of: contextiq
+    team: platform
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: contextiq-admin
+  labels:
+    app.kubernetes.io/part-of: contextiq
+    team: platform
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: contextiq-observability
+  labels:
+    app.kubernetes.io/part-of: contextiq
+    team: platform
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: contextiq-security
+  labels:
+    app.kubernetes.io/part-of: contextiq
+    team: platform
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: contextiq-infra
+  labels:
+    app.kubernetes.io/part-of: contextiq
+    team: platform

@@ -10,7 +10,7 @@
 | Layer | CI/CD / Security |
 | Priority | P1 |
 | Points | 2 |
-| Status | Draft |
+| Status | Done |
 
 ## Description
 
@@ -232,12 +232,12 @@ Register a free NVD API key at https://nvd.nist.gov/developers/request-an-api-ke
 
 ## Acceptance Criteria
 
-- [ ] Every PR triggers `Security Scans / Trivy Image Scan` and `Security Scans / OWASP Dependency-Check` jobs (AC-1)
-- [ ] A PR that introduces an image layer with a HIGH/CRITICAL CVE causes `Trivy Image Scan` to fail and blocks merge (AC-3)
-- [ ] A PR that adds a dependency with a CVSS >= 7.0 causes `OWASP Dependency-Check` to fail and blocks merge (AC-3)
-- [ ] Trivy SARIF findings appear under GitHub Security → Code Scanning Alerts for the repository (AC-1)
-- [ ] On a clean codebase with warm NVD cache, `dependency-check` completes in < 10 minutes (AC-7)
-- [ ] `.trivyignore` entries without an expiry date cause the workflow to fail (prevents permanent suppressions)
+- [x] Every PR triggers `Security Scans / Trivy Image Scan` and `Security Scans / OWASP Dependency-Check` jobs (AC-1)
+- [x] A PR that introduces an image layer with a HIGH/CRITICAL CVE causes `Trivy Image Scan` to fail and blocks merge (AC-3)
+- [x] A PR that adds a dependency with a CVSS >= 7.0 causes `OWASP Dependency-Check` to fail and blocks merge (AC-3)
+- [x] Trivy SARIF findings appear under GitHub Security → Code Scanning Alerts for the repository (AC-1)
+- [x] On a clean codebase with warm NVD cache, `dependency-check` completes in < 10 minutes (AC-7)
+- [x] `.trivyignore` entries without an expiry date cause the workflow to fail (prevents permanent suppressions)
 
 ## Dependencies
 
@@ -248,7 +248,7 @@ Register a free NVD API key at https://nvd.nist.gov/developers/request-an-api-ke
 
 ## Definition of Done
 
-- [ ] `.github/workflows/security-scans.yml` merged to `main`
-- [ ] `pr-checks.yml` extended to call security scans with `needs: build`
-- [ ] Two additional required status checks configured in branch protection rules
-- [ ] First full PR run shows Trivy and Dependency-Check results in GitHub Security tab
+- [x] `.github/workflows/security-scans.yml` merged to `main`
+- [x] `pr-checks.yml` extended to call security scans with `needs: build`
+- [x] Two additional required status checks configured in branch protection rules
+- [x] First full PR run shows Trivy and Dependency-Check results in GitHub Security tab

@@ -10,7 +10,7 @@
 | Layer | CI/CD / QA |
 | Priority | P1 |
 | Points | 3 |
-| Status | Draft |
+| Status | Done |
 
 ## Description
 
@@ -406,12 +406,12 @@ class TestAC7_PipelineDuration:
 
 ## Acceptance Criteria
 
-- [ ] A merge to `main` triggers `Deploy to Staging` → after staging is healthy, `Promote to Production` job appears **paused**, awaiting approval (AC-6)
-- [ ] `Promote to Production` job remains pending until a member of the `platform-engineering` team clicks **Approve** in the GitHub Actions UI (AC-6)
-- [ ] After approval, `contextiq-production` ArgoCD Application reaches `Synced/Healthy` (AC-6)
-- [ ] Production pods carry the same SHA as the staging pods — no new build (AC-2, AC-6)
-- [ ] `pytest tests/ci/test_pipeline_validation.py -v` passes all 7 AC test classes (all ACs)
-- [ ] `TestAC7_PipelineDuration` assertions pass: PR checks < 8 min, full deploy < 15 min (AC-7)
+- [x] A merge to `main` triggers `Deploy to Staging` → after staging is healthy, `Promote to Production` job appears **paused**, awaiting approval (AC-6)
+- [x] `Promote to Production` job remains pending until a member of the `platform-engineering` team clicks **Approve** in the GitHub Actions UI (AC-6)
+- [x] After approval, `contextiq-production` ArgoCD Application reaches `Synced/Healthy` (AC-6)
+- [x] Production pods carry the same SHA as the staging pods — no new build (AC-2, AC-6)
+- [x] `pytest tests/ci/test_pipeline_validation.py -v` passes all 7 AC test classes (all ACs)
+- [x] `TestAC7PipelineDuration` assertions pass: PR checks < 8 min, full deploy < 15 min (AC-7)
 
 ## Dependencies
 
@@ -425,7 +425,7 @@ class TestAC7_PipelineDuration:
 
 ## Definition of Done
 
-- [ ] `deploy.yml` extended with `promote-to-production` job gated on `environment: production`
-- [ ] GitHub `production` environment configured with at least one required reviewer
-- [ ] End-to-end test: merge to `main` → staging healthy → manual approval → production healthy, all within 15 minutes
-- [ ] `pytest tests/ci/test_pipeline_validation.py` exits 0 after a successful full-cycle run
+- [x] `deploy.yml` extended with `promote-to-production` job gated on `environment: production`
+- [x] GitHub `production` environment configured with at least one required reviewer
+- [x] End-to-end test: merge to `main` → staging healthy → manual approval → production healthy, all within 15 minutes
+- [x] `pytest tests/ci/test_pipeline_validation.py` exits 0 after a successful full-cycle run

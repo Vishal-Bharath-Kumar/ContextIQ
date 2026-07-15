@@ -10,7 +10,7 @@
 | Layer | Infrastructure / Backend |
 | Priority | P0 |
 | Points | 3 |
-| Status | Draft |
+| Status | Done |
 
 ## Description
 
@@ -257,12 +257,12 @@ if __name__ == "__main__":
 
 ## Acceptance Criteria
 
-- [ ] `configure_entra_id_broker.py` runs idempotently — re-running with same config produces no duplicates (AC-2)
-- [ ] Keycloak Admin Console shows the `entra-id` identity provider in the `contextiq` realm (AC-2)
-- [ ] A test user in the Entra ID `ContextIQ-Admins` group logs in via the `/auth` endpoint and receives a Keycloak JWT containing `realm_access.roles: ["admin"]` (AC-4)
-- [ ] `syncMode: FORCE` means role assignment is re-evaluated on every login, not only on first login (AC-4)
-- [ ] `idp_config.yaml` covers all 7 `PlatformRole` values (AC-4)
-- [ ] `entra-id-secret.yaml` contains no real credentials — values are `PLACEHOLDER` (OWASP A02)
+- [x] `configure_entra_id_broker.py` runs idempotently — re-running with same config produces no duplicates (AC-2)
+- [x] Keycloak Admin Console shows the `entra-id` identity provider in the `contextiq` realm (AC-2)
+- [x] A test user in the Entra ID `ContextIQ-Admins` group logs in via the `/auth` endpoint and receives a Keycloak JWT containing `realm_access.roles: ["admin"]` (AC-4)
+- [x] `syncMode: FORCE` means role assignment is re-evaluated on every login, not only on first login (AC-4)
+- [x] `idp_config.yaml` covers all 7 `PlatformRole` values (AC-4)
+- [x] `entra-id-secret.yaml` contains no real credentials — values are `PLACEHOLDER` (OWASP A02)
 
 ## Dependencies
 
@@ -272,6 +272,6 @@ if __name__ == "__main__":
 
 ## Definition of Done
 
-- [ ] `python scripts/keycloak/configure_entra_id_broker.py` completes without error against staging Keycloak
-- [ ] Manual login test: Entra ID user mapped to `ContextIQ-SecurityOfficers` group receives `security_officer` role in their Keycloak JWT
-- [ ] `mypy --strict scripts/keycloak/configure_entra_id_broker.py` passes
+- [x] `python scripts/keycloak/configure_entra_id_broker.py` completes without error against staging Keycloak
+- [x] Manual login test: Entra ID user mapped to `ContextIQ-SecurityOfficers` group receives `security_officer` role in their Keycloak JWT
+- [x] `mypy --strict scripts/keycloak/configure_entra_id_broker.py` passes

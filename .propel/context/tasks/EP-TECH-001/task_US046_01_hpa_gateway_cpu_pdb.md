@@ -10,7 +10,7 @@
 | Layer | Infrastructure |
 | Priority | P0 |
 | Points | 1 |
-| Status | Draft |
+| Status | Done |
 
 ## Description
 
@@ -148,11 +148,11 @@ pdb:
 
 ## Acceptance Criteria
 
-- [ ] `kubectl get hpa -n contextiq-gateway` shows `MIN PODS: 2`, `MAX PODS: 10`, `TARGETS: <x>%/60%` (AC-1, AC-3)
-- [ ] `kubectl get pdb -n contextiq-gateway` shows `ALLOWED-DISRUPTIONS: ≥1` when 3+ pods running (AC-5)
-- [ ] `kubectl drain <node>` cannot evict the last two Gateway pods simultaneously — PDB blocks it (AC-5)
-- [ ] `helm template helm/charts/mcp-gateway/ -f values-dev.yaml | grep HorizontalPodAutoscaler` returns no output — HPA disabled in dev (AC-6)
-- [ ] Scale-down `stabilizationWindowSeconds: 300` is visible in `kubectl describe hpa` (AC-4)
+- [x] `kubectl get hpa -n contextiq-gateway` shows `MIN PODS: 2`, `MAX PODS: 10`, `TARGETS: <x>%/60%` (AC-1, AC-3)
+- [x] `kubectl get pdb -n contextiq-gateway` shows `ALLOWED-DISRUPTIONS: ≥1` when 3+ pods running (AC-5)
+- [x] `kubectl drain <node>` cannot evict the last two Gateway pods simultaneously — PDB blocks it (AC-5)
+- [x] `helm template helm/charts/mcp-gateway/ -f values-dev.yaml | grep HorizontalPodAutoscaler` returns no output — HPA disabled in dev (AC-6)
+- [x] Scale-down `stabilizationWindowSeconds: 300` is visible in `kubectl describe hpa` (AC-4)
 
 ## Dependencies
 
@@ -162,6 +162,6 @@ pdb:
 
 ## Definition of Done
 
-- [ ] `helm lint helm/charts/mcp-gateway/` passes
-- [ ] `kubectl get hpa release-name-mcp-gateway -n contextiq-gateway -o yaml` shows correct `behavior` stanza
-- [ ] `kubectl describe pdb release-name-mcp-gateway -n contextiq-gateway` shows `Min Available: 2`
+- [x] `helm lint helm/charts/mcp-gateway/` passes
+- [x] `kubectl get hpa release-name-mcp-gateway -n contextiq-gateway -o yaml` shows correct `behavior` stanza
+- [x] `kubectl describe pdb release-name-mcp-gateway -n contextiq-gateway` shows `Min Available: 2`

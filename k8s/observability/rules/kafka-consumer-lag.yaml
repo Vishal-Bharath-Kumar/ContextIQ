@@ -1,0 +1,34 @@
+# AC-5: Derived consumer-lag recording rule and alerts.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name:      kafka-consumer-lag
+  namespace: contextiq-observability
+spec:
+  groups:
+    - name:     kafka.consumer_lag
+      interval: 30s
+      rules:
+        - record: kafka:consumer_group_lag:max_by_topic
+          expr: |
+            max by (topic, group, namespace) (
+              kafka_consumergroup_lag{namespace="contextiq-data"}
+            )
+
+        - alert: KafkaConsumerLagHigh
+          expr:  kafka:consumer_group_lag:max_by_topic > 10000
+          for:   5m
+          labels:
+            severity: warning
+          annotations:
+            summary:     "Consumer group {{ $labels.group }} lag > 10k on {{ $labels.topic }}"
+            description: "Lag is {{ $value }} messages — check consumer pod health."
+
+        - alert: KafkaUnderReplicatedPartitions
+          expr:  kafka_server_replicamanager_underreplicatedpartitions > 0
+          for:   2m
+          labels:
+            severity: critical
+          annotations:
+            summary:     "Kafka under-replicated partitions detected"
+            description: "{{ $value }} partitions are under-replicated — broker may be down."

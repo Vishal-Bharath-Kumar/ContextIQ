@@ -1,0 +1,28 @@
+# Patch the nginx-ingress-controller ConfigMap to enforce TLS 1.3 only.
+# Apply with: kubectl apply -f k8s/ingress-nginx/configmap-patch.yaml
+# NGINX Ingress Controller will hot-reload the configuration without a pod restart.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ingress-nginx-controller
+  namespace: ingress-nginx    # adjust if controller is in a different namespace
+data:
+  # AC-4: Only TLS 1.3 — drop TLS 1.0, 1.1, 1.2 entirely
+  ssl-protocols: "TLSv1.3"
+
+  # Cipher suites: TLS 1.3 ciphers are fixed by the spec (not configurable via ssl-ciphers),
+  # but we explicitly clear the TLS 1.2 cipher list to ensure no negotiation fallback
+  ssl-ciphers: ""    # empty string: no TLS 1.2 cipher suites offered
+
+  # HSTS: 1-year duration, include all subdomains, allow preload
+  hsts:                    "true"
+  hsts-max-age:            "31536000"
+  hsts-include-subdomains: "true"
+  hsts-preload:            "true"
+
+  # Redirect all HTTP to HTTPS
+  force-ssl-redirect: "true"
+  ssl-redirect:       "true"
+
+  # Preserve original client IP from upstream proxy/load-balancer
+  use-forwarded-headers: "true"

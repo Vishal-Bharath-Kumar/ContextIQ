@@ -1,0 +1,19 @@
+# AC-5: Prometheus scrapes Kafka broker JMX Exporter metrics every 30s.
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name:      kafka
+  namespace: contextiq-observability
+  labels:
+    app.kubernetes.io/part-of: contextiq
+spec:
+  namespaceSelector:
+    matchNames: [contextiq-data]
+  selector:
+    matchLabels:
+      app.kubernetes.io/name:      kafka
+      app.kubernetes.io/component: controller    # targets combined controller+broker pods
+  endpoints:
+    - port:     jmx-exporter    # 9308 — JMX Exporter HTTP metrics port on broker pods
+      interval: 30s
+      path:     /metrics

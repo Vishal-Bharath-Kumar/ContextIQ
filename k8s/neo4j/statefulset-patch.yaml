@@ -1,0 +1,16 @@
+# Kustomize strategic merge patch — sets storageClassName on Neo4j PVC.
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: neo4j
+  namespace: contextiq-data
+spec:
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        storageClassName: contextiq-encrypted-gp3
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 50Gi

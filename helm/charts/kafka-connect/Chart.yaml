@@ -1,0 +1,9 @@
+apiVersion: v2
+name:        kafka-connect
+description: Kafka Connect distributed mode for ContextIQ data pipelines
+type:        application
+version:     0.1.0
+dependencies:
+  - name:       kafka-connect
+    version:    "1.4.4"    # pinned; update after staging validation
+    repository: https://charts.bitnami.com/bitnami

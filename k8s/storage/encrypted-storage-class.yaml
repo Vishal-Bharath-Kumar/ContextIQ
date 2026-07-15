@@ -1,0 +1,23 @@
+# AC-5: AES-256 encryption for all data store PVs via AWS EBS encryption.
+# The KMS CMK alias/contextiq-data-encryption is managed outside the cluster.
+#
+# Prerequisites:
+#   - AWS EBS CSI driver installed (standard EKS managed add-on)
+#   - KMS CMK `alias/contextiq-data-encryption` provisioned in the same AWS region
+#   - EKS node IAM role has kms:GenerateDataKeyWithoutPlaintext + kms:Decrypt permissions
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: contextiq-encrypted-gp3
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "false"    # opt-in per PVC; not cluster-wide default
+provisioner: ebs.csi.aws.com
+volumeBindingMode: WaitForFirstConsumer    # provision in the same AZ as the pod
+reclaimPolicy: Retain    # RETAIN: data survives PVC deletion — prevents accidental data loss
+allowVolumeExpansion: true
+parameters:
+  type:       gp3
+  iops:       "3000"
+  throughput: "125"
+  encrypted:  "true"                              # AC-5: EBS volume encrypted with AES-256
+  kmsKeyId:   "alias/contextiq-data-encryption"  # CMK managed outside the cluster

@@ -1,0 +1,145 @@
+import type { RouteObject } from "react-router-dom";
+
+import { PlatformRole } from "../auth/roles";
+import { AdminLayout } from "../layouts/AdminLayout";
+import {
+  RequireAuditor,
+  RequireManager,
+  RequirePlatformEngineer,
+  RequireRoles,
+  RequireSecurityOfficer,
+} from "../guards";
+import { AddConnectorPage } from "../pages/connectors/AddConnectorPage";
+import { ConnectorListPage } from "../pages/connectors/ConnectorListPage";
+import { ForbiddenPage } from "../pages/errors/ForbiddenPage";
+import { LoginPage } from "../pages/errors/LoginPage";
+import { AddModelPage } from "../pages/models/AddModelPage";
+import { ModelListPage } from "../pages/models/ModelListPage";
+import { RoutingWeightsPage } from "../pages/models/RoutingWeightsPage";
+import { PolicyDetailPage } from "../pages/policies/PolicyDetailPage";
+import { PolicyListPage } from "../pages/policies/PolicyListPage";
+import { ReplayExplorerPage } from "../pages/traces/ReplayExplorerPage";
+import { TraceDetailPage } from "../pages/traces/TraceDetailPage";
+import { AuditLogPage } from "../pages/AuditLogPage";
+
+export const ADMIN_ROUTES: RouteObject[] = [
+  {
+    path: "/",
+    element: (
+      // Root requires any authenticated user with at least one valid platform role.
+      <RequireRoles
+        allowedRoles={[
+          PlatformRole.DEVELOPER,
+          PlatformRole.PLATFORM_ENGINEER,
+          PlatformRole.DEVOPS_SRE,
+          PlatformRole.ADMIN,
+          PlatformRole.SECURITY_OFFICER,
+          PlatformRole.MANAGER,
+          PlatformRole.AUDITOR,
+        ]}
+      >
+        <AdminLayout />
+      </RequireRoles>
+    ),
+    children: [
+      // Connectors — PLATFORM_ENGINEER or ADMIN
+      {
+        path: "connectors",
+        element: (
+          <RequirePlatformEngineer>
+            <ConnectorListPage />
+          </RequirePlatformEngineer>
+        ),
+      },
+      {
+        path: "connectors/add",
+        element: (
+          <RequirePlatformEngineer>
+            <AddConnectorPage />
+          </RequirePlatformEngineer>
+        ),
+      },
+
+      // Policies — SECURITY_OFFICER or ADMIN
+      {
+        path: "policies",
+        element: (
+          <RequireSecurityOfficer>
+            <PolicyListPage />
+          </RequireSecurityOfficer>
+        ),
+      },
+      {
+        path: "policies/:id",
+        element: (
+          <RequireSecurityOfficer>
+            <PolicyDetailPage />
+          </RequireSecurityOfficer>
+        ),
+      },
+      {
+        path: "policies/new",
+        element: (
+          <RequireSecurityOfficer>
+            <PolicyDetailPage />
+          </RequireSecurityOfficer>
+        ),
+      },
+
+      // Models — PLATFORM_ENGINEER or ADMIN
+      {
+        path: "models",
+        element: (
+          <RequirePlatformEngineer>
+            <ModelListPage />
+          </RequirePlatformEngineer>
+        ),
+      },
+      {
+        path: "models/add",
+        element: (
+          <RequirePlatformEngineer>
+            <AddModelPage />
+          </RequirePlatformEngineer>
+        ),
+      },
+      {
+        path: "models/weights",
+        element: (
+          <RequirePlatformEngineer>
+            <RoutingWeightsPage />
+          </RequirePlatformEngineer>
+        ),
+      },
+
+      // Audit Log — AUDITOR, DEVOPS_SRE, SECURITY_OFFICER, or ADMIN (AC-5)
+      // RequireAuditor guard is applied inside AuditLogPage itself.
+      {
+        path: "audit-log",
+        element: <AuditLogPage />,
+      },
+
+      // Traces / Replay — AUDITOR, DEVOPS_SRE, SECURITY_OFFICER, or ADMIN
+      {
+        path: "traces",
+        element: (
+          <RequireAuditor>
+            <ReplayExplorerPage />
+          </RequireAuditor>
+        ),
+      },
+      {
+        path: "traces/:id",
+        element: (
+          <RequireAuditor>
+            <TraceDetailPage />
+          </RequireAuditor>
+        ),
+      },
+
+      // Error pages — no role guard
+      { path: "403", element: <ForbiddenPage /> },
+      { path: "login", element: <LoginPage /> },
+    ],
+  },
+];

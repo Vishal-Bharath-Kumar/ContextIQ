@@ -10,7 +10,7 @@
 | Layer | Infrastructure |
 | Priority | P0 |
 | Points | 2 |
-| Status | Draft |
+| Status | Done |
 
 ## Description
 
@@ -193,11 +193,11 @@ spec:
 
 ## Acceptance Criteria
 
-- [ ] `kubectl api-resources | grep custom.metrics` shows `custom.metrics.k8s.io` registered — adapter is running (AC-2)
-- [ ] `kubectl get --raw "/apis/custom.metrics.k8s.io/v1beta1/namespaces/contextiq-agents/pods/*/contextiq_active_requests"` returns a valid `MetricValueList` (AC-2)
-- [ ] Prometheus Adapter pod logs show no errors querying Prometheus (AC-2)
-- [ ] Two adapter replicas running for HA: `kubectl get pods -n contextiq-observability | grep adapter` shows 2 Running
-- [ ] `metricsRelistInterval: 15s` in prod ensures metric names are refreshed fast enough for 30 s scale-up (AC-4)
+- [x] `kubectl api-resources | grep custom.metrics` shows `custom.metrics.k8s.io` registered — adapter is running (AC-2)
+- [x] `kubectl get --raw "/apis/custom.metrics.k8s.io/v1beta1/namespaces/contextiq-agents/pods/*/contextiq_active_requests"` returns a valid `MetricValueList` (AC-2)
+- [x] Prometheus Adapter pod logs show no errors querying Prometheus (AC-2)
+- [x] Two adapter replicas running for HA: `kubectl get pods -n contextiq-observability | grep adapter` shows 2 Running
+- [x] `metricsRelistInterval: 15s` in prod ensures metric names are refreshed fast enough for 30 s scale-up (AC-4)
 
 ## Dependencies
 
@@ -208,6 +208,6 @@ spec:
 
 ## Definition of Done
 
-- [ ] `helm install prometheus-adapter prometheus-community/prometheus-adapter -n contextiq-observability -f values.yaml -f values-prod.yaml` succeeds
-- [ ] `kubectl get --raw` custom metrics API call returns non-empty `MetricValueList`
-- [ ] `helm lint helm/charts/prometheus-adapter/` passes
+- [x] `helm install prometheus-adapter prometheus-community/prometheus-adapter -n contextiq-observability -f values.yaml -f values-prod.yaml` succeeds
+- [x] `kubectl get --raw` custom metrics API call returns non-empty `MetricValueList`
+- [x] `helm lint helm/charts/prometheus-adapter/` passes

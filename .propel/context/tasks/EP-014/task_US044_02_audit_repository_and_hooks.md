@@ -10,7 +10,7 @@
 | Layer | Backend |
 | Priority | P0 |
 | Points | 2 |
-| Status | Draft |
+| Status | Done |
 
 ## Description
 
@@ -280,12 +280,12 @@ All routes below must have `audit: AuditContext = Depends(get_audit_context)` ad
 
 ## Acceptance Criteria
 
-- [ ] Every mutating route in the coverage table above logs one row to `admin_audit_log` per request (AC-1)
-- [ ] `before_state` is `null` for create operations; populated with the current resource snapshot for update/status operations (AC-1)
-- [ ] `ip_address` is populated from `X-Forwarded-For` when present, falling back to `request.client.host` (AC-1)
-- [ ] `actor_user_id` equals the `sub` claim from the JWT (AC-1)
-- [ ] `AuditContext.log()` delegates to `AdminAuditRepository.log()` which computes and stores `row_hash` (AC-6)
-- [ ] `_latest_row_hash()` returns `GENESIS_PREV_HASH` when the table is empty (AC-6)
+- [x] Every mutating route in the coverage table above logs one row to `admin_audit_log` per request (AC-1)
+- [x] `before_state` is `null` for create operations; populated with the current resource snapshot for update/status operations (AC-1)
+- [x] `ip_address` is populated from `X-Forwarded-For` when present, falling back to `request.client.host` (AC-1)
+- [x] `actor_user_id` equals the `sub` claim from the JWT (AC-1)
+- [x] `AuditContext.log()` delegates to `AdminAuditRepository.log()` which computes and stores `row_hash` (AC-6)
+- [x] `_latest_row_hash()` returns `GENESIS_PREV_HASH` when the table is empty (AC-6)
 
 ## Dependencies
 
@@ -295,5 +295,5 @@ All routes below must have `audit: AuditContext = Depends(get_audit_context)` ad
 
 ## Definition of Done
 
-- [ ] `grep -r "get_audit_context" src/api/admin/routes/ src/knowledge_sources/routers/ src/model_registry/routers/ src/model_router/routers/` returns 9 matches (one per row in the coverage table)
-- [ ] `mypy --strict src/audit/admin_audit_log/repository.py src/audit/admin_audit_log/context.py` passes
+- [x] `grep -r "get_audit_context" src/api/admin/routes/ src/knowledge_sources/routers/ src/model_registry/routers/ src/model_router/routers/` returns 9 matches (one per row in the coverage table)
+- [x] `mypy --strict src/audit/admin_audit_log/repository.py src/audit/admin_audit_log/context.py` passes

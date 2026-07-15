@@ -10,7 +10,7 @@
 | Layer | Infrastructure |
 | Priority | P0 |
 | Points | 2 |
-| Status | Draft |
+| Status | Done |
 
 ## Description
 
@@ -324,11 +324,11 @@ resources:
 
 ## Acceptance Criteria
 
-- [ ] `kubectl get namespaces | grep contextiq` returns exactly 7 namespaces (AC-1)
-- [ ] `kubectl get resourcequota -A | grep contextiq` returns 7 quota objects (AC-3)
-- [ ] `kubectl get limitrange -A | grep contextiq` returns 7 limit-range objects (AC-3)
-- [ ] A Pod deployed without explicit `resources:` block in `contextiq-agents` still has default limits applied by the LimitRange (AC-3)
-- [ ] `kubectl apply -k k8s/namespaces/` is idempotent — re-applying does not error on existing objects
+- [x] `kubectl get namespaces | grep contextiq` returns exactly 7 namespaces (AC-1)
+- [x] `kubectl get resourcequota -A | grep contextiq` returns 7 quota objects (AC-3)
+- [x] `kubectl get limitrange -A | grep contextiq` returns 7 limit-range objects (AC-3)
+- [x] A Pod deployed without explicit `resources:` block in `contextiq-agents` still has default limits applied by the LimitRange (AC-3)
+- [x] `kubectl apply -k k8s/namespaces/` is idempotent — re-applying does not error on existing objects
 
 ## Dependencies
 
@@ -337,5 +337,5 @@ resources:
 
 ## Definition of Done
 
-- [ ] `kubectl apply -k k8s/namespaces/` completes without error in staging cluster
-- [ ] `kubectl describe resourcequota quota -n contextiq-agents` shows correct hard limits
+- [x] `kubectl apply -k k8s/namespaces/` completes without error in staging cluster
+- [x] `kubectl describe resourcequota quota -n contextiq-agents` shows correct hard limits

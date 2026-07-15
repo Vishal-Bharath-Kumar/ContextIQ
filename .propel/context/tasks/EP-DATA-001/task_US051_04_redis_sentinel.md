@@ -10,7 +10,7 @@
 | Layer | Infrastructure / Backend |
 | Priority | P0 |
 | Points | 2 |
-| Status | Draft |
+| Status | Done |
 
 ## Description
 
@@ -330,13 +330,13 @@ spec:
 
 ## Acceptance Criteria
 
-- [ ] `kubectl get pods -n contextiq-data -l app.kubernetes.io/name=redis` shows `redis-master-0` + 2 replica pods Running (AC-4)
-- [ ] `redis-cli -p 26379 SENTINEL masters` shows `contextiq-redis` with `num-slaves: 2` and `num-other-sentinels: 2` (AC-4)
-- [ ] `redis-cli CONFIG GET notify-keyspace-events` returns `KEA` (AC-4)
-- [ ] Killing `redis-master-0` results in automatic failover to a replica within 10 seconds; `SENTINEL masters` shows new primary (AC-4)
-- [ ] `python scripts/datastore/verify_redis.py` passes all 5 checks (AC-4)
-- [ ] `/vault/secrets/redis.env` present in master pod with `REDIS_PASSWORD` (AC-6)
-- [ ] `kubectl get servicemonitor redis -n contextiq-observability` exists; `redis_*` metrics in Grafana (AC-7)
+- [x] `kubectl get pods -n contextiq-data -l app.kubernetes.io/name=redis` shows `redis-master-0` + 2 replica pods Running (AC-4)
+- [x] `redis-cli -p 26379 SENTINEL masters` shows `contextiq-redis` with `num-slaves: 2` and `num-other-sentinels: 2` (AC-4)
+- [x] `redis-cli CONFIG GET notify-keyspace-events` returns `KEA` (AC-4)
+- [x] Killing `redis-master-0` results in automatic failover to a replica within 10 seconds; `SENTINEL masters` shows new primary (AC-4)
+- [x] `python scripts/datastore/verify_redis.py` passes all 5 checks (AC-4)
+- [x] `/vault/secrets/redis.env` present in master pod with `REDIS_PASSWORD` (AC-6)
+- [x] `kubectl get servicemonitor redis -n contextiq-observability` exists; `redis_*` metrics in Grafana (AC-7)
 
 ## Dependencies
 
@@ -347,6 +347,6 @@ spec:
 
 ## Definition of Done
 
-- [ ] Redis Sentinel cluster stable; `verify_redis.py` passes in staging
-- [ ] Application connects via `create_redis_client()` in `src/data/redis_client.py`
-- [ ] Keyspace notification test: `SET key ex 1` → `__keyevent@0__:expired` received within 2 seconds
+- [x] Redis Sentinel cluster stable; `verify_redis.py` passes in staging
+- [x] Application connects via `create_redis_client()` in `src/data/redis_client.py`
+- [x] Keyspace notification test: `SET key ex 1` → `__keyevent@0__:expired` received within 2 seconds

@@ -1,0 +1,33 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kafka-connect
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: contextiq
+  # Multi-source: upstream Bitnami kafka-connect chart + custom values from git ($values)
+  sources:
+    # Source 1: upstream Bitnami kafka-connect Helm chart
+    # NOTE: chart must be 'kafka-connect', not 'kafka' (different chart, different version)
+    - repoURL:        https://charts.bitnami.com/bitnami
+      chart:          kafka-connect
+      targetRevision: "1.4.4"    # pinned; matches Chart.yaml dependency version
+      helm:
+        valueFiles:
+          - $values/helm/charts/kafka-connect/values.yaml
+    # Source 2: git repo supplying the custom values file (referenced as $values above)
+    - repoURL:        https://github.com/your-org/contextiq.git
+      targetRevision: HEAD
+      ref:            values
+  destination:
+    server:    https://kubernetes.default.svc
+    namespace: contextiq-data
+  syncPolicy:
+    automated:
+      prune:    true     # Connect workers are stateless — safe to prune
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false
+      - ApplyOutOfSyncOnly=true

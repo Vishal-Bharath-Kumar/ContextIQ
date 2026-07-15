@@ -10,7 +10,7 @@
 | Layer | Infrastructure / Backend |
 | Priority | P0 |
 | Points | 2 |
-| Status | Draft |
+| Status | Done |
 
 ## Description
 
@@ -218,12 +218,12 @@ resources:
 
 ## Acceptance Criteria
 
-- [ ] `vault audit list` shows `file/` and `syslog/` audit devices enabled on the active node (AC-6)
-- [ ] After performing a `vault read database/postgres/creds/mcp-gateway`, a JSON line appears in `/vault/audit/audit.log` with `request.path: "database/postgres/creds/mcp-gateway"` (AC-6)
-- [ ] Loki receives Vault audit log lines: Grafana query `{job="vault-audit"}` returns results (AC-6)
-- [ ] `rotate_static_secrets.sh` completes without error; all migrated Secrets are annotated `vault.hashicorp.com/migrated=true` (AC-5)
-- [ ] `kubectl get secret -n contextiq-data -o yaml | grep -v migrated` returns no Secret objects with raw database passwords (AC-5)
-- [ ] Vault audit log `log_raw=false` — no plaintext secret values appear in audit output (OWASP A02)
+- [x] `vault audit list` shows `file/` and `syslog/` audit devices enabled on the active node (AC-6)
+- [x] After performing a `vault read database/postgres/creds/mcp-gateway`, a JSON line appears in `/vault/audit/audit.log` with `request.path: "database/postgres/creds/mcp-gateway"` (AC-6)
+- [x] Loki receives Vault audit log lines: Grafana query `{job="vault-audit"}` returns results (AC-6)
+- [x] `rotate_static_secrets.sh` completes without error; all migrated Secrets are annotated `vault.hashicorp.com/migrated=true` (AC-5)
+- [x] `kubectl get secret -n contextiq-data -o yaml | grep -v migrated` returns no Secret objects with raw database passwords (AC-5)
+- [x] Vault audit log `log_raw=false` — no plaintext secret values appear in audit output (OWASP A02)
 
 ## Dependencies
 
@@ -233,6 +233,6 @@ resources:
 
 ## Definition of Done
 
-- [ ] `vault audit list` shows both devices in staging Vault cluster
-- [ ] `scripts/vault/rotate_static_secrets.sh` runs end-to-end in staging; all target Secrets annotated
-- [ ] Grafana: Loki datasource query `{job="vault-audit"} | json` returns recent audit entries
+- [x] `vault audit list` shows both devices in staging Vault cluster
+- [x] `scripts/vault/rotate_static_secrets.sh` runs end-to-end in staging; all target Secrets annotated
+- [x] Grafana: Loki datasource query `{job="vault-audit"} | json` returns recent audit entries

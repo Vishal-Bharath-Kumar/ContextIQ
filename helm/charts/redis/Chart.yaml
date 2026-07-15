@@ -1,0 +1,9 @@
+apiVersion: v2
+name:        redis
+description: Redis Sentinel HA for ContextIQ caching layer
+type:        application
+version:     0.1.0
+dependencies:
+  - name:       redis
+    version:    "19.6.4"    # pinned; tracks Redis 7.2.x — update after staging validation
+    repository: https://charts.bitnami.com/bitnami

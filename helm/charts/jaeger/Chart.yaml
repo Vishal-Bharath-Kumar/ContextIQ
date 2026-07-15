@@ -1,0 +1,10 @@
+apiVersion: v2
+name: jaeger
+description: ContextIQ Jaeger distributed tracing (contextiq-observability namespace)
+type: application
+version: 0.1.0
+appVersion: "1.57.0"
+dependencies:
+  - name: contextiq-common
+    version: "0.1.0"
+    repository: "file://../../library/contextiq-common"

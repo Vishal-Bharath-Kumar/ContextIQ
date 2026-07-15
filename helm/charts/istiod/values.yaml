@@ -1,0 +1,27 @@
+istiod:
+  pilot:
+    replicaCount: 2    # HA control plane
+
+    resources:
+      requests: { cpu: "500m", memory: "2Gi" }
+      limits:   { cpu: "2",    memory: "4Gi" }
+
+    env:
+      PILOT_ENABLE_STATUS: "true"
+
+  # AC-3: meshConfig forces STRICT mTLS as the mesh-wide default
+  meshConfig:
+    accessLogFile: /dev/stdout    # access logs forwarded to Loki via stdout collection
+    enablePrometheusMerge: true
+
+    # Outbound traffic restricted to services in the registry — no arbitrary external calls
+    outboundTrafficPolicy:
+      mode: REGISTRY_ONLY
+
+    # AC-4: Minimum TLS protocol version — TLS 1.3 for all mTLS connections
+    meshMTLS:
+      minProtocolVersion: TLSV1_3
+
+  # Enable CNI plugin — avoids requiring NET_ADMIN capability on init containers
+  cni:
+    enabled: true

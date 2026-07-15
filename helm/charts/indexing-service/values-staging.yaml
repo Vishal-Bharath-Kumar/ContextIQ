@@ -1,0 +1,6 @@
+hpa:
+  enabled: true
+  minReplicas: 1
+  maxReplicas: 3    # reduced max in staging to control cost
+env:
+  LOG_LEVEL: INFO

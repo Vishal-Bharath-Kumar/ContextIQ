@@ -1,0 +1,10 @@
+apiVersion: v2
+name: admin-portal
+description: ContextIQ Admin Portal — nginx SPA + Admin API
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+dependencies:
+  - name: contextiq-common
+    version: "0.1.0"
+    repository: "file://../../library/contextiq-common"

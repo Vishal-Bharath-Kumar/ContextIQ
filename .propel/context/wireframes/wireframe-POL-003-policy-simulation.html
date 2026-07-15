@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<title>POL-003 — Policy Simulation · ContextIQ Wireframe</title>
+<link rel="stylesheet" href="_wireframe-base.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="topbar-logo"><div class="topbar-logo-icon">C</div>ContextIQ</div>
+  <div class="topbar-sep"></div>
+  <nav class="topbar-breadcrumb"><a>Policies</a> <span>›</span> <a>pii-redaction</a> <span>›</span> Simulate</nav>
+  <div class="topbar-actions"><div class="topbar-search">🔍 Search</div><button class="topbar-icon-btn">🔔</button></div>
+</header>
+<nav class="sidebar" aria-label="Main navigation">
+  <div class="sidebar-nav">
+    <a class="nav-item"><span class="icon">⊞</span>Dashboard</a>
+    <div class="nav-section">Data Sources</div>
+    <a class="nav-item"><span class="icon">⬡</span>Connectors</a><a class="nav-item"><span class="icon">🗄</span>Knowledge Sources</a>
+    <div class="nav-section">Governance</div>
+    <a class="nav-item active" aria-current="page"><span class="icon">🛡</span>Policies</a>
+    <div class="nav-section">Observability</div>
+    <a class="nav-item"><span class="icon">▶</span>Replay Explorer</a><a class="nav-item"><span class="icon">📋</span>Audit Log</a><a class="nav-item"><span class="icon">📊</span>Observability</a>
+    <div class="nav-section">Platform</div><a class="nav-item"><span class="icon">👥</span>Users</a><a class="nav-item"><span class="icon">💻</span>Models</a><a class="nav-item"><span class="icon">⚙</span>Settings</a>
+  </div>
+  <div class="sidebar-user"><div class="user-avatar">CS</div><div class="user-info"><div class="user-name">Carol Sec</div><div class="user-role">Security Officer</div></div></div>
+</nav>
+<main class="main-content" role="main">
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:20px">
+    <button class="btn btn-ghost btn-sm">← Back to Editor</button>
+    <div class="page-title" style="margin-left:8px">Policy Simulation — pii-redaction v3</div>
+  </div>
+  <div class="grid-2" style="height:calc(100vh - 56px - 100px)">
+    <!-- Input panel -->
+    <div class="card" style="display:flex;flex-direction:column">
+      <div class="card-title">Input Payload</div>
+      <div style="flex:1;background:oklch(0.08 0.008 260);border-radius:4px;padding:12px;font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--brand-blue-400);overflow:auto;min-height:200px">
+        <span style="color:var(--neutral-700)">{</span>
+  <span style="color:var(--neutral-500)">"text"</span>: <span style="color:var(--success-400)">"My SSN is 123-45-6789 and my"</span>,
+  <span style="color:var(--neutral-500)">"model"</span>: <span style="color:var(--success-400)">"gpt-4o"</span>,
+  <span style="color:var(--neutral-500)">"context"</span>: <span style="color:var(--neutral-700)">{</span>
+    <span style="color:var(--neutral-500)">"session_id"</span>: <span style="color:var(--success-400)">"sess-xyz"</span>,
+    <span style="color:var(--neutral-500)">"user_id"</span>: <span style="color:var(--success-400)">"alice@co.com"</span>
+  <span style="color:var(--neutral-700)">}</span>
+<span style="color:var(--neutral-700)">}</span>
+      </div>
+      <div style="margin-top:12px;display:flex;justify-content:flex-end">
+        <button class="btn btn-primary">▶ Run Simulation</button>
+      </div>
+    </div>
+
+    <!-- Output panel -->
+    <div class="card" style="display:flex;flex-direction:column">
+      <div class="card-title">Decision Result</div>
+      <!-- DENY result -->
+      <div style="background:var(--danger-900);border:1px solid oklch(0.28 0.12 25);border-radius:8px;padding:20px;text-align:center;margin-bottom:16px">
+        <div style="font-size:28px;font-weight:700;color:var(--danger-400);letter-spacing:0.05em">DENY</div>
+        <div style="font-size:12px;color:var(--neutral-500);margin-top:4px">pii-redaction v3 · 2ms</div>
+      </div>
+
+      <div style="font-size:12px;color:var(--neutral-500);margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em">Matched Rule</div>
+      <div class="code-block" style="margin-bottom:14px;font-size:11px">allow { not contains(input.text, "SSN") ... }  <span style="color:var(--neutral-600)">// line 5</span></div>
+
+      <div style="font-size:12px;color:var(--neutral-500);margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em">Binding Path</div>
+      <div class="code-block" style="margin-bottom:14px;font-size:11px"><span style="color:var(--brand-blue-400)">input</span>.<span style="color:var(--warning-400)">text</span> ⊇ <span style="color:var(--success-400)">"SSN"</span></div>
+
+      <div style="font-size:12px;color:var(--neutral-500);margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em">Rule Evaluation Trace</div>
+      <div style="font-size:11px;font-family:'IBM Plex Mono',monospace;line-height:1.8;color:var(--neutral-500)">
+        <div>↳ allow → <span style="color:var(--danger-400)">DENY</span></div>
+        <div style="padding-left:16px">↳ not contains(input.text,"SSN") → <span style="color:var(--danger-400)">false</span></div>
+        <div style="padding-left:32px">↳ contains("My SSN is...", "SSN") → <span style="color:var(--success-400)">true</span></div>
+      </div>
+    </div>
+  </div>
+</main>
+<aside class="annotation-panel">
+  <div class="ann-screen-id">POL-003</div>
+  <div class="ann-route">Route: /policies/:id/simulate</div>
+  <div class="ann-guard">Guard: SECURITY_OFFICER, ADMIN</div>
+  <div class="ann-divider"></div>
+  <div class="ann-section">Components</div>
+  <div class="ann-item"><div class="ann-component">&lt;MonacoEditor language="json"&gt;</div><div class="ann-note">Input payload · schema template preloaded · editable</div></div>
+  <div class="ann-item"><div class="ann-component">&lt;DecisionBadge&gt;</div><div class="ann-note">DENY=danger-900 bg · ALLOW=success-900 bg · prominent centred</div></div>
+  <div class="ann-item"><div class="ann-component">&lt;CodeBlock&gt;</div><div class="ann-note">Matched rule + binding path · copyable</div></div>
+  <div class="ann-divider"></div>
+  <div class="ann-section">States</div>
+  <span class="state-chip">idle</span>
+  <span class="state-chip">loading</span>
+  <span class="state-chip">ALLOW</span>
+  <span class="state-chip">DENY</span>
+</aside>
+</body>
+</html>

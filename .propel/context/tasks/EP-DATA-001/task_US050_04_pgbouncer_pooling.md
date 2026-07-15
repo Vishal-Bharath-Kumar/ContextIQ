@@ -10,7 +10,7 @@
 | Layer | Infrastructure / Backend |
 | Priority | P0 |
 | Points | 2 |
-| Status | Draft |
+| Status | Done |
 
 ## Description
 
@@ -268,12 +268,12 @@ spec:
 
 ## Acceptance Criteria
 
-- [ ] `kubectl get deployment pgbouncer -n contextiq-data` shows `READY 2/2` (AC-5)
-- [ ] `psql "host=pgbouncer.contextiq-data.svc.cluster.local port=5432 dbname=contextiq" -c "SHOW pools;"` shows `pool_mode=transaction` (AC-5)
-- [ ] `psql "host=postgresql.contextiq-data.svc.cluster.local" -c "SHOW max_connections;"` returns `250` (AC-5)
-- [ ] Under load test (200 concurrent connections to PgBouncer), `psql -c "SELECT count(*) FROM pg_stat_activity;"` on PostgreSQL shows ≤ 200 active backend connections (AC-5)
-- [ ] `statement_cache_size=0` set in `create_async_engine` — verified by `psql -c "SHOW prepared_transactions;"` returning 0 rows (PgBouncer transaction mode compatible)
-- [ ] Prometheus query `pgbouncer_pools_server_active_connections` visible in Grafana (AC-5)
+- [x] `kubectl get deployment pgbouncer -n contextiq-data` shows `READY 2/2` (AC-5)
+- [x] `psql "host=pgbouncer.contextiq-data.svc.cluster.local port=5432 dbname=contextiq" -c "SHOW pools;"` shows `pool_mode=transaction` (AC-5)
+- [x] `psql "host=postgresql.contextiq-data.svc.cluster.local" -c "SHOW max_connections;"` returns `250` (AC-5)
+- [x] Under load test (200 concurrent connections to PgBouncer), `psql -c "SELECT count(*) FROM pg_stat_activity;"` on PostgreSQL shows ≤ 200 active backend connections (AC-5)
+- [x] `statement_cache_size=0` set in `create_async_engine` — verified by `psql -c "SHOW prepared_transactions;"` returning 0 rows (PgBouncer transaction mode compatible)
+- [x] Prometheus query `pgbouncer_pools_server_active_connections` visible in Grafana (AC-5)
 
 ## Dependencies
 
@@ -283,6 +283,6 @@ spec:
 
 ## Definition of Done
 
-- [ ] `helm install pgbouncer bitnami/pgbouncer -n contextiq-data -f values.yaml -f values-prod.yaml` completes
-- [ ] All application services updated to use `pgbouncer.contextiq-data.svc.cluster.local` as database host
-- [ ] `create_async_engine` updated with `statement_cache_size: 0` in `connect_args`
+- [x] `helm install pgbouncer bitnami/pgbouncer -n contextiq-data -f values.yaml -f values-prod.yaml` completes
+- [x] All application services updated to use `pgbouncer.contextiq-data.svc.cluster.local` as database host
+- [x] `create_async_engine` updated with `statement_cache_size: 0` in `connect_args`

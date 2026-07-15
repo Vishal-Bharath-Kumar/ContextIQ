@@ -1,0 +1,55 @@
+# AC-3: ArgoCD pre-sync hook — Job must succeed before any pod rollout begins.
+# AC-4: backoffLimit=0 ensures a failed migration is visible immediately; ArgoCD halts sync.
+#
+# IMAGE: Replace ${IMAGE_TAG} at deploy time with:
+#   envsubst < k8s/postgres/migration-job.yaml | kubectl apply -f -
+#   OR use kustomize images transformer in the overlay.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: alembic-migration
+  namespace: contextiq-data
+  annotations:
+    argocd.argoproj.io/hook:               PreSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation    # delete previous run before creating new
+spec:
+  backoffLimit:          0      # no retries — a retry on failed DDL may mask data corruption
+  activeDeadlineSeconds: 300   # 5-minute hard timeout
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/component: db-migration
+        app.kubernetes.io/part-of:   contextiq
+      annotations:
+        # Vault Agent init-container only — no long-running sidecar in a one-shot Job
+        vault.hashicorp.com/agent-inject:                    "true"
+        vault.hashicorp.com/role:                            "admin-api"
+        vault.hashicorp.com/agent-pre-populate-only:         "true"
+        vault.hashicorp.com/agent-inject-secret-postgres:    "database/postgres/creds/admin-api"
+        vault.hashicorp.com/agent-inject-template-postgres: |
+          {{- with secret "database/postgres/creds/admin-api" -}}
+          export DB_USERNAME="{{ .Data.username }}"
+          export DB_PASSWORD="{{ .Data.password }}"
+          {{- end }}
+    spec:
+      restartPolicy: Never
+      serviceAccountName: db-migration
+      containers:
+        - name: alembic-migration
+          image: "ghcr.io/org/contextiq-api:${IMAGE_TAG}"    # substituted by CI / kustomize
+          imagePullPolicy: Always
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              set -euo pipefail
+              . /vault/secrets/postgres.env
+              export DATABASE_URL="postgresql+asyncpg://${DB_USERNAME}:${DB_PASSWORD}@postgresql.contextiq-data.svc.cluster.local:5432/contextiq?ssl=require"
+              python -m scripts.ci.run_migration
+          env:
+            - name: ENVIRONMENT
+              value: production
+            - name: LOG_FORMAT
+              value: json    # structured logs forwarded to Loki (AC-4)
+          resources:
+            requests: { cpu: "200m", memory: "256Mi" }
+            limits:   { cpu: "500m", memory: "512Mi" }

@@ -10,7 +10,7 @@
 | Layer | Infrastructure / Backend |
 | Priority | P0 |
 | Points | 2 |
-| Status | Draft |
+| Status | Done |
 
 ## Description
 
@@ -326,12 +326,12 @@ spec:
 
 ## Acceptance Criteria
 
-- [ ] `kubectl get pods -n contextiq-data -l app.kubernetes.io/name=opensearch` shows 3 pods Running (AC-3)
-- [ ] `curl -u admin:$PASS https://opensearch.contextiq-data.svc.cluster.local:9200/_cluster/health` shows `"status":"green","number_of_nodes":3` (AC-3)
-- [ ] `bootstrap_opensearch.py` completes; `curl .../contextiq_documents/_mapping` shows `content`, `source_id`, `metadata`, `indexed_at` fields (AC-3)
-- [ ] Index similarity is BM25: `curl .../contextiq_documents/_settings | jq '.["contextiq_documents"].settings.index.similarity'` shows `"type":"BM25"` (AC-3)
-- [ ] `/vault/secrets/opensearch.env` present in pod with `OPENSEARCH_PASSWORD` set (AC-6)
-- [ ] `kubectl get servicemonitor opensearch -n contextiq-observability` exists; Prometheus scrapes node metrics (AC-7)
+- [x] `kubectl get pods -n contextiq-data -l app.kubernetes.io/name=opensearch` shows 3 pods Running (AC-3)
+- [x] `curl -u admin:$PASS https://opensearch.contextiq-data.svc.cluster.local:9200/_cluster/health` shows `"status":"green","number_of_nodes":3` (AC-3)
+- [x] `bootstrap_opensearch.py` completes; `curl .../contextiq_documents/_mapping` shows `content`, `source_id`, `metadata`, `indexed_at` fields (AC-3)
+- [x] Index similarity is BM25: `curl .../contextiq_documents/_settings | jq '."contextiq_documents".settings.index.similarity'` shows `"type":"BM25"` (AC-3)
+- [x] `/vault/secrets/opensearch.env` present in pod with `OPENSEARCH_PASSWORD` set (AC-6)
+- [x] `kubectl get servicemonitor opensearch -n contextiq-observability` exists; Prometheus scrapes node metrics (AC-7)
 
 ## Dependencies
 
@@ -342,6 +342,6 @@ spec:
 
 ## Definition of Done
 
-- [ ] OpenSearch cluster green for 15 minutes with all 3 shards allocated
-- [ ] `bootstrap_opensearch.py` committed and idempotent in staging
-- [ ] Test document indexable: `PUT /contextiq_documents/_doc/1 {"content":"test","source_id":"s1","indexed_at":"2026-07-10T00:00:00Z","metadata":{}}` returns 201
+- [x] OpenSearch cluster green for 15 minutes with all 3 shards allocated
+- [x] `bootstrap_opensearch.py` committed and idempotent in staging
+- [x] Test document indexable: `PUT /contextiq_documents/_doc/1 {"content":"test","source_id":"s1","indexed_at":"2026-07-10T00:00:00Z","metadata":{}}` returns 201

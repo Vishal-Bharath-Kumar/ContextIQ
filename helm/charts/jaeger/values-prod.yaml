@@ -1,0 +1,6 @@
+replicaCount: 2
+pdb:
+  enabled: true
+  minAvailable: 1
+env:
+  SPAN_STORAGE_TYPE: "elasticsearch"

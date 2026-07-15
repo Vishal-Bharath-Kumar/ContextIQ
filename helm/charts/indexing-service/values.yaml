@@ -1,0 +1,94 @@
+replicaCount: 1
+
+image:
+  repository: contextiq/indexing-service
+  pullPolicy: IfNotPresent
+  tag: ""
+
+namespace: contextiq-agents    # indexing runs in the agents namespace alongside workers
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8000
+
+resources:
+  # Indexing is CPU-bound (embedding inference) — generous CPU allocation
+  requests:
+    cpu:    "500m"
+    memory: "1Gi"
+  limits:
+    cpu:    "4"
+    memory: "4Gi"
+
+readinessProbe:
+  httpGet:
+    path: /healthz
+    port: 8000
+  initialDelaySeconds: 20
+  periodSeconds: 10
+  failureThreshold: 3
+
+livenessProbe:
+  httpGet:
+    path: /healthz
+    port: 8000
+  initialDelaySeconds: 40
+  periodSeconds: 30
+  failureThreshold: 5
+
+hpa:
+  enabled: true
+  minReplicas: 1      # AC-1: indexing can run on a single pod at rest
+  maxReplicas: 5      # AC-1
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70    # embedding is CPU-intensive; 70% is sustainable
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 0     # AC-4: scale up immediately (< 30 s)
+      policies:
+        - type:          Pods
+          value:         2              # add 2 pods per event; indexing backlog drains quickly
+          periodSeconds: 30
+    scaleDown:
+      stabilizationWindowSeconds: 300   # AC-4: 5-minute scale-down stabilisation window
+      policies:
+        - type:          Pods
+          value:         1
+          periodSeconds: 60
+
+podSecurityContext:
+  runAsNonRoot: true
+  seccompProfile:
+    type: RuntimeDefault
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem:   true
+  runAsNonRoot:             true
+  runAsUser:                1000
+  capabilities:
+    drop: ["ALL"]
+
+env:
+  KEYCLOAK_URL: "http://keycloak.contextiq-security.svc.cluster.local/auth"
+  KEYCLOAK_REALM: "contextiq"
+  DATABASE_URL: ""    # sourced from /vault/secrets/postgres.env
+  QDRANT_URL:   ""    # sourced from /vault/secrets/qdrant.env
+  KAFKA_BOOTSTRAP_SERVERS: ""
+
+vault:
+  enabled: true
+  role: indexing-service
+  secrets:
+    - name:      postgres
+      vaultPath: "database/postgres/creds/indexing-service"
+      format:    env
+    - name:      qdrant
+      vaultPath: "secret/data/contextiq/qdrant/api-key"
+      format:    env

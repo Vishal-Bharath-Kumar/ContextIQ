@@ -1,0 +1,55 @@
+# k8s/audit/archive-cronjob.yaml
+#
+# Kubernetes CronJob that runs the audit log archiver daily at 02:00 UTC.
+# AC-3: archives previous calendar day's admin_audit_log rows to MinIO.
+# concurrencyPolicy: Forbid — prevents overlapping runs from corrupting the
+# archive object for the same day.
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: audit-log-archiver
+  namespace: contextiq
+spec:
+  schedule: "0 2 * * *"       # 02:00 UTC daily — AC-3
+  concurrencyPolicy: Forbid    # prevent overlapping runs
+  failedJobsHistoryLimit: 5
+  successfulJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 2          # retry up to 2 times on transient failures
+      template:
+        spec:
+          restartPolicy: OnFailure
+          serviceAccountName: contextiq-audit-archiver
+          containers:
+            - name: archiver
+              image: contextiq/mcp-gateway:latest
+              command: ["python", "scripts/audit/run_archive.py"]
+              envFrom:
+                - secretRef:
+                    name: audit-archive-minio-credentials
+              env:
+                - name: DATABASE_URL
+                  valueFrom:
+                    secretKeyRef:
+                      name: contextiq-db-credentials
+                      key: DATABASE_URL
+              resources:
+                requests:
+                  cpu:    "100m"
+                  memory: "256Mi"
+                limits:
+                  cpu:    "500m"
+                  memory: "512Mi"
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem:   true
+                runAsNonRoot:             true
+                runAsUser:                1000
+                capabilities:
+                  drop: ["ALL"]
+          securityContext:
+            runAsNonRoot: true
+            seccompProfile:
+              type: RuntimeDefault

@@ -10,7 +10,7 @@
 | Layer | Backend |
 | Priority | P0 |
 | Points | 2 |
-| Status | Draft |
+| Status | Done |
 
 ## Description
 
@@ -288,13 +288,13 @@ def downgrade() -> None:
 
 ## Acceptance Criteria
 
-- [ ] `AdminAuditLog` ORM has all AC-1 required fields: `user_id` (→ `actor_user_id`), `action`, `resource_type`, `resource_id`, `before_state`, `after_state`, `timestamp`, `ip_address` (AC-1)
-- [ ] Alembic migration `0019` creates the table + the `trg_admin_audit_log_immutable` trigger (AC-2)
-- [ ] `UPDATE admin_audit_log SET action='x' WHERE ...` raises `PL/pgSQL` exception — verifiable via `psql` or pytest (AC-2)
-- [ ] `DELETE FROM admin_audit_log WHERE ...` raises the same exception (AC-2)
-- [ ] `compute_row_hash()` is deterministic: same inputs always produce the same SHA-256 digest (AC-6)
-- [ ] `GENESIS_PREV_HASH` is the sentinel for the first row in the table (AC-6)
-- [ ] `row_fields_for_hashing()` is stable — its field list is documented as immutable (AC-6)
+- [x] `AdminAuditLog` ORM has all AC-1 required fields: `user_id` (→ `actor_user_id`), `action`, `resource_type`, `resource_id`, `before_state`, `after_state`, `timestamp`, `ip_address` (AC-1)
+- [x] Alembic migration `0019` creates the table + the `trg_admin_audit_log_immutable` trigger (AC-2)
+- [x] `UPDATE admin_audit_log SET action='x' WHERE ...` raises `PL/pgSQL` exception — verifiable via `psql` or pytest (AC-2)
+- [x] `DELETE FROM admin_audit_log WHERE ...` raises the same exception (AC-2)
+- [x] `compute_row_hash()` is deterministic: same inputs always produce the same SHA-256 digest (AC-6)
+- [x] `GENESIS_PREV_HASH` is the sentinel for the first row in the table (AC-6)
+- [x] `row_fields_for_hashing()` is stable — its field list is documented as immutable (AC-6)
 
 ## Dependencies
 
@@ -304,6 +304,6 @@ def downgrade() -> None:
 
 ## Definition of Done
 
-- [ ] `alembic upgrade 0019` runs without error
-- [ ] `psql -c "UPDATE admin_audit_log SET action='x' WHERE true"` returns error (immutability test)
-- [ ] `mypy --strict src/audit/admin_audit_log/` passes
+- [x] `alembic upgrade 0019` runs without error
+- [x] `psql -c "UPDATE admin_audit_log SET action='x' WHERE true"` returns error (immutability test)
+- [x] `mypy --strict src/audit/admin_audit_log/` passes

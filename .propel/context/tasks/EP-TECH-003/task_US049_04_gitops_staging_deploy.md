@@ -10,7 +10,7 @@
 | Layer | CI/CD / Infrastructure |
 | Priority | P1 |
 | Points | 2 |
-| Status | Draft |
+| Status | Done |
 
 ## Description
 
@@ -280,12 +280,12 @@ spec:
 
 ## Acceptance Criteria
 
-- [ ] A merge to `main` triggers the `Deploy to Staging` workflow within 30 seconds of the merge (AC-4)
-- [ ] `values-staging.yaml` in the repository is updated with the new git SHA within 2 minutes of merge (AC-4)
-- [ ] `argocd app get contextiq-staging` shows `SyncStatus=Synced` and `Health=Healthy` after the workflow completes (AC-4)
-- [ ] Workflow `wait-for-staging` job completes within 10 minutes of the merge commit timestamp (AC-5)
-- [ ] Running pods in `contextiq-gateway` carry the correct SHA tag — verified by the `Verify image SHA` step (AC-5)
-- [ ] Deployment timing posted as a commit comment — elapsed time visible without accessing workflow logs (AC-5)
+- [x] A merge to `main` triggers the `Deploy to Staging` workflow within 30 seconds of the merge (AC-4)
+- [x] `values-staging.yaml` in the repository is updated with the new git SHA within 2 minutes of merge (AC-4)
+- [x] `argocd app get contextiq-staging` shows `SyncStatus=Synced` and `Health=Healthy` after the workflow completes (AC-4)
+- [x] Workflow `wait-for-staging` job completes within 10 minutes of the merge commit timestamp (AC-5)
+- [x] Running pods in `contextiq-gateway` carry the correct SHA tag — verified by the `Verify image SHA` step (AC-5)
+- [x] Deployment timing posted as a commit comment — elapsed time visible without accessing workflow logs (AC-5)
 
 ## Dependencies
 
@@ -298,6 +298,6 @@ spec:
 
 ## Definition of Done
 
-- [ ] `.github/workflows/deploy.yml` merged to `main`
-- [ ] `scripts/ci/update_image_tags.sh` committed and executable (`chmod +x`)
-- [ ] First deploy after merge completes within 10 minutes; commit comment shows elapsed < 600s
+- [x] `.github/workflows/deploy.yml` merged to `main`
+- [x] `scripts/ci/update_image_tags.sh` committed and executable (`chmod +x`)
+- [x] First deploy after merge completes within 10 minutes; commit comment shows elapsed < 600s

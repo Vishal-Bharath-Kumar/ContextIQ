@@ -1,0 +1,308 @@
+name: Deploy to Staging and Production
+
+on:
+  push:
+    branches: [main]
+
+# Only one deploy runs at a time; new pushes cancel in-progress deploys to
+# prevent overlapping image-tag commits and ArgoCD sync races.
+concurrency:
+  group: deploy-staging
+  cancel-in-progress: true
+
+env:
+  ARGOCD_SERVER:     ${{ secrets.ARGOCD_SERVER }}       # e.g. argocd.contextiq.io
+  ARGOCD_AUTH_TOKEN: ${{ secrets.ARGOCD_AUTH_TOKEN }}   # ArgoCD API token (repo admin)
+  # BUG FIX: ARGOCD_SERVER and ARGOCD_AUTH_TOKEN above are read natively by
+  # the ArgoCD CLI — do NOT duplicate them inside ARGOCD_OPTS.  Embedding the
+  # auth token in ARGOCD_OPTS as a plain string ("--auth-token <value>") risks
+  # bypassing GitHub Actions' automatic secret masking.  Only extra transport
+  # flags belong here.
+  ARGOCD_OPTS:       "--grpc-web"
+  STAGING_APP_NAME:  contextiq-staging
+
+jobs:
+  # -----------------------------------------------------------------------
+  # Step 1: Build and push the merge-commit image
+  # -----------------------------------------------------------------------
+  build:
+    name: Build Docker Images
+    uses: ./.github/workflows/build.yml
+    with:
+      push: true
+    permissions:
+      contents:  read
+      packages:  write
+      id-token:  write    # required for SLSA provenance attestation
+
+  # -----------------------------------------------------------------------
+  # Step 2: Update Helm values with new image SHA → commit → ArgoCD picks it up
+  # -----------------------------------------------------------------------
+  update-image-tags:
+    name: Update Staging Image Tags
+    runs-on: ubuntu-24.04
+    needs: build
+    timeout-minutes: 3
+    permissions:
+      contents: write    # commit updated values file back to the repo
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Use a deploy key (not GITHUB_TOKEN) so the push triggers
+          # the ArgoCD webhook; pushes made with GITHUB_TOKEN do not trigger
+          # other GitHub Actions workflows on the same repo by default.
+          ssh-key:    ${{ secrets.GITOPS_DEPLOY_KEY }}
+          ref:        main
+          fetch-depth: 1
+
+      - name: Install yq (YAML editor)
+        uses: mikefarah/yq@v4.44.3
+
+      - name: Update image tags in Helm values
+        env:
+          NEW_SHA: ${{ github.sha }}
+        run: |
+          # BUG FIX: $REGISTRY was the second positional argument in the spec's
+          # script signature but was never used inside the script — dead code.
+          # Removed from script and call site; script now takes (sha, values-file).
+          bash scripts/ci/update_image_tags.sh \
+            "$NEW_SHA" \
+            helm/contextiq/values-staging.yaml
+
+      - name: Commit and push updated image tags
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add helm/contextiq/values-staging.yaml
+          # --quiet exits 0 even when nothing is staged; the || true prevents
+          # failing the step if the SHA did not actually change the values file.
+          git diff --staged --quiet && echo "No changes to commit — same SHA" && exit 0
+          git commit \
+            -m "ci: update staging image tags to ${{ github.sha }} [skip ci]"
+          git push origin main
+          # [skip ci] prevents the push from re-triggering this deploy workflow
+
+  # -----------------------------------------------------------------------
+  # Step 3: Wait for ArgoCD to sync staging Application
+  # AC-4: sync triggered by the GitOps commit above (pull model)
+  # AC-5: staging fully deployed within 10 min of the merge commit
+  # -----------------------------------------------------------------------
+  wait-for-staging:
+    name: Wait for Staging Deployment
+    runs-on: ubuntu-24.04
+    needs: update-image-tags
+    timeout-minutes: 10    # AC-5: hard job timeout — fails if staging not healthy by 10 min
+
+    steps:
+      - name: Install ArgoCD CLI
+        run: |
+          curl -sSL -o /usr/local/bin/argocd \
+            "https://github.com/argoproj/argo-cd/releases/download/v2.11.5/argocd-linux-amd64"
+          chmod +x /usr/local/bin/argocd
+          argocd version --client
+
+      # BUG FIX: kubectl is needed by the "Verify image SHA" step but the spec
+      # provided no cluster authentication.  Configure kubectl using a
+      # base64-encoded kubeconfig stored as a GitHub Actions secret.
+      - name: Configure kubectl (staging cluster)
+        env:
+          KUBECONFIG_DATA: ${{ secrets.KUBECONFIG_STAGING }}
+        run: |
+          mkdir -p ~/.kube
+          printf '%s' "$KUBECONFIG_DATA" | base64 --decode > ~/.kube/config
+          chmod 600 ~/.kube/config
+          kubectl cluster-info --request-timeout=10s
+
+      # AC-4: poll for ArgoCD sync completion every 15s for up to 8 min.
+      # BUG FIX (original spec): the loop exited on deadline without exit 1,
+      # allowing downstream steps to run even when staging never became healthy.
+      # Fixed by tracking final SYNC_STATUS/HEALTH and failing explicitly.
+      - name: Wait for ArgoCD sync to complete
+        run: |
+          echo "Waiting for ArgoCD to pick up the new commit and sync..."
+          SYNC_STATUS="Unknown"
+          HEALTH="Unknown"
+          DEADLINE=$(( $(date +%s) + 480 ))    # 8 min — leaves 2 min for verification
+
+          while [ "$(date +%s)" -lt "$DEADLINE" ]; do
+            APP_JSON=$(argocd app get "$STAGING_APP_NAME" --output json 2>/dev/null || echo '{}')
+            SYNC_STATUS=$(printf '%s' "$APP_JSON" | jq -r '.status.sync.status // "Unknown"')
+            HEALTH=$(printf '%s' "$APP_JSON"      | jq -r '.status.health.status // "Unknown"')
+            REMAINING=$(( DEADLINE - $(date +%s) ))
+            echo "  SyncStatus=$SYNC_STATUS  Health=$HEALTH  remaining=${REMAINING}s"
+
+            if [ "$SYNC_STATUS" = "Synced" ] && [ "$HEALTH" = "Healthy" ]; then
+              echo "SUCCESS: $STAGING_APP_NAME is Synced and Healthy"
+              break
+            fi
+            sleep 15
+          done
+
+          # BUG FIX: explicitly fail when the deadline was hit without success.
+          # Print conditions from ArgoCD to surface the root cause.
+          if [ "$SYNC_STATUS" != "Synced" ] || [ "$HEALTH" != "Healthy" ]; then
+            echo "::error::TIMEOUT: $STAGING_APP_NAME did not become Synced+Healthy within 8 minutes"
+            echo "Final state: SyncStatus=$SYNC_STATUS  Health=$HEALTH"
+            argocd app get "$STAGING_APP_NAME" --output json \
+              | jq '{sync: .status.sync.status, health: .status.health.status, conditions: .status.conditions}'
+            exit 1
+          fi
+
+          # Summary of final status
+          argocd app get "$STAGING_APP_NAME" --output json \
+            | jq '{sync: .status.sync.status, health: .status.health.status}'
+
+      # Confirm that the running pods carry the expected image SHA
+      - name: Verify image SHA on deployed pods
+        run: |
+          EXPECTED_SHA="${{ github.sha }}"
+          NAMESPACES=(contextiq-gateway contextiq-agents contextiq-admin)
+          FAILED=0
+          for NS in "${NAMESPACES[@]}"; do
+            RUNNING_SHA=$(kubectl get pods -n "$NS" \
+              -o jsonpath='{.items[0].spec.containers[0].image}' 2>/dev/null \
+              | awk -F: '{print $2}')
+            echo "  $NS: deployed SHA = ${RUNNING_SHA:-<none>} (expected: $EXPECTED_SHA)"
+            if [ "$RUNNING_SHA" != "$EXPECTED_SHA" ]; then
+              echo "::error::$NS pods are running wrong image SHA: $RUNNING_SHA"
+              FAILED=1
+            fi
+          done
+          if [ "$FAILED" -ne 0 ]; then
+            exit 1
+          fi
+          echo "PASS: all namespaces running expected SHA $EXPECTED_SHA"
+
+      # Post deployment timing summary as a commit comment
+      - name: Post deployment summary
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const start  = new Date('${{ github.event.head_commit.timestamp }}');
+            const elapsed = Math.round((Date.now() - start.getTime()) / 1000);
+            const withinBudget = elapsed < 600;
+            await github.rest.repos.createCommitComment({
+              owner:      context.repo.owner,
+              repo:       context.repo.repo,
+              commit_sha: context.sha,
+              body: [
+                `**Staging Deployment** — \`${{ env.STAGING_APP_NAME }}\``,
+                `SHA: \`${{ github.sha }}\``,
+                `Elapsed: **${elapsed}s** (target: < 600s)`,
+                withinBudget ? '✅ Within 10-minute budget' : '⚠️ Exceeded 10-minute budget',
+              ].join('\n'),
+            });
+
+  # -----------------------------------------------------------------------
+  # Step 4: Manual approval gate → production deploy
+  # AC-6: 'production' environment requires at least one reviewer approval.
+  # This job is reached only after staging is verified Synced+Healthy (AC-5).
+  # The job pauses here until a member of platform-engineering clicks Approve.
+  # -----------------------------------------------------------------------
+  promote-to-production:
+    name: Promote to Production
+    runs-on: ubuntu-24.04
+    needs: wait-for-staging    # only offer promotion after staging is healthy (AC-5)
+    timeout-minutes: 10
+
+    # AC-6: 'production' environment has Required Reviewers configured in
+    # GitHub: Settings → Environments → production → Required reviewers.
+    # The job will not start until an approved reviewer clicks "Approve and Deploy".
+    environment:
+      name: production
+      url:  https://api.contextiq.io    # displayed in the approval UI for reviewer context
+
+    env:
+      PRODUCTION_APP: contextiq-production
+      # ARGOCD_SERVER, ARGOCD_AUTH_TOKEN, and ARGOCD_OPTS are inherited from
+      # the workflow-level env — no need to re-declare them here.
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Use a deploy key so the git push triggers the ArgoCD webhook.
+          ssh-key:     ${{ secrets.GITOPS_DEPLOY_KEY }}
+          ref:         main
+          fetch-depth: 1
+
+      - name: Install yq
+        uses: mikefarah/yq@v4.44.3
+
+      - name: Install ArgoCD CLI
+        run: |
+          curl -sSL -o /usr/local/bin/argocd \
+            "https://github.com/argoproj/argo-cd/releases/download/v2.11.5/argocd-linux-amd64"
+          chmod +x /usr/local/bin/argocd
+
+      # AC-6: this step is reached only after a reviewer has clicked Approve
+      - name: Update production image tags
+        run: |
+          # BUG FIX: spec called update_image_tags.sh with 3 args including a
+          # $REGISTRY arg that was removed in TASK-US049-04.  Updated to 2-arg
+          # signature: (git-sha, values-file).
+          bash scripts/ci/update_image_tags.sh \
+            "${{ github.sha }}" \
+            helm/contextiq/values-production.yaml
+
+      - name: Commit and push production image tags
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add helm/contextiq/values-production.yaml
+          git diff --staged --quiet && echo "No changes to commit — same SHA" && exit 0
+          git commit \
+            -m "ci: promote ${{ github.sha }} to production [skip ci]"
+          git push origin main
+
+      # Trigger an immediate ArgoCD hard refresh to avoid waiting for the
+      # polling interval (default 3 min) before ArgoCD detects the new commit.
+      - name: Trigger ArgoCD hard refresh
+        # BUG FIX: spec set ARGOCD_OPTS: "--server … --auth-token …" in step
+        # env, embedding the auth token in a plain string that may bypass secret
+        # masking.  ARGOCD_SERVER, ARGOCD_AUTH_TOKEN, and ARGOCD_OPTS="--grpc-web"
+        # are inherited from workflow-level env — no step-level override needed.
+        run: argocd app get "$PRODUCTION_APP" --hard-refresh
+
+      - name: Wait for production sync
+        run: |
+          echo "Waiting for production ArgoCD sync..."
+          DEADLINE=$(( $(date +%s) + 540 ))    # 9 min (1 min reserved for surrounding steps)
+
+          while [ "$(date +%s)" -lt "$DEADLINE" ]; do
+            APP_JSON=$(argocd app get "$PRODUCTION_APP" --output json 2>/dev/null || echo '{}')
+            STATUS=$(printf '%s' "$APP_JSON" \
+              | jq -r '"\(.status.sync.status // "Unknown")/\(.status.health.status // "Unknown")"')
+            REMAINING=$(( DEADLINE - $(date +%s) ))
+            echo "  Status: $STATUS  remaining: ${REMAINING}s"
+
+            if [ "$STATUS" = "Synced/Healthy" ]; then
+              echo "SUCCESS: $PRODUCTION_APP is Synced and Healthy"
+              exit 0
+            fi
+            sleep 15
+          done
+
+          echo "::error::TIMEOUT: $PRODUCTION_APP did not become Synced/Healthy within 9 minutes"
+          argocd app get "$PRODUCTION_APP" --output json \
+            | jq '{sync: .status.sync.status, health: .status.health.status, conditions: .status.conditions}'
+          exit 1
+
+      - name: Post production deployment summary
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const sha      = '${{ github.sha }}';
+            const approver = '${{ github.actor }}';
+            await github.rest.repos.createCommitComment({
+              owner:      context.repo.owner,
+              repo:       context.repo.repo,
+              commit_sha: sha,
+              body: [
+                `**Production Deployment** — approved by @${approver}`,
+                `SHA: \`${sha}\``,
+                `ArgoCD app: \`${{ env.PRODUCTION_APP }}\``,
+              ].join('\n'),
+            });

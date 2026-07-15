@@ -10,7 +10,7 @@
 | Layer | Infrastructure |
 | Priority | P0 |
 | Points | 3 |
-| Status | Draft |
+| Status | Done |
 
 ## Description
 
@@ -304,12 +304,12 @@ spec:
 
 ## Acceptance Criteria
 
-- [ ] `kubectl get pods -n contextiq-infra | grep cert-manager` shows controller (×2), webhook (×2), cainjector (×2) Running (AC-1)
-- [ ] `kubectl get clusterissuer` shows `contextiq-internal-ca` and `letsencrypt-prod` with `READY=True` (AC-1)
-- [ ] `kubectl get certificate -A` shows all Ingress TLS Secrets with `READY=True` and valid domains (AC-2)
-- [ ] `kubectl describe certificate keycloak-tls -n contextiq-security` shows `renewBefore: 720h0m0s` (AC-7)
-- [ ] `curl -I https://api.contextiq.io` returns `HTTP/2 200` with a valid TLS certificate in the chain (AC-2)
-- [ ] Cert expiry is >= 90 days from now (Let's Encrypt issues 90-day certs; renewBefore=30d ensures renewal at 60-day mark) (AC-7)
+- [x] `kubectl get pods -n contextiq-infra | grep cert-manager` shows controller (×2), webhook (×2), cainjector (×2) Running (AC-1)
+- [x] `kubectl get clusterissuer` shows `contextiq-internal-ca` and `letsencrypt-prod` with `READY=True` (AC-1)
+- [x] `kubectl get certificate -A` shows all Ingress TLS Secrets with `READY=True` and valid domains (AC-2)
+- [x] `kubectl describe certificate keycloak-tls -n contextiq-security` shows `renewBefore: 720h0m0s` (AC-7)
+- [x] `curl -I https://api.contextiq.io` returns `HTTP/2 200` with a valid TLS certificate in the chain (AC-2)
+- [x] Cert expiry is >= 90 days from now (Let's Encrypt issues 90-day certs; renewBefore=30d ensures renewal at 60-day mark) (AC-7)
 
 ## Dependencies
 
@@ -320,6 +320,6 @@ spec:
 
 ## Definition of Done
 
-- [ ] `helm install cert-manager jetstack/cert-manager -n contextiq-infra -f values.yaml` completes with all pods Ready
-- [ ] `bootstrap_root_ca.sh` creates `contextiq-root-ca` Secret in `contextiq-infra`
-- [ ] All three Ingress resources (keycloak, mcp-gateway, admin-portal) have `READY=True` cert-manager Certificates
+- [x] `helm install cert-manager jetstack/cert-manager -n contextiq-infra -f values.yaml` completes with all pods Ready
+- [x] `bootstrap_root_ca.sh` creates `contextiq-root-ca` Secret in `contextiq-infra`
+- [x] All three Ingress resources (keycloak, mcp-gateway, admin-portal) have `READY=True` cert-manager Certificates

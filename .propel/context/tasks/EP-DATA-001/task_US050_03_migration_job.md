@@ -10,7 +10,7 @@
 | Layer | Infrastructure / Backend |
 | Priority | P0 |
 | Points | 2 |
-| Status | Draft |
+| Status | Done |
 
 ## Description
 
@@ -285,12 +285,12 @@ postgresql:
 
 ## Acceptance Criteria
 
-- [ ] After a merge, ArgoCD sync log shows `PreSync: alembic-migration` job completing with exit code 0 before any pod rollout starts (AC-3)
-- [ ] `kubectl get job alembic-migration -n contextiq-data -o jsonpath='{.status.succeeded}'` returns `1` after a successful deployment (AC-3)
-- [ ] Introducing a deliberately invalid migration (e.g. duplicate column) causes the Job to exit 1, ArgoCD shows `SyncFailed`, and existing pods remain running on the old version (AC-4)
-- [ ] `kubectl logs job/alembic-migration -n contextiq-data` shows JSON lines with `event`, `timestamp`, and `current_revision` fields (AC-4)
-- [ ] Loki query `{app="alembic-migration"} | json | event = "migration_failed"` returns results on failure — alertable via Grafana (AC-4)
-- [ ] `activeDeadlineSeconds: 300` — a stalled migration kills the Job at 5 minutes and returns a descriptive timeout error (AC-4)
+- [x] After a merge, ArgoCD sync log shows `PreSync: alembic-migration` job completing with exit code 0 before any pod rollout starts (AC-3)
+- [x] `kubectl get job alembic-migration -n contextiq-data -o jsonpath='{.status.succeeded}'` returns `1` after a successful deployment (AC-3)
+- [x] Introducing a deliberately invalid migration (e.g. duplicate column) causes the Job to exit 1, ArgoCD shows `SyncFailed`, and existing pods remain running on the old version (AC-4)
+- [x] `kubectl logs job/alembic-migration -n contextiq-data` shows JSON lines with `event`, `timestamp`, and `current_revision` fields (AC-4)
+- [x] Loki query `{app="alembic-migration"} | json | event = "migration_failed"` returns results on failure — alertable via Grafana (AC-4)
+- [x] `activeDeadlineSeconds: 300` — a stalled migration kills the Job at 5 minutes and returns a descriptive timeout error (AC-4)
 
 ## Dependencies
 
@@ -301,6 +301,6 @@ postgresql:
 
 ## Definition of Done
 
-- [ ] `k8s/postgres/migration-job.yaml` committed; ArgoCD pre-sync hook recognised (verify with `argocd app get contextiq-staging`)
-- [ ] `scripts/ci/run_migration.py` committed and executable; unit-tested in `tests/unit/test_run_migration.py`
-- [ ] Staging deploy cycle: migration Job passes, then pods roll out — verified end-to-end
+- [x] `k8s/postgres/migration-job.yaml` committed; ArgoCD pre-sync hook recognised (verify with `argocd app get contextiq-staging`)
+- [x] `scripts/ci/run_migration.py` committed and executable; unit-tested in `tests/unit/test_run_migration.py`
+- [x] Staging deploy cycle: migration Job passes, then pods roll out — verified end-to-end

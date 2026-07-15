@@ -10,7 +10,7 @@
 | Layer | Infrastructure |
 | Priority | P0 |
 | Points | 2 |
-| Status | Draft |
+| Status | Done |
 
 ## Description
 
@@ -429,14 +429,14 @@ validate-hpa-staging: ## Run HPA validation suite in staging
 
 ## Acceptance Criteria
 
-- [ ] `test_hpa_min_max_replicas` parametrized tests pass for all 3 HPAs — correct min/max (AC-1)
-- [ ] `test_agent_worker_hpa_has_custom_metric` — HPA spec contains `contextiq_active_requests` Pods metric (AC-2)
-- [ ] `test_gateway_hpa_cpu_target` — CPU target is 60% (AC-3)
-- [ ] `test_scale_down_stabilization_window` passes for all 3 HPAs — `stabilizationWindowSeconds: 300` (AC-4)
-- [ ] `hpa_timing_check.py` confirms scale-up within 30 s of load starting (AC-4)
-- [ ] `hpa_timing_check.py` confirms no scale-down within 300 s of load stopping (AC-4)
-- [ ] `pdb_disruption_test.sh` — PDB prevents all gateway pods from being evicted (AC-5)
-- [ ] All tests run in CI via `make validate-hpa-staging` without manual cluster access (AC-6)
+- [x] `test_hpa_min_max_replicas` parametrized tests pass for all 3 HPAs — correct min/max (AC-1)
+- [x] `test_agent_worker_hpa_has_custom_metric` — HPA spec contains `contextiq_active_requests` Pods metric (AC-2)
+- [x] `test_gateway_hpa_cpu_target` — CPU target is 60% (AC-3)
+- [x] `test_scale_down_stabilization_window` passes for all 3 HPAs — `stabilizationWindowSeconds: 300` (AC-4)
+- [x] `hpa_timing_check.py` confirms scale-up within 30 s of load starting (AC-4)
+- [x] `hpa_timing_check.py` confirms no scale-down within 300 s of load stopping (AC-4)
+- [x] `pdb_disruption_test.sh` — PDB prevents all gateway pods from being evicted (AC-5)
+- [x] All tests run in CI via `make validate-hpa-staging` without manual cluster access (AC-6)
 
 ## Dependencies
 
@@ -448,6 +448,6 @@ validate-hpa-staging: ## Run HPA validation suite in staging
 
 ## Definition of Done
 
-- [ ] `pytest tests/infra/test_hpa_config.py -v` passes against staging cluster
-- [ ] `make validate-hpa-staging` exits 0 in CI
-- [ ] `mypy --strict scripts/validate/hpa_load_generator.py scripts/validate/hpa_timing_check.py` passes
+- [x] `pytest tests/infra/test_hpa_config.py -v` passes against staging cluster
+- [x] `make validate-hpa-staging` exits 0 in CI
+- [x] `mypy --strict scripts/validate/hpa_load_generator.py scripts/validate/hpa_timing_check.py` passes

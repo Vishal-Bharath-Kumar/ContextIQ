@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<title>ERR-001 — Access Denied · ContextIQ Wireframe</title>
+<link rel="stylesheet" href="_wireframe-base.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="topbar-logo"><div class="topbar-logo-icon">C</div>ContextIQ</div>
+  <div class="topbar-sep"></div>
+  <nav class="topbar-breadcrumb">Access Denied</nav>
+  <div class="topbar-actions"><div class="topbar-search">🔍 Search</div><button class="topbar-icon-btn">🔔</button></div>
+</header>
+<nav class="sidebar" aria-label="Main navigation">
+  <div class="sidebar-nav">
+    <a class="nav-item"><span class="icon">⊞</span>Dashboard</a>
+    <div class="nav-section">Data Sources</div><a class="nav-item"><span class="icon">⬡</span>Connectors</a><a class="nav-item"><span class="icon">🗄</span>Knowledge Sources</a>
+    <div class="nav-section">Governance</div><a class="nav-item"><span class="icon">🛡</span>Policies</a>
+    <div class="nav-section">Observability</div><a class="nav-item"><span class="icon">▶</span>Replay Explorer</a><a class="nav-item"><span class="icon">📋</span>Audit Log</a><a class="nav-item"><span class="icon">📊</span>Observability</a>
+    <div class="nav-section">Platform</div><a class="nav-item"><span class="icon">👥</span>Users</a><a class="nav-item"><span class="icon">💻</span>Models</a><a class="nav-item"><span class="icon">⚙</span>Settings</a>
+  </div>
+  <div class="sidebar-user"><div class="user-avatar">DV</div><div class="user-info"><div class="user-name">Dana Dev</div><div class="user-role">Developer</div></div></div>
+</nav>
+<main class="main-content" role="main" style="display:flex;align-items:center;justify-content:center">
+  <div style="max-width:480px;width:100%;text-align:center;padding:48px 32px">
+    <!-- 403 number -->
+    <div style="font-family:'IBM Plex Sans',sans-serif;font-size:80px;font-weight:700;letter-spacing:-0.04em;line-height:1;color:var(--neutral-700);margin-bottom:16px" aria-hidden="true">403</div>
+
+    <!-- Heading -->
+    <h1 style="font-family:'IBM Plex Sans',sans-serif;font-size:24px;font-weight:600;color:var(--neutral-200);margin-bottom:12px">Access Denied</h1>
+
+    <!-- Message -->
+    <p style="font-size:14px;color:var(--neutral-500);line-height:1.6;margin-bottom:28px">
+      You don't have permission to view this page. This area requires a role that has not been
+      assigned to your account. Contact your platform administrator if you believe this is a mistake.
+    </p>
+
+    <!-- Required role hint (contextual) -->
+    <div style="display:inline-flex;align-items:center;gap:8px;padding:8px 14px;background:var(--neutral-900);border:1px solid var(--neutral-700);border-radius:6px;margin-bottom:28px;font-size:12px">
+      <span style="color:var(--neutral-600)">Required role:</span>
+      <span class="badge" style="background:var(--brand-blue-600);color:white;font-size:11px">ADMIN</span>
+    </div>
+
+    <!-- Actions -->
+    <div style="display:flex;gap:12px;justify-content:center">
+      <button class="btn btn-ghost" onclick="history.back()" aria-label="Go back to previous page">← Back</button>
+      <a class="btn btn-primary" href="/dashboard">Go to Dashboard</a>
+    </div>
+  </div>
+</main>
+<aside class="annotation-panel">
+  <div class="ann-screen-id">ERR-001</div>
+  <div class="ann-route">Route: /access-denied<br>+ inline guard redirect</div>
+  <div class="ann-guard">Guard: any authenticated user</div>
+  <div class="ann-divider"></div>
+  <div class="ann-section">Components</div>
+  <div class="ann-item"><div class="ann-component">&lt;AccessDenied&gt;</div><div class="ann-note">Full-screen centred layout · max-w-480</div></div>
+  <div class="ann-item"><div class="ann-component">&lt;RequiredRoleBadge&gt;</div><div class="ann-note">Passed as prop from route guard · displays required role chip</div></div>
+  <div class="ann-divider"></div>
+  <div class="ann-section">Typography</div>
+  <div class="ann-note">"403": font-size 80px weight 700 color neutral-700 (large muted background numeral)</div>
+  <div class="ann-note">"Access Denied": font-size 24px weight 600 color neutral-200</div>
+  <div class="ann-divider"></div>
+  <div class="ann-section">Navigation</div>
+  <div class="ann-note">← Back → history.back()<br>Go to Dashboard → navigate('/dashboard')</div>
+  <div class="ann-divider"></div>
+  <div class="ann-section">States</div>
+  <span class="state-chip">unauthenticated redirect (→ AUTH-001)</span>
+  <span class="state-chip">authenticated, wrong role (this screen)</span>
+</aside>
+</body>
+</html>

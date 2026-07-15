@@ -1,0 +1,49 @@
+---
+# Issuer 1: Internal CA — used for all inter-service and database TLS (AC-1)
+# Prerequisite: run scripts/cert-manager/bootstrap_root_ca.sh to populate the Secret.
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: contextiq-internal-ca
+spec:
+  ca:
+    secretName: contextiq-root-ca    # created by bootstrap_root_ca.sh in contextiq-infra
+
+---
+# Issuer 2: Let's Encrypt production — used for edge-facing Ingresses (AC-1)
+# Uses DNS-01 challenge via Route53 with IRSA; no static AWS credentials required.
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-prod
+spec:
+  acme:
+    email:  platform-engineering@contextiq.io    # expiry alert notifications
+    server: https://acme-v02.api.letsencrypt.org/directory
+    privateKeySecretRef:
+      name: letsencrypt-prod-account-key    # ACME account private key (auto-generated)
+    solvers:
+      - dns01:
+          route53:
+            region: us-east-1
+            # Credentials via IRSA — the cert-manager ServiceAccount is annotated with
+            # the IAM role ARN in values.yaml; no static AWS keys needed.
+            role: arn:aws:iam::ACCOUNT_ID:role/contextiq-cert-manager-dns01
+
+---
+# Issuer 3: Let's Encrypt staging — used for non-prod environments to avoid rate limits
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-staging
+spec:
+  acme:
+    email:  platform-engineering@contextiq.io
+    server: https://acme-staging-v02.api.letsencrypt.org/directory
+    privateKeySecretRef:
+      name: letsencrypt-staging-account-key
+    solvers:
+      - dns01:
+          route53:
+            region: us-east-1
+            role: arn:aws:iam::ACCOUNT_ID:role/contextiq-cert-manager-dns01

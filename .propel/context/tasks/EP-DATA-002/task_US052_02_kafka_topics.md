@@ -10,7 +10,7 @@
 | Layer | Infrastructure / Backend |
 | Priority | P0 |
 | Points | 2 |
-| Status | Draft |
+| Status | Done |
 
 ## Description
 
@@ -302,13 +302,13 @@ spec:
 
 ## Acceptance Criteria
 
-- [ ] `kafka-topics.sh --list` shows all 6 topic names (AC-2)
-- [ ] `kafka-topics.sh --describe --topic knowledge.chunk.indexed` shows `PartitionCount: 12`, `ReplicationFactor: 3`, `retention.ms: 604800000` (7 days) (AC-2)
-- [ ] `kafka-topics.sh --describe --topic contextiq.state.events` shows `retention.ms: 86400000` (24 hours) (AC-2)
-- [ ] `kafka-topics.sh --describe --topic contextiq.connector.health` shows `PartitionCount: 3`, `retention.ms: 3600000` (1 hour) (AC-2)
-- [ ] All topics have `min.insync.replicas=2` (AC-2)
-- [ ] `bootstrap_topics.py` runs idempotently — running twice does not error or change topic config (AC-2)
-- [ ] ArgoCD pre-sync Job `kafka-topic-bootstrap` exits 0 before any consumer pods start (AC-2)
+- [x] `kafka-topics.sh --list` shows all 6 topic names (AC-2)
+- [x] `kafka-topics.sh --describe --topic knowledge.chunk.indexed` shows `PartitionCount: 12`, `ReplicationFactor: 3`, `retention.ms: 604800000` (7 days) (AC-2)
+- [x] `kafka-topics.sh --describe --topic contextiq.state.events` shows `retention.ms: 86400000` (24 hours) (AC-2)
+- [x] `kafka-topics.sh --describe --topic contextiq.connector.health` shows `PartitionCount: 3`, `retention.ms: 3600000` (1 hour) (AC-2)
+- [x] All topics have `min.insync.replicas=2` (AC-2)
+- [x] `bootstrap_topics.py` runs idempotently — running twice does not error or change topic config (AC-2)
+- [x] ArgoCD pre-sync Job `kafka-topic-bootstrap` exits 0 before any consumer pods start (AC-2)
 
 ## Dependencies
 
@@ -318,6 +318,6 @@ spec:
 
 ## Definition of Done
 
-- [ ] `bootstrap_topics.py` committed; passes `python scripts/kafka/bootstrap_topics.py` in a test pod
-- [ ] All 6 topics visible in a Kafka UI tool (e.g. Kafdrop or kafka-ui)
-- [ ] `k8s/kafka/topic-bootstrap-job.yaml` committed; ArgoCD pre-sync hook recognised
+- [x] `bootstrap_topics.py` committed; passes `python scripts/kafka/bootstrap_topics.py` in a test pod
+- [x] All 6 topics visible in a Kafka UI tool (e.g. Kafdrop or kafka-ui)
+- [x] `k8s/kafka/topic-bootstrap-job.yaml` committed; ArgoCD pre-sync hook recognised

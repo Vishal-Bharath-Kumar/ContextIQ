@@ -10,7 +10,7 @@
 | Layer | Infrastructure / QA |
 | Priority | P0 |
 | Points | 3 |
-| Status | Draft |
+| Status | Done |
 
 ## Description
 
@@ -592,13 +592,13 @@ class TestAC7_ServiceMonitors:
 
 ## Acceptance Criteria
 
-- [ ] `kubectl get pods -n contextiq-infra -l app=minio` shows 4 Running pods (AC-5)
-- [ ] `mc stat contextiq/contextiq-traces` returns `status: success` (AC-5)
-- [ ] `mc version info contextiq/contextiq-traces` shows `status: enabled` (AC-5)
-- [ ] `mc ilm ls contextiq/contextiq-traces` shows a 90-day transition rule and a 365-day expiry rule (AC-5)
-- [ ] `bootstrap_minio.py` runs idempotently; all 5 buckets exist with SSE-S3 enabled (AC-5, AC-6)
-- [ ] `pytest tests/integration/test_datastores.py -v` passes all 7 AC test classes (all ACs)
-- [ ] `TestAC7_ServiceMonitors` — all 5 ServiceMonitors exist in `contextiq-observability` (AC-7)
+- [x] `kubectl get pods -n contextiq-infra -l app=minio` shows 4 Running pods (AC-5)
+- [x] `mc stat contextiq/contextiq-traces` returns `status: success` (AC-5)
+- [x] `mc version info contextiq/contextiq-traces` shows `status: enabled` (AC-5)
+- [x] `mc ilm ls contextiq/contextiq-traces` shows a 90-day transition rule and a 365-day expiry rule (AC-5)
+- [x] `bootstrap_minio.py` runs idempotently; all 5 buckets exist with SSE-S3 enabled (AC-5, AC-6)
+- [x] `pytest tests/integration/test_datastores.py -v` passes all 7 AC test classes (all ACs)
+- [x] `TestAC7_ServiceMonitors` — all 5 ServiceMonitors exist in `contextiq-observability` (AC-7)
 
 ## Dependencies
 
@@ -610,6 +610,6 @@ class TestAC7_ServiceMonitors:
 
 ## Definition of Done
 
-- [ ] MinIO distributed cluster stable with all 4 pods Running
-- [ ] `bootstrap_minio.py` committed and idempotent in staging
-- [ ] All 5 integration test classes pass in staging with 0 failures
+- [x] MinIO distributed cluster stable with all 4 pods Running
+- [x] `bootstrap_minio.py` committed and idempotent in staging
+- [x] All 5 integration test classes pass in staging with 0 failures

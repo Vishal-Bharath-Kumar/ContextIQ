@@ -1,0 +1,25 @@
+replicaCount: 3
+hpa:
+  enabled: true
+  minReplicas: 3     # prod baseline: 3 warm pods for immediate request headroom
+  maxReplicas: 20
+  customMetric:
+    enabled:            true
+    targetAverageValue: "5"
+  cpuFallback:
+    enabled: true
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 0
+      policies:
+        - type:          Pods
+          value:         5
+          periodSeconds: 30
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+        - type:          Pods
+          value:         2
+          periodSeconds: 60
+env:
+  LOG_LEVEL: WARNING

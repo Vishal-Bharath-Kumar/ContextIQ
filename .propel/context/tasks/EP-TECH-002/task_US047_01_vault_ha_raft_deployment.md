@@ -10,7 +10,7 @@
 | Layer | Infrastructure |
 | Priority | P0 |
 | Points | 3 |
-| Status | Draft |
+| Status | Done |
 
 ## Description
 
@@ -265,11 +265,11 @@ spec:
 
 ## Acceptance Criteria
 
-- [ ] `kubectl get pods -n contextiq-security | grep vault` shows 3 Running vault-server pods + 2 injector pods (AC-1)
-- [ ] `vault status` shows `HA Mode: active` on one pod and `standby` on others (AC-1)
-- [ ] `vault status -format=json | jq .sealed` returns `false` after pod restart — KMS auto-unseal working (AC-1)
-- [ ] `kubectl get pdb -n contextiq-security` shows `ALLOWED-DISRUPTIONS: 1` (AC-1 HA)
-- [ ] Vault Agent Injector webhook is registered: `kubectl get mutatingwebhookconfiguration | grep vault` (needed for AC-3)
+- [x] `kubectl get pods -n contextiq-security | grep vault` shows 3 Running vault-server pods + 2 injector pods (AC-1)
+- [x] `vault status` shows `HA Mode: active` on one pod and `standby` on others (AC-1)
+- [x] `vault status -format=json | jq .sealed` returns `false` after pod restart — KMS auto-unseal working (AC-1)
+- [x] `kubectl get pdb -n contextiq-security` shows `ALLOWED-DISRUPTIONS: 1` (AC-1 HA)
+- [x] Vault Agent Injector webhook is registered: `kubectl get mutatingwebhookconfiguration | grep vault` (needed for AC-3)
 
 ## Dependencies
 
@@ -280,6 +280,6 @@ spec:
 
 ## Definition of Done
 
-- [ ] `helm install vault hashicorp/vault -n contextiq-security -f values.yaml -f values-prod.yaml` completes
-- [ ] All 3 Vault pods pass readiness probe (`vault status` exits 0)
-- [ ] `init_vault.sh` runs successfully on first deployment; operator saves generated keys offline
+- [x] `helm install vault hashicorp/vault -n contextiq-security -f values.yaml -f values-prod.yaml` completes
+- [x] All 3 Vault pods pass readiness probe (`vault status` exits 0)
+- [x] `init_vault.sh` runs successfully on first deployment; operator saves generated keys offline

@@ -1,0 +1,8 @@
+pgbouncer:
+  replicaCount: 3
+  config:
+    maxClientConn:   5000
+    defaultPoolSize: 60    # 60 server connections × 3 PgBouncer pods ≤ 180 (under 200 cap)
+  resources:
+    requests: { cpu: "500m", memory: "512Mi" }
+    limits:   { cpu: "2",    memory: "1Gi" }

@@ -10,7 +10,7 @@
 | Layer | Backend |
 | Priority | P0 |
 | Points | 3 |
-| Status | Draft |
+| Status | Done |
 
 ## Description
 
@@ -396,12 +396,12 @@ class SyncJob(Base):
 
 ## Acceptance Criteria
 
-- [ ] `alembic upgrade head` from `0019` completes without error; `alembic current` shows `0020 (head)` (AC-2)
-- [ ] `psql -c "\dt"` shows all 8 tables: `connector_config`, `knowledge_source`, `knowledge_chunk`, `model_registry`, `policy`, `audit_log`, `execution_trace_index`, `sync_job` (AC-2)
-- [ ] `alembic downgrade 0019` drops all 8 tables and all 4 ENUM types cleanly (AC-4)
-- [ ] `alembic upgrade 0020` after `downgrade 0019` re-creates all tables (idempotent up/down cycle) (AC-4)
-- [ ] `alembic check` (autogenerate comparison) shows no pending schema differences after migration is applied (AC-2)
-- [ ] All FK constraints verified: `psql -c "\d+ knowledge_chunk"` shows FK to `knowledge_source.id` (AC-2)
+- [x] `alembic upgrade head` from `0019` completes without error; `alembic current` shows `0020 (head)` (AC-2)
+- [x] `psql -c "\dt"` shows all 8 tables: `connector_config`, `knowledge_source`, `knowledge_chunk`, `model_registry`, `policy`, `audit_log`, `execution_trace_index`, `sync_job` (AC-2)
+- [x] `alembic downgrade 0019` drops all 8 tables and all 4 ENUM types cleanly (AC-4)
+- [x] `alembic upgrade 0020` after `downgrade 0019` re-creates all tables (idempotent up/down cycle) (AC-4)
+- [x] `alembic check` (autogenerate comparison) shows no pending schema differences after migration is applied (AC-2)
+- [x] All FK constraints verified: `psql -c "\d+ knowledge_chunk"` shows FK to `knowledge_source.id` (AC-2)
 
 ## Dependencies
 
@@ -411,6 +411,6 @@ class SyncJob(Base):
 
 ## Definition of Done
 
-- [ ] `alembic/versions/0020_create_core_app_tables.py` committed with passing `alembic upgrade head` in CI
-- [ ] All 8 ORM model files created in `src/data/models/`
-- [ ] Unit tests in `tests/unit/test_models.py` assert that each model can be instantiated with required fields
+- [x] `alembic/versions/0020_create_core_app_tables.py` committed with passing `alembic upgrade head` in CI
+- [x] All 8 ORM model files created in `src/data/models/`
+- [x] Unit tests in `tests/unit/test_models.py` assert that each model can be instantiated with required fields

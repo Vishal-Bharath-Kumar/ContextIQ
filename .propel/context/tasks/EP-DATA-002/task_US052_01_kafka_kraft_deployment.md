@@ -10,7 +10,7 @@
 | Layer | Infrastructure |
 | Priority | P0 |
 | Points | 3 |
-| Status | Draft |
+| Status | Done |
 
 ## Description
 
@@ -221,12 +221,12 @@ spec:
 
 ## Acceptance Criteria
 
-- [ ] `kubectl get pods -n contextiq-data -l app.kubernetes.io/name=kafka` shows 3 Running pods (AC-1)
-- [ ] `kubectl exec -n contextiq-data kafka-controller-0 -- kafka-metadata-quorum.sh --bootstrap-server localhost:9092 describe --status` shows `LeaderId` set and `CurrentVoters` has 3 entries (AC-1 KRaft quorum)
-- [ ] No ZooKeeper pods running in `contextiq-data` namespace — KRaft confirmed (AC-1)
-- [ ] `kubectl get pvc -n contextiq-data -l app.kubernetes.io/name=kafka` shows 3 PVCs bound with `contextiq-encrypted-gp3` (AC-1)
-- [ ] `kubectl get pdb kafka-controller -n contextiq-data` shows `ALLOWED-DISRUPTIONS: 1` (AC-1 HA)
-- [ ] Each broker pod has `/vault/secrets/kafka.env` with `KAFKA_INTER_BROKER_PASSWORD` set (Vault injection)
+- [x] `kubectl get pods -n contextiq-data -l app.kubernetes.io/name=kafka` shows 3 Running pods (AC-1)
+- [x] `kubectl exec -n contextiq-data kafka-controller-0 -- kafka-metadata-quorum.sh --bootstrap-server localhost:9092 describe --status` shows `LeaderId` set and `CurrentVoters` has 3 entries (AC-1 KRaft quorum)
+- [x] No ZooKeeper pods running in `contextiq-data` namespace — KRaft confirmed (AC-1)
+- [x] `kubectl get pvc -n contextiq-data -l app.kubernetes.io/name=kafka` shows 3 PVCs bound with `contextiq-encrypted-gp3` (AC-1)
+- [x] `kubectl get pdb kafka-controller -n contextiq-data` shows `ALLOWED-DISRUPTIONS: 1` (AC-1 HA)
+- [x] Each broker pod has `/vault/secrets/kafka.env` with `KAFKA_INTER_BROKER_PASSWORD` set (Vault injection)
 
 ## Dependencies
 
@@ -237,6 +237,6 @@ spec:
 
 ## Definition of Done
 
-- [ ] `helm install kafka bitnami/kafka -n contextiq-data -f values.yaml -f values-prod.yaml` completes with all 3 pods Running
-- [ ] KRaft quorum describe shows 3 voters and an active leader
-- [ ] `kafka-topics.sh --bootstrap-server kafka.contextiq-data.svc.cluster.local:9092 --list` executable (prereq for TASK-US052-02)
+- [x] `helm install kafka bitnami/kafka -n contextiq-data -f values.yaml -f values-prod.yaml` completes with all 3 pods Running
+- [x] KRaft quorum describe shows 3 voters and an active leader
+- [x] `kafka-topics.sh --bootstrap-server kafka.contextiq-data.svc.cluster.local:9092 --list` executable (prereq for TASK-US052-02)

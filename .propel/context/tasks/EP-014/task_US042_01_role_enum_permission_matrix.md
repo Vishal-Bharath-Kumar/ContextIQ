@@ -10,7 +10,7 @@
 | Layer | Backend |
 | Priority | P0 |
 | Points | 2 |
-| Status | Draft |
+| Status | Done |
 
 ## Description
 
@@ -263,12 +263,12 @@ def require_admin_role(
 
 ## Acceptance Criteria
 
-- [ ] `PlatformRole` defines exactly 7 roles matching the story: `DEVELOPER`, `PLATFORM_ENGINEER`, `DEVOPS_SRE`, `ADMIN`, `SECURITY_OFFICER`, `MANAGER`, `AUDITOR` (AC-1)
-- [ ] `ROLE_PERMISSION_MATRIX` is defined as a module-level constant and covers all 8 `Permission` values (AC-2)
-- [ ] `JWTClaims.has_permission(Permission.ADMIN_ALL)` returns `True` only for `ADMIN` role; `JWTClaims.has_permission(Permission.READ_TRACES)` returns `True` for `AUDITOR`, `DEVOPS_SRE`, `SECURITY_OFFICER`, and `ADMIN` (AC-2)
-- [ ] `JWTClaims.roles` merges both `realm_access.roles` and `resource_access.<client>.roles` — Keycloak client-level roles are honoured (AC-4)
-- [ ] Role matching is case-insensitive — `"ADMIN"` and `"admin"` both match `PlatformRole.ADMIN` (AC-4)
-- [ ] `decode_jwt_claims` reads `request.state.jwt_claims` set by `JWTAuthMiddleware` — no second JWT decode per request (AC-4, performance)
+- [x] `PlatformRole` defines exactly 7 roles matching the story: `DEVELOPER`, `PLATFORM_ENGINEER`, `DEVOPS_SRE`, `ADMIN`, `SECURITY_OFFICER`, `MANAGER`, `AUDITOR` (AC-1)
+- [x] `ROLE_PERMISSION_MATRIX` is defined as a module-level constant and covers all 8 `Permission` values (AC-2)
+- [x] `JWTClaims.has_permission(Permission.ADMIN_ALL)` returns `True` only for `ADMIN` role; `JWTClaims.has_permission(Permission.READ_TRACES)` returns `True` for `AUDITOR`, `DEVOPS_SRE`, `SECURITY_OFFICER`, and `ADMIN` (AC-2)
+- [x] `JWTClaims.roles` merges both `realm_access.roles` and `resource_access.<client>.roles` — Keycloak client-level roles are honoured (AC-4)
+- [x] Role matching is case-insensitive — `"ADMIN"` and `"admin"` both match `PlatformRole.ADMIN` (AC-4)
+- [x] `decode_jwt_claims` reads `request.state.jwt_claims` set by `JWTAuthMiddleware` — no second JWT decode per request (AC-4, performance)
 
 ## Dependencies
 
@@ -277,5 +277,5 @@ def require_admin_role(
 
 ## Definition of Done
 
-- [ ] `mypy --strict` passes on `roles.py` and `dependencies.py`
-- [ ] Unit tests: `has_permission()` matrix coverage, case-insensitive role match, admin implicit super-role
+- [x] `mypy --strict` passes on `roles.py` and `dependencies.py`
+- [x] Unit tests: `has_permission()` matrix coverage, case-insensitive role match, admin implicit super-role

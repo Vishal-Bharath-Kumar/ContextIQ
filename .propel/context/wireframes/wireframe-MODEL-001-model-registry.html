@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<title>MODEL-001 — Model Registry · ContextIQ Wireframe</title>
+<link rel="stylesheet" href="_wireframe-base.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="topbar-logo"><div class="topbar-logo-icon">C</div>ContextIQ</div>
+  <div class="topbar-sep"></div>
+  <nav class="topbar-breadcrumb">Models</nav>
+  <div class="topbar-actions"><div class="topbar-search">🔍 Search</div><button class="topbar-icon-btn">🔔</button></div>
+</header>
+<nav class="sidebar" aria-label="Main navigation">
+  <div class="sidebar-nav">
+    <a class="nav-item"><span class="icon">⊞</span>Dashboard</a>
+    <div class="nav-section">Data Sources</div><a class="nav-item"><span class="icon">⬡</span>Connectors</a><a class="nav-item"><span class="icon">🗄</span>Knowledge Sources</a>
+    <div class="nav-section">Governance</div><a class="nav-item"><span class="icon">🛡</span>Policies</a>
+    <div class="nav-section">Observability</div><a class="nav-item"><span class="icon">▶</span>Replay Explorer</a><a class="nav-item"><span class="icon">📋</span>Audit Log</a><a class="nav-item"><span class="icon">📊</span>Observability</a>
+    <div class="nav-section">Platform</div><a class="nav-item"><span class="icon">👥</span>Users</a>
+    <a class="nav-item active" aria-current="page"><span class="icon">💻</span>Models</a>
+    <a class="nav-item"><span class="icon">⚙</span>Settings</a>
+  </div>
+  <div class="sidebar-user"><div class="user-avatar">BP</div><div class="user-info"><div class="user-name">Bob PE</div><div class="user-role">Platform Engineer</div></div></div>
+</nav>
+<main class="main-content" role="main">
+  <div class="page-header">
+    <div class="page-title">Model Registry</div>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-outline btn-sm">⚖ Routing Weights</button>
+      <button class="btn btn-primary btn-sm">+ Add Model</button>
+    </div>
+  </div>
+
+  <div class="table-wrapper">
+    <table class="table-wf" aria-label="Model registry">
+      <thead>
+        <tr>
+          <th>Model ID</th>
+          <th>Provider</th>
+          <th>Display Name</th>
+          <th style="width:120px">Coding Score</th>
+          <th style="width:120px">Reasoning</th>
+          <th>Context</th>
+          <th>Cost /1K</th>
+          <th>Avg Latency</th>
+          <th>Status</th>
+          <th style="width:70px">Active</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="mono text-small">gpt-4o-2024-05-13</td>
+          <td><span class="badge" style="background:oklch(0.24 0.01 260);color:var(--neutral-400);font-size:10px">OpenAI</span></td>
+          <td>GPT-4o</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div class="progress-track" style="flex:1"><div class="progress-fill" style="width:88%"></div></div>
+              <span class="tabular" style="font-size:11px;min-width:28px;text-align:right">88</span>
+            </div>
+          </td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div class="progress-track" style="flex:1"><div class="progress-fill" style="width:92%"></div></div>
+              <span class="tabular" style="font-size:11px;min-width:28px;text-align:right">92</span>
+            </div>
+          </td>
+          <td class="tabular text-small">128K</td>
+          <td class="tabular text-small">$0.005</td>
+          <td class="tabular text-small">240ms</td>
+          <td><span class="badge badge-success">Active</span></td>
+          <td><div class="toggle" role="switch" aria-checked="true" aria-label="Toggle GPT-4o active"><div class="toggle-thumb"></div></div></td>
+          <td><button class="btn btn-ghost btn-sm btn-icon" aria-label="Edit GPT-4o">✏</button></td>
+        </tr>
+        <tr>
+          <td class="mono text-small">claude-3-5-sonnet-20241022</td>
+          <td><span class="badge" style="background:oklch(0.24 0.01 260);color:var(--neutral-400);font-size:10px">Anthropic</span></td>
+          <td>Claude 3.5 Sonnet</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div class="progress-track" style="flex:1"><div class="progress-fill" style="width:85%"></div></div>
+              <span class="tabular" style="font-size:11px;min-width:28px;text-align:right">85</span>
+            </div>
+          </td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div class="progress-track" style="flex:1"><div class="progress-fill" style="width:95%"></div></div>
+              <span class="tabular" style="font-size:11px;min-width:28px;text-align:right">95</span>
+            </div>
+          </td>
+          <td class="tabular text-small">200K</td>
+          <td class="tabular text-small">$0.003</td>
+          <td class="tabular text-small">180ms</td>
+          <td><span class="badge badge-success">Active</span></td>
+          <td><div class="toggle active" role="switch" aria-checked="true" aria-label="Toggle Claude 3.5 active"><div class="toggle-thumb"></div></div></td>
+          <td><button class="btn btn-ghost btn-sm btn-icon" aria-label="Edit Claude 3.5">✏</button></td>
+        </tr>
+        <tr style="opacity:0.6">
+          <td class="mono text-small">gemini-1.5-pro-002</td>
+          <td><span class="badge" style="background:oklch(0.24 0.01 260);color:var(--neutral-400);font-size:10px">Google</span></td>
+          <td>Gemini 1.5 Pro</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div class="progress-track" style="flex:1"><div class="progress-fill" style="width:78%"></div></div>
+              <span class="tabular" style="font-size:11px;min-width:28px;text-align:right">78</span>
+            </div>
+          </td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div class="progress-track" style="flex:1"><div class="progress-fill" style="width:82%"></div></div>
+              <span class="tabular" style="font-size:11px;min-width:28px;text-align:right">82</span>
+            </div>
+          </td>
+          <td class="tabular text-small">1M</td>
+          <td class="tabular text-small">$0.0035</td>
+          <td class="tabular text-small">310ms</td>
+          <td><span class="badge badge-neutral">Inactive</span></td>
+          <td><div class="toggle" role="switch" aria-checked="false" aria-label="Toggle Gemini 1.5 active"><div class="toggle-thumb"></div></div></td>
+          <td><button class="btn btn-ghost btn-sm btn-icon" aria-label="Edit Gemini">✏</button></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</main>
+<aside class="annotation-panel">
+  <div class="ann-screen-id">MODEL-001</div>
+  <div class="ann-route">Route: /models</div>
+  <div class="ann-guard">Guard: PLATFORM_ENGINEER, ADMIN</div>
+  <div class="ann-divider"></div>
+  <div class="ann-section">Components</div>
+  <div class="ann-item"><div class="ann-component">&lt;ModelTable&gt;</div><div class="ann-note">sortable columns · row click opens MODEL-002</div></div>
+  <div class="ann-item"><div class="ann-component">&lt;ProgressBar&gt;</div><div class="ann-note">0-100 score; brand-blue-500 fill</div></div>
+  <div class="ann-item"><div class="ann-component">&lt;Toggle&gt;</div><div class="ann-note">Optimistic UI update · PATCH /api/v1/models/{id}/active</div></div>
+  <div class="ann-divider"></div>
+  <div class="ann-section">States</div>
+  <span class="state-chip">loading (skeletons)</span>
+  <span class="state-chip">empty</span>
+  <span class="state-chip">active row</span>
+  <span class="state-chip">inactive row (dim 0.6)</span>
+</aside>
+</body>
+</html>

@@ -1,0 +1,9 @@
+apiVersion: v2
+name:        opensearch
+description: OpenSearch 3-node cluster for ContextIQ full-text search
+type:        application
+version:     0.1.0
+dependencies:
+  - name:       opensearch
+    version:    "2.14.0"    # pinned; tracks OpenSearch 2.14.x — update after staging validation
+    repository: https://opensearch-project.github.io/helm-charts

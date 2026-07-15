@@ -10,7 +10,7 @@
 | Layer | CI/CD |
 | Priority | P1 |
 | Points | 2 |
-| Status | Draft |
+| Status | Done |
 
 ## Description
 
@@ -309,12 +309,12 @@ Options:
 
 ## Acceptance Criteria
 
-- [ ] Every PR to `main` triggers the `PR Checks` workflow automatically (AC-1)
-- [ ] A PR with a ruff lint violation shows `PR Checks / Lint (ruff)` as failed and blocks merge (AC-3)
-- [ ] A PR with a failing test shows `PR Checks / Test (pytest)` as failed and blocks merge (AC-3)
-- [ ] Workflow completes in < 8 minutes on a warm cache run (AC-7)
-- [ ] `test-results/` artifact uploaded and test annotations visible in the PR (AC-1)
-- [ ] Coverage gate: pytest exits non-zero if line coverage drops below 80%
+- [x] Every PR to `main` triggers the `PR Checks` workflow automatically (AC-1)
+- [x] A PR with a ruff lint violation shows `PR Checks / Lint (ruff)` as failed and blocks merge (AC-3)
+- [x] A PR with a failing test shows `PR Checks / Test (pytest)` as failed and blocks merge (AC-3)
+- [x] Workflow completes in < 8 minutes on a warm cache run (AC-7)
+- [x] `test-results/` artifact uploaded and test annotations visible in the PR (AC-1)
+- [x] Coverage gate: pytest exits non-zero if line coverage drops below 80%
 
 ## Dependencies
 
@@ -324,6 +324,6 @@ Options:
 
 ## Definition of Done
 
-- [ ] `.github/workflows/pr-checks.yml` merged to `main`
-- [ ] Branch protection rules configured with 3 required status checks
-- [ ] First PR after setup shows all 3 status checks passing within 8 minutes
+- [x] `.github/workflows/pr-checks.yml` merged to `main`
+- [x] Branch protection rules configured with 3 required status checks
+- [x] First PR after setup shows all 3 status checks passing within 8 minutes

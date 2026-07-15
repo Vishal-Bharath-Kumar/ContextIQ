@@ -10,7 +10,7 @@
 | Layer | Infrastructure |
 | Priority | P0 |
 | Points | 3 |
-| Status | Draft |
+| Status | Done |
 
 ## Description
 
@@ -414,13 +414,13 @@ if __name__ == "__main__":
 
 ## Acceptance Criteria
 
-- [ ] `kubectl get pods -n keycloak` shows 2 Running pods (AC-1)
-- [ ] `kubectl get pdb -n keycloak` shows `ALLOWED-DISRUPTIONS: 1` (AC-1)
-- [ ] Keycloak Admin Console reachable at `https://contextiq.internal/auth/admin` (AC-5)
-- [ ] Non-admin session redirected by Keycloak to login when accessing Admin Console (AC-5)
-- [ ] `bootstrap_realm.py` creates the `contextiq` realm with `accessTokenLifespan=300` (AC-6)
-- [ ] `kubectl rollout restart deployment/keycloak -n keycloak` completes with zero downtime (`maxUnavailable: 0`) (AC-1)
-- [ ] Ingress rewrites `/auth/*` correctly to Keycloak's `KC_HTTP_RELATIVE_PATH`
+- [x] `kubectl get pods -n keycloak` shows 2 Running pods (AC-1)
+- [x] `kubectl get pdb -n keycloak` shows `ALLOWED-DISRUPTIONS: 1` (AC-1)
+- [x] Keycloak Admin Console reachable at `https://contextiq.internal/auth/admin` (AC-5)
+- [x] Non-admin session redirected by Keycloak to login when accessing Admin Console (AC-5)
+- [x] `bootstrap_realm.py` creates the `contextiq` realm with `accessTokenLifespan=300` (AC-6)
+- [x] `kubectl rollout restart deployment/keycloak -n keycloak` completes with zero downtime (`maxUnavailable: 0`) (AC-1)
+- [x] Ingress rewrites `/auth/*` correctly to Keycloak's `KC_HTTP_RELATIVE_PATH`
 
 ## Dependencies
 
@@ -431,6 +431,6 @@ if __name__ == "__main__":
 
 ## Definition of Done
 
-- [ ] `kubectl apply -k k8s/keycloak/` succeeds in staging cluster
-- [ ] Health endpoint `GET /auth/health/ready` returns `{"status": "UP"}` from both pods
-- [ ] `mypy --strict scripts/keycloak/bootstrap_realm.py` passes
+- [x] `kubectl apply -k k8s/keycloak/` succeeds in staging cluster
+- [x] Health endpoint `GET /auth/health/ready` returns `{"status": "UP"}` from both pods
+- [x] `mypy --strict scripts/keycloak/bootstrap_realm.py` passes

@@ -10,7 +10,7 @@
 | Layer | Infrastructure |
 | Priority | P0 |
 | Points | 3 |
-| Status | Draft |
+| Status | Done |
 
 ## Description
 
@@ -286,12 +286,12 @@ spec:
 
 ## Acceptance Criteria
 
-- [ ] `kubectl get statefulset postgresql-primary -n contextiq-data` shows `READY 1/1` (AC-1)
-- [ ] PVC `data-postgresql-primary-0` is bound and uses `contextiq-encrypted-gp3` StorageClass (AC-1, TASK-US048-04)
-- [ ] Backup CronJob fires at 01:00 UTC; `mc ls minio/contextiq-postgres-backups/daily/` shows an object dated today (AC-1)
-- [ ] `mc ilm ls minio/contextiq-postgres-backups` shows the 30-day expiry rule active (AC-1)
-- [ ] `psql -c "SHOW wal_level;"` returns `replica` — replication pre-configured (AC-6 prerequisite)
-- [ ] `kubectl get pdb postgresql-primary-pdb -n contextiq-data` shows `ALLOWED-DISRUPTIONS: 0` when 1 pod is running (AC-5 prerequisite)
+- [x] `kubectl get statefulset postgresql-primary -n contextiq-data` shows `READY 1/1` (AC-1)
+- [x] PVC `data-postgresql-primary-0` is bound and uses `contextiq-encrypted-gp3` StorageClass (AC-1, TASK-US048-04)
+- [x] Backup CronJob fires at 01:00 UTC; `mc ls minio/contextiq-postgres-backups/daily/` shows an object dated today (AC-1)
+- [x] `mc ilm ls minio/contextiq-postgres-backups` shows the 30-day expiry rule active (AC-1)
+- [x] `psql -c "SHOW wal_level;"` returns `replica` — replication pre-configured (AC-6 prerequisite)
+- [x] `kubectl get pdb postgresql-primary-pdb -n contextiq-data` shows `ALLOWED-DISRUPTIONS: 0` when 1 pod is running (AC-5 prerequisite)
 
 ## Dependencies
 
@@ -302,6 +302,6 @@ spec:
 
 ## Definition of Done
 
-- [ ] `helm install postgresql bitnami/postgresql -n contextiq-data -f values.yaml -f values-prod.yaml` completes
-- [ ] `psql "host=postgresql.contextiq-data.svc.cluster.local dbname=contextiq"` connects (via Vault dynamic credentials)
-- [ ] Backup CronJob completes successfully in staging; backup object visible in MinIO
+- [x] `helm install postgresql bitnami/postgresql -n contextiq-data -f values.yaml -f values-prod.yaml` completes
+- [x] `psql "host=postgresql.contextiq-data.svc.cluster.local dbname=contextiq"` connects (via Vault dynamic credentials)
+- [x] Backup CronJob completes successfully in staging; backup object visible in MinIO

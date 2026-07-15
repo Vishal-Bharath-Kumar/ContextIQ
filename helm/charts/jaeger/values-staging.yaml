@@ -1,0 +1,3 @@
+replicaCount: 1
+env:
+  SPAN_STORAGE_TYPE: "elasticsearch"

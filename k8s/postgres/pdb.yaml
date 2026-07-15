@@ -1,0 +1,13 @@
+# AC-5 dependency: guarantees at least 1 PostgreSQL primary is always available
+# during voluntary disruptions (node drains, cluster upgrades).
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: postgresql-primary-pdb
+  namespace: contextiq-data
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name:      postgresql
+      app.kubernetes.io/component: primary
+  minAvailable: 1

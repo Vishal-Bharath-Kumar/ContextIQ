@@ -1,0 +1,42 @@
+global:
+  imageRegistry: ""
+  environment: development
+
+mcp-gateway:
+  replicaCount: 1
+  hpa:
+    enabled: false
+  pdb:
+    enabled: false
+  env:
+    LOG_LEVEL: DEBUG
+
+agent-worker:
+  replicaCount: 1
+  hpa:
+    enabled: false
+  pdb:
+    enabled: false
+  env:
+    LOG_LEVEL: DEBUG
+
+admin-portal:
+  replicaCount: 1
+  hpa:
+    enabled: false
+  pdb:
+    enabled: false
+
+keycloak:
+  replicaCount: 1
+  hpa:
+    enabled: false
+  pdb:
+    enabled: false
+
+jaeger:
+  replicaCount: 1
+  hpa:
+    enabled: false
+  pdb:
+    enabled: false

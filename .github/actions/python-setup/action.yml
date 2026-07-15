@@ -1,0 +1,31 @@
+name: Python + uv setup
+description: Install Python, uv, and project dependencies with full caching.
+
+inputs:
+  python-version:
+    description: Python version to install
+    default: "3.11"
+  install-groups:
+    description: Dependency groups to install (uv sync --group)
+    default: "dev"
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Python ${{ inputs.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ inputs.python-version }}
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v3
+      with:
+        version: "0.4.x"
+        # enable-cache lets setup-uv manage the uv download cache automatically.
+        # Do NOT also set UV_CACHE_DIR here — setup-uv owns the cache directory
+        # and overriding it would cause cache save/restore key mismatches.
+        enable-cache: true
+
+    - name: Install dependencies
+      shell: bash
+      run: uv sync --frozen --group ${{ inputs.install-groups }}

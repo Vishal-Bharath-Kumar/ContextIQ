@@ -10,7 +10,7 @@
 | Layer | QA / Infrastructure |
 | Priority | P0 |
 | Points | 3 |
-| Status | Draft |
+| Status | Done |
 
 ## Description
 
@@ -387,13 +387,13 @@ class TestAC7_HAFailover:
 
 ## Acceptance Criteria
 
-- [ ] `pytest tests/security/test_vault_integration.py -k "TestAC1"` passes — 3 pods running, unsealed, PDB correct (AC-1)
-- [ ] `pytest tests/security/test_vault_integration.py -k "TestAC2"` passes — all 4 secrets engines mounted, dynamic creds unique (AC-2)
-- [ ] `pytest tests/security/test_vault_integration.py -k "TestAC3"` passes — `vault-agent` sidecar present, `/vault/secrets/postgres.env` exists in gateway pod (AC-3)
-- [ ] `pytest tests/security/test_vault_integration.py -k "TestAC4"` passes — lease_duration ~3600s, renewable=true (AC-4)
-- [ ] `pytest tests/security/test_vault_integration.py -k "TestAC5"` passes — all static secrets annotated as migrated or deleted (AC-5)
-- [ ] `pytest tests/security/test_vault_integration.py -k "TestAC6"` passes — file audit device enabled, log_raw=false (AC-6)
-- [ ] `bash scripts/vault/ha_failover_test.sh` completes with `SUCCESS` and reports elapsed < 30s (AC-7)
+- [x] `pytest tests/security/test_vault_integration.py -k "TestAC1"` passes — 3 pods running, unsealed, PDB correct (AC-1)
+- [x] `pytest tests/security/test_vault_integration.py -k "TestAC2"` passes — all 4 secrets engines mounted, dynamic creds unique (AC-2)
+- [x] `pytest tests/security/test_vault_integration.py -k "TestAC3"` passes — `vault-agent` sidecar present, `/vault/secrets/postgres.env` exists in gateway pod (AC-3)
+- [x] `pytest tests/security/test_vault_integration.py -k "TestAC4"` passes — lease_duration ~3600s, renewable=true (AC-4)
+- [x] `pytest tests/security/test_vault_integration.py -k "TestAC5"` passes — all static secrets annotated as migrated or deleted (AC-5)
+- [x] `pytest tests/security/test_vault_integration.py -k "TestAC6"` passes — file audit device enabled, log_raw=false (AC-6)
+- [x] `bash scripts/vault/ha_failover_test.sh` completes with `SUCCESS` and reports elapsed < 30s (AC-7)
 
 ## Dependencies
 
@@ -407,7 +407,7 @@ class TestAC7_HAFailover:
 
 ## Definition of Done
 
-- [ ] All 7 `TestACN` classes pass in staging with 0 failures
-- [ ] `ha_failover_test.sh` reports leader election time < 30s in at least two consecutive runs
-- [ ] Tests added to `tests/security/` and included in the security CI job definition
-- [ ] `@destructive` tests gated behind `--run-destructive` pytest CLI flag (not executed in every CI run)
+- [x] All 7 `TestACN` classes pass in staging with 0 failures
+- [x] `ha_failover_test.sh` reports leader election time < 30s in at least two consecutive runs
+- [x] Tests added to `tests/security/` and included in the security CI job definition
+- [x] `@destructive` tests gated behind `--run-destructive` pytest CLI flag (not executed in every CI run)

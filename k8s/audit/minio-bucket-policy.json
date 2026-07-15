@@ -1,0 +1,23 @@
+{
+  "Rules": [
+    {
+      "ID": "audit-cold-transition",
+      "Status": "Enabled",
+      "Filter": { "Prefix": "audit-log/" },
+      "Transitions": [
+        {
+          "Days": 90,
+          "StorageClass": "GLACIER"
+        }
+      ]
+    },
+    {
+      "ID": "audit-3yr-expiry",
+      "Status": "Enabled",
+      "Filter": { "Prefix": "audit-log/" },
+      "Expiration": {
+        "Days": 1096
+      }
+    }
+  ]
+}

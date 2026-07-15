@@ -1,0 +1,236 @@
+{
+  "__inputs": [],
+  "__requires": [
+    { "type": "grafana", "id": "grafana", "name": "Grafana", "version": "9.0.0" },
+    { "type": "datasource", "id": "prometheus", "name": "Prometheus", "version": "1.0.0" }
+  ],
+  "annotations": { "list": [] },
+  "description": "Kafka broker and consumer-lag metrics for ContextIQ (AC-5)",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "id": 1,
+      "title": "Cluster Health",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red",   "value": 1 }
+            ]
+          },
+          "mappings": [],
+          "color": { "mode": "thresholds" }
+        }
+      },
+      "gridPos": { "h": 4, "w": 4, "x": 0, "y": 1 },
+      "id": 2,
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "orientation": "auto", "textMode": "auto", "colorMode": "background" },
+      "title": "Under-Replicated Partitions",
+      "type": "stat",
+      "targets": [
+        {
+          "expr":         "sum(kafka_server_replicamanager_underreplicatedpartitions)",
+          "legendFormat": "under-replicated",
+          "refId":        "A"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red",   "value": null },
+              { "color": "green", "value": 1 }
+            ]
+          },
+          "mappings": [],
+          "color": { "mode": "thresholds" }
+        }
+      },
+      "gridPos": { "h": 4, "w": 4, "x": 4, "y": 1 },
+      "id": 3,
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "orientation": "auto", "textMode": "auto", "colorMode": "background" },
+      "title": "Active Controller Count (should be 1)",
+      "type": "stat",
+      "targets": [
+        {
+          "expr":         "sum(kafka_controller_kafkacontroller_activecontrollercount)",
+          "legendFormat": "active controllers",
+          "refId":        "A"
+        }
+      ]
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 5 },
+      "id": 10,
+      "title": "Consumer Lag",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "fieldConfig": {
+        "defaults": {
+          "color":  { "mode": "palette-classic" },
+          "custom": { "lineWidth": 1, "fillOpacity": 5 }
+        }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 6 },
+      "id": 11,
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "title": "Max Consumer Group Lag by Topic",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr":         "kafka:consumer_group_lag:max_by_topic",
+          "legendFormat": "{{ group }} / {{ topic }}",
+          "refId":        "A"
+        }
+      ]
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 14 },
+      "id": 20,
+      "title": "Throughput",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "fieldConfig": {
+        "defaults": {
+          "unit":   "Bps",
+          "color":  { "mode": "palette-classic" },
+          "custom": { "lineWidth": 1, "fillOpacity": 5 }
+        }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 15 },
+      "id": 21,
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "title": "Bytes In per Topic (1m rate)",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr":         "kafka_server_brokertopicmetrics_bytesin_rate",
+          "legendFormat": "{{ topic }}",
+          "refId":        "A"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "fieldConfig": {
+        "defaults": {
+          "unit":   "Bps",
+          "color":  { "mode": "palette-classic" },
+          "custom": { "lineWidth": 1, "fillOpacity": 5 }
+        }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 15 },
+      "id": 22,
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "title": "Bytes Out per Topic (1m rate)",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr":         "kafka_server_brokertopicmetrics_bytesout_rate",
+          "legendFormat": "{{ topic }}",
+          "refId":        "A"
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "fieldConfig": {
+        "defaults": {
+          "unit":   "msgs/s",
+          "color":  { "mode": "palette-classic" },
+          "custom": { "lineWidth": 1, "fillOpacity": 5 }
+        }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 23 },
+      "id": 23,
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "title": "Messages In per Topic (1m rate)",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr":         "kafka_server_brokertopicmetrics_messagesin_rate",
+          "legendFormat": "{{ topic }}",
+          "refId":        "A"
+        }
+      ]
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 31 },
+      "id": 30,
+      "title": "ISR Health",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "fieldConfig": {
+        "defaults": {
+          "color":  { "mode": "palette-classic" },
+          "custom": { "lineWidth": 1, "fillOpacity": 5 }
+        }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 32 },
+      "id": 31,
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } },
+      "title": "ISR Shrinks / Expands per Second",
+      "type": "timeseries",
+      "targets": [
+        {
+          "expr":         "kafka_server_replicamanager_isrshrinks_rate",
+          "legendFormat": "ISR Shrinks",
+          "refId":        "A"
+        },
+        {
+          "expr":         "kafka_server_replicamanager_isrexpands_rate",
+          "legendFormat": "ISR Expands",
+          "refId":        "B"
+        }
+      ]
+    }
+  ],
+  "schemaVersion": 36,
+  "style": "dark",
+  "tags": ["kafka", "contextiq"],
+  "templating": {
+    "list": [
+      {
+        "current": {},
+        "hide": 0,
+        "includeAll": false,
+        "label": "Datasource",
+        "name": "datasource",
+        "options": [],
+        "query": "prometheus",
+        "refresh": 1,
+        "type": "datasource"
+      }
+    ]
+  },
+  "time": { "from": "now-3h", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "Kafka — ContextIQ Cluster",
+  "uid": "contextiq-kafka-v1",
+  "version": 1
+}

@@ -10,7 +10,7 @@
 | Layer | Backend |
 | Priority | P0 |
 | Points | 2 |
-| Status | Draft |
+| Status | Done |
 
 ## Description
 
@@ -399,11 +399,11 @@ spec:
 
 ## Acceptance Criteria
 
-- [ ] `kafka-consumer-groups.sh --bootstrap-server ... --list` shows all 6 group IDs (`indexing-service`, `graph-agent`, `context-retrieval`, `replay-service`, `audit-logger`, `health-monitor`) (AC-3)
-- [ ] `register_consumer_groups.py` exits 0; all groups show `STATE: Empty` (no active members — groups are pre-registered but not yet consuming) (AC-3)
-- [ ] Starting `indexing-service` with a missing topic raises a `RuntimeError` at startup containing the topic name and remediation message (AC-3)
-- [ ] Starting `indexing-service` with a valid topic and pre-registered group proceeds without error; `KafkaConsumerValidator.validate()` passes (AC-3)
-- [ ] `consumer-group-job` ArgoCD hook runs after `kafka-topic-bootstrap` (sync wave -4 vs -5) (AC-3)
+- [x] `kafka-consumer-groups.sh --bootstrap-server ... --list` shows all 6 group IDs (`indexing-service`, `graph-agent`, `context-retrieval`, `replay-service`, `audit-logger`, `health-monitor`) (AC-3)
+- [x] `register_consumer_groups.py` exits 0; all groups show `STATE: Empty` (no active members — groups are pre-registered but not yet consuming) (AC-3)
+- [x] Starting `indexing-service` with a missing topic raises a `RuntimeError` at startup containing the topic name and remediation message (AC-3)
+- [x] Starting `indexing-service` with a valid topic and pre-registered group proceeds without error; `KafkaConsumerValidator.validate()` passes (AC-3)
+- [x] `consumer-group-job` ArgoCD hook runs after `kafka-topic-bootstrap` (sync wave -4 vs -5) (AC-3)
 
 ## Dependencies
 
@@ -413,6 +413,6 @@ spec:
 
 ## Definition of Done
 
-- [ ] `register_consumer_groups.py` committed and idempotent in staging
-- [ ] `src/kafka/consumer_validator.py` and `src/kafka/consumer_base.py` committed with unit tests in `tests/unit/test_consumer_validator.py`
-- [ ] One service (e.g. `indexing-service`) updated to call `KafkaConsumerValidator.validate()` in its FastAPI lifespan and validated in staging
+- [x] `register_consumer_groups.py` committed and idempotent in staging
+- [x] `src/kafka/consumer_validator.py` and `src/kafka/consumer_base.py` committed with unit tests in `tests/unit/test_consumer_validator.py`
+- [x] One service (e.g. `indexing-service`) updated to call `KafkaConsumerValidator.validate()` in its FastAPI lifespan and validated in staging

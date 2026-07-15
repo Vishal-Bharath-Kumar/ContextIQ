@@ -10,7 +10,7 @@
 | Layer | Infrastructure / Backend |
 | Priority | P0 |
 | Points | 2 |
-| Status | Draft |
+| Status | Done |
 
 ## Description
 
@@ -236,11 +236,11 @@ spec:
 
 ## Acceptance Criteria
 
-- [ ] `kubectl get pods -n contextiq-data -l app.kubernetes.io/name=qdrant` shows 3 pods Running (AC-1)
-- [ ] `curl http://qdrant.contextiq-data.svc.cluster.local:6333/cluster` shows `peer_count: 3` and `status: "enabled"` (AC-1)
-- [ ] `python scripts/datastore/bootstrap_qdrant.py` completes; `curl .../collections/contextiq_embeddings` shows `"size": 1536, "distance": "Cosine"` (AC-1)
-- [ ] `/vault/secrets/qdrant.env` present in Qdrant pod — Vault API key injected (AC-6)
-- [ ] `kubectl get servicemonitor qdrant -n contextiq-observability` exists; Prometheus scrapes `/metrics` (AC-7)
+- [x] `kubectl get pods -n contextiq-data -l app.kubernetes.io/name=qdrant` shows 3 pods Running (AC-1)
+- [x] `curl http://qdrant.contextiq-data.svc.cluster.local:6333/cluster` shows `peer_count: 3` and `status: "enabled"` (AC-1)
+- [x] `python scripts/datastore/bootstrap_qdrant.py` completes; `curl .../collections/contextiq_embeddings` shows `"size": 1536, "distance": "Cosine"` (AC-1)
+- [x] `/vault/secrets/qdrant.env` present in Qdrant pod — Vault API key injected (AC-6)
+- [x] `kubectl get servicemonitor qdrant -n contextiq-observability` exists; Prometheus scrapes `/metrics` (AC-7)
 
 ## Dependencies
 
@@ -250,6 +250,6 @@ spec:
 
 ## Definition of Done
 
-- [ ] Qdrant StatefulSet stable with 3 Running pods
-- [ ] `bootstrap_qdrant.py` committed and runs idempotently in staging
-- [ ] Collection visible in Qdrant web UI at `http://qdrant.contextiq-data.svc.cluster.local:6333/dashboard`
+- [x] Qdrant StatefulSet stable with 3 Running pods
+- [x] `bootstrap_qdrant.py` committed and runs idempotently in staging
+- [x] Collection visible in Qdrant web UI at `http://qdrant.contextiq-data.svc.cluster.local:6333/dashboard`

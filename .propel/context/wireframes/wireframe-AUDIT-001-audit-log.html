@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<title>AUDIT-001 — Audit Log · ContextIQ Wireframe</title>
+<link rel="stylesheet" href="_wireframe-base.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="topbar-logo"><div class="topbar-logo-icon">C</div>ContextIQ</div>
+  <div class="topbar-sep"></div>
+  <nav class="topbar-breadcrumb">Audit Log</nav>
+  <div class="topbar-actions"><div class="topbar-search">🔍 Search</div><button class="topbar-icon-btn">🔔</button></div>
+</header>
+<nav class="sidebar" aria-label="Main navigation">
+  <div class="sidebar-nav">
+    <a class="nav-item"><span class="icon">⊞</span>Dashboard</a>
+    <div class="nav-section">Data Sources</div>
+    <a class="nav-item"><span class="icon">⬡</span>Connectors</a><a class="nav-item"><span class="icon">🗄</span>Knowledge Sources</a>
+    <div class="nav-section">Governance</div><a class="nav-item"><span class="icon">🛡</span>Policies</a>
+    <div class="nav-section">Observability</div>
+    <a class="nav-item"><span class="icon">▶</span>Replay Explorer</a>
+    <a class="nav-item active" aria-current="page"><span class="icon">📋</span>Audit Log</a>
+    <a class="nav-item"><span class="icon">📊</span>Observability</a>
+    <div class="nav-section">Platform</div><a class="nav-item"><span class="icon">👥</span>Users</a><a class="nav-item"><span class="icon">💻</span>Models</a><a class="nav-item"><span class="icon">⚙</span>Settings</a>
+  </div>
+  <div class="sidebar-user"><div class="user-avatar">DA</div><div class="user-info"><div class="user-name">Dave Auditor</div><div class="user-role">Auditor</div></div></div>
+</nav>
+<main class="main-content" role="main">
+  <div class="page-header">
+    <div class="page-title">Audit Log</div>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-outline btn-sm">🛡 Verify Integrity</button>
+      <button class="btn btn-secondary btn-sm">↓ Export</button>
+    </div>
+  </div>
+
+  <!-- Filter bar -->
+  <form role="search" aria-label="Audit log filters">
+    <div class="filter-bar" style="flex-wrap:wrap;gap:8px;align-items:flex-end">
+      <div>
+        <div class="form-label">Action</div>
+        <select class="select-wf" style="width:160px"><option>All Actions</option><option>POLICY_UPDATED</option><option>POLICY_DELETED</option><option>CONNECTOR_EDITED</option><option>MODEL_ACTIVATED</option><option>USER_ROLE_CHANGED</option></select>
+      </div>
+      <div>
+        <div class="form-label">Resource Type</div>
+        <select class="select-wf" style="width:130px"><option>All Resources</option><option>POLICY</option><option>CONNECTOR</option><option>MODEL</option><option>USER</option></select>
+      </div>
+      <div>
+        <div class="form-label">Actor email</div>
+        <input class="input-wf" style="width:180px" placeholder="alice@co.com" aria-label="Filter by actor email">
+      </div>
+      <div>
+        <div class="form-label">From</div>
+        <input class="input-wf" type="datetime-local" style="width:160px" aria-label="From date">
+      </div>
+      <div>
+        <div class="form-label">To</div>
+        <input class="input-wf" type="datetime-local" style="width:160px" aria-label="To date">
+      </div>
+      <button class="btn btn-primary btn-sm">Apply</button>
+      <button class="btn btn-ghost btn-sm" type="reset">Clear</button>
+    </div>
+  </form>
+
+  <!-- Table -->
+  <div class="table-wrapper" style="margin-top:16px">
+    <table class="table-wf" aria-label="Audit log entries">
+      <thead>
+        <tr>
+          <th style="width:20px"></th>
+          <th>Timestamp</th>
+          <th>Action</th>
+          <th>Resource Type</th>
+          <th>Resource ID</th>
+          <th>Actor</th>
+          <th>IP Address</th>
+          <th>Row Hash</th>
+        </tr>
+      </thead>
+      <tbody>
+        <!-- Row 1 — collapsed -->
+        <tr style="cursor:pointer">
+          <td style="color:var(--neutral-600)">▶</td>
+          <td class="mono tabular text-small">2026-07-14 14:32:01</td>
+          <td><span class="badge badge-brand">POLICY_UPDATED</span></td>
+          <td>POLICY</td>
+          <td class="mono text-small" title="pol-abc-001-0000-0000-000000000001">pol-abc-001…</td>
+          <td>alice@co.com</td>
+          <td class="mono text-small">10.0.1.42</td>
+          <td class="mono text-small" style="color:var(--neutral-600)" title="a1b2c3d4e5f6789012345678901234567890abcd">a1b2c3d4…</td>
+        </tr>
+
+        <!-- Row 2 — expanded with diff -->
+        <tr style="cursor:pointer;background:var(--neutral-900)">
+          <td style="color:var(--brand-blue-400)">▼</td>
+          <td class="mono tabular text-small">2026-07-14 14:28:03</td>
+          <td><span class="badge badge-neutral">CONNECTOR_EDITED</span></td>
+          <td>CONNECTOR</td>
+          <td class="mono text-small">conn-sql-…</td>
+          <td>bob@co.com</td>
+          <td class="mono text-small">10.0.1.55</td>
+          <td class="mono text-small" style="color:var(--neutral-600)">b2c3d4e5…</td>
+        </tr>
+        <!-- Expanded diff row -->
+        <tr>
+          <td colspan="8" style="padding:0;background:var(--neutral-950)">
+            <div style="padding:12px 40px">
+              <div class="grid-2" style="gap:12px">
+                <div>
+                  <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:var(--neutral-600);margin-bottom:6px">Before State</div>
+                  <div class="code-block" style="font-size:11px;background:var(--danger-900);border-color:oklch(0.28 0.12 25)">
+<span style="color:var(--danger-400)">- "host": "old.db.internal:5432"</span>
+<span style="color:var(--neutral-500)">  "port": 5432</span>
+<span style="color:var(--neutral-500)">  "database": "contextiq_prod"</span>
+                  </div>
+                </div>
+                <div>
+                  <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:var(--neutral-600);margin-bottom:6px">After State</div>
+                  <div class="code-block" style="font-size:11px;background:var(--success-900);border-color:oklch(0.28 0.10 145)">
+<span style="color:var(--success-400)">+ "host": "new.db.internal:5432"</span>
+<span style="color:var(--neutral-500)">  "port": 5432</span>
+<span style="color:var(--neutral-500)">  "database": "contextiq_prod"</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </td>
+        </tr>
+
+        <!-- Row 3 — collapsed -->
+        <tr style="cursor:pointer">
+          <td style="color:var(--neutral-600)">▶</td>
+          <td class="mono tabular text-small">2026-07-14 14:15:44</td>
+          <td><span class="badge badge-warning">USER_ROLE_CHANGED</span></td>
+          <td>USER</td>
+          <td class="mono text-small">usr-carol…</td>
+          <td>alice@co.com</td>
+          <td class="mono text-small">10.0.1.42</td>
+          <td class="mono text-small" style="color:var(--neutral-600)">c3d4e5f6…</td>
+        </tr>
+        <tr style="cursor:pointer">
+          <td style="color:var(--neutral-600)">▶</td>
+          <td class="mono tabular text-small">2026-07-14 13:55:12</td>
+          <td><span class="badge badge-brand">MODEL_ACTIVATED</span></td>
+          <td>MODEL</td>
+          <td class="mono text-small">mdl-gpt4o…</td>
+          <td>bob@co.com</td>
+          <td class="mono text-small">10.0.1.55</td>
+          <td class="mono text-small" style="color:var(--neutral-600)">d4e5f601…</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Load more -->
+  <div style="text-align:center;margin-top:16px;font-size:12px">
+    <div style="color:var(--neutral-600);margin-bottom:8px">Showing 50 of ~1,204 entries</div>
+    <button class="btn btn-ghost" aria-label="Load next page of audit log entries">Load more</button>
+  </div>
+</main>
+<aside class="annotation-panel">
+  <div class="ann-screen-id">AUDIT-001</div>
+  <div class="ann-route">Route: /audit-log</div>
+  <div class="ann-guard">Guard: AUDITOR, DEVOPS_SRE, SECURITY_OFFICER, ADMIN</div>
+  <div class="ann-divider"></div>
+  <div class="ann-section">Components</div>
+  <div class="ann-item"><div class="ann-component">&lt;AuditLogFilterBar&gt;</div><div class="ann-note">RHF + Zod validation · role="search"</div></div>
+  <div class="ann-item"><div class="ann-component">&lt;AuditLogTable&gt;</div><div class="ann-note">▶ collapsed / ▼ expanded inline diff</div></div>
+  <div class="ann-item"><div class="ann-component">&lt;JsonDiffViewer&gt;</div><div class="ann-note">before=danger-900 · after=success-900 · IBM Plex Mono</div></div>
+  <div class="ann-item"><div class="ann-component">&lt;Pagination variant="load-more"&gt;</div><div class="ann-note">fetchNextPage · TanStack Query</div></div>
+  <div class="ann-divider"></div>
+  <div class="ann-section">Action Badge Colors</div>
+  <div class="ann-note">policy.* → brand<br>model.* → brand<br>connector.* → neutral<br>user.* → warning</div>
+  <div class="ann-divider"></div>
+  <div class="ann-section">States</div>
+  <span class="state-chip">loading (10 skeletons)</span>
+  <span class="state-chip">empty</span>
+  <span class="state-chip">expanded row</span>
+  <span class="state-chip">filter active</span>
+</aside>
+</body>
+</html>

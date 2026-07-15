@@ -1,0 +1,12 @@
+# AC-2: dev overrides — relaxed probes, single replica, debug logging
+replicaCount: 1
+hpa:
+  enabled: false
+pdb:
+  enabled: false
+env:
+  LOG_LEVEL: DEBUG
+  KEYCLOAK_URL: "http://localhost:8080/auth"
+# Disable Vault sidecar in dev — use DATABASE_URL env var directly
+vault:
+  enabled: false

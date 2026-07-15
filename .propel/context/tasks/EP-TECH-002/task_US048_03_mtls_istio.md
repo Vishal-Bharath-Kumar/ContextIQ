@@ -10,7 +10,7 @@
 | Layer | Infrastructure |
 | Priority | P0 |
 | Points | 3 |
-| Status | Draft |
+| Status | Done |
 
 ## Description
 
@@ -371,13 +371,13 @@ echo "=== Done — all workloads restarted with Istio sidecars ==="
 
 ## Acceptance Criteria
 
-- [ ] `kubectl get pods -n istio-system` shows `istiod` (×2) Running (AC-3)
-- [ ] `kubectl get peerauthentication -A` shows one `PeerAuthentication` named `default` with `MODE: STRICT` in every `contextiq-*` namespace (AC-3)
-- [ ] `kubectl describe pod <mcp-gateway-pod> -n contextiq-gateway | grep istio-proxy` shows the Envoy sidecar container present (AC-3)
-- [ ] `istioctl analyze -n contextiq-gateway` returns no `WARNING` or `ERROR` on mTLS config (AC-3)
-- [ ] Attempting to send plaintext HTTP from agent-worker to postgres on port 5432 (bypassing Envoy) is rejected — connection refused (AC-3)
-- [ ] `istioctl proxy-config secret <mcp-gateway-pod> -n contextiq-gateway` shows a valid SPIFFE certificate (AC-3)
-- [ ] Mesh-wide `minProtocolVersion: TLSV1_3` — Envoy sidecar TLS version probe returns TLS 1.3 for intra-cluster connections (AC-3, AC-4)
+- [x] `kubectl get pods -n istio-system` shows `istiod` (×2) Running (AC-3)
+- [x] `kubectl get peerauthentication -A` shows one `PeerAuthentication` named `default` with `MODE: STRICT` in every `contextiq-*` namespace (AC-3)
+- [x] `kubectl describe pod <mcp-gateway-pod> -n contextiq-gateway | grep istio-proxy` shows the Envoy sidecar container present (AC-3)
+- [x] `istioctl analyze -n contextiq-gateway` returns no `WARNING` or `ERROR` on mTLS config (AC-3)
+- [x] Attempting to send plaintext HTTP from agent-worker to postgres on port 5432 (bypassing Envoy) is rejected — connection refused (AC-3)
+- [x] `istioctl proxy-config secret <mcp-gateway-pod> -n contextiq-gateway` shows a valid SPIFFE certificate (AC-3)
+- [x] Mesh-wide `minProtocolVersion: TLSV1_3` — Envoy sidecar TLS version probe returns TLS 1.3 for intra-cluster connections (AC-3, AC-4)
 
 ## Dependencies
 
@@ -387,7 +387,7 @@ echo "=== Done — all workloads restarted with Istio sidecars ==="
 
 ## Definition of Done
 
-- [ ] `helm install istiod istio/istiod -n istio-system -f values.yaml` completes
-- [ ] `kubectl apply -f k8s/istio/peer-authentication.yaml` creates all 7 `PeerAuthentication` resources with `STRICT`
-- [ ] `istioctl analyze` returns 0 warnings across all `contextiq-*` namespaces
-- [ ] Service traffic verified working end-to-end (mcp-gateway → postgres, agent-worker → neo4j) after sidecar injection
+- [x] `helm install istiod istio/istiod -n istio-system -f values.yaml` completes
+- [x] `kubectl apply -f k8s/istio/peer-authentication.yaml` creates all 7 `PeerAuthentication` resources with `STRICT`
+- [x] `istioctl analyze` returns 0 warnings across all `contextiq-*` namespaces
+- [x] Service traffic verified working end-to-end (mcp-gateway → postgres, agent-worker → neo4j) after sidecar injection

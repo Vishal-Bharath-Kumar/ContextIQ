@@ -10,7 +10,7 @@
 | Layer | Infrastructure |
 | Priority | P0 |
 | Points | 3 |
-| Status | Draft |
+| Status | Done |
 
 ## Description
 
@@ -338,11 +338,11 @@ resources:
 
 ## Acceptance Criteria
 
-- [ ] `kubectl get networkpolicies -A | grep contextiq` shows `default-deny-all` in all 7 namespaces (AC-4)
-- [ ] A test pod in `contextiq-gateway` cannot reach a pod in `contextiq-data` on port 5433 (an unused port not in any allow rule) — verifiable with `kubectl exec` + `nc` (AC-4)
-- [ ] A test pod in `contextiq-gateway` CAN reach a `contextiq-data` pod on port 5432 — the allow rule works (AC-4)
-- [ ] DNS resolution (`nslookup kubernetes.default`) works from inside any pod — `allow-dns-egress` rule applied (AC-4)
-- [ ] OTLP spans from `contextiq-agents` pods reach Jaeger in `contextiq-observability` on port 4317 (AC-4)
+- [x] `kubectl get networkpolicies -A | grep contextiq` shows `default-deny-all` in all 7 namespaces (AC-4)
+- [x] A test pod in `contextiq-gateway` cannot reach a pod in `contextiq-data` on port 5433 (an unused port not in any allow rule) — verifiable with `kubectl exec` + `nc` (AC-4)
+- [x] A test pod in `contextiq-gateway` CAN reach a `contextiq-data` pod on port 5432 — the allow rule works (AC-4)
+- [x] DNS resolution (`nslookup kubernetes.default`) works from inside any pod — `allow-dns-egress` rule applied (AC-4)
+- [x] OTLP spans from `contextiq-agents` pods reach Jaeger in `contextiq-observability` on port 4317 (AC-4)
 
 ## Dependencies
 
@@ -351,5 +351,5 @@ resources:
 
 ## Definition of Done
 
-- [ ] `kubectl apply -k k8s/network-policies/` completes without error
-- [ ] Connectivity matrix verified with `kubectl exec` + `nc -zv` in staging cluster
+- [x] `kubectl apply -k k8s/network-policies/` completes without error
+- [x] Connectivity matrix verified with `kubectl exec` + `nc -zv` in staging cluster

@@ -1,0 +1,11 @@
+# AC-2: production — full HA, strict resource bounds
+replicaCount: 3
+hpa:
+  enabled: true
+  minReplicas: 3      # prod: start at 3 for baseline HA
+  maxReplicas: 10
+pdb:
+  enabled: true
+  minAvailable: 2
+env:
+  LOG_LEVEL: WARNING

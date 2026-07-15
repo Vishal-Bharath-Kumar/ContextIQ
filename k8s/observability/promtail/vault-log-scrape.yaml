@@ -1,0 +1,55 @@
+# AC-6: Promtail scrape configuration for Vault audit logs.
+# Collects JSON audit lines from Vault pod log paths and forwards them to Loki.
+# Mount this ConfigMap into the Promtail deployment by adding it to Promtail's
+# extraVolumes / extraVolumeMounts and referencing it in extraScrapeConfigs.
+#
+# Loki query examples for Grafana dashboards:
+#   All Vault operations:
+#     {job="vault-audit"} | json | line_format "{{.type}} {{.path}} {{.operation}}"
+#   Failed operations (AC-6 security alerting):
+#     {job="vault-audit"} | json | error != ""
+#   Credential lease operations:
+#     {job="vault-audit", path=~"database/.*"} | json
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: promtail-vault-scrape
+  namespace: contextiq-observability
+data:
+  vault-scrape.yaml: |
+    scrape_configs:
+      - job_name: vault-audit
+        static_configs:
+          - targets:
+              - localhost
+            labels:
+              job:       vault-audit
+              namespace: contextiq-security
+              __path__:  /var/log/pods/contextiq-security_vault-*/*/*.log
+
+        pipeline_stages:
+          # Parse the JSON audit log lines emitted by Vault
+          - json:
+              expressions:
+                time:        time
+                type:        type
+                auth_type:   auth.accessor
+                path:        request.path
+                operation:   request.operation
+                remote_addr: request.remote_address
+                error:       error
+
+          # Drop high-frequency health-check noise to reduce log volume
+          - drop:
+              expression: '.*sys/health.*'
+
+          # Promote high-value audit fields as Loki stream labels for fast querying
+          - labels:
+              type:
+              path:
+              operation:
+
+          # Parse and normalise the Vault-emitted RFC3339Nano timestamp
+          - timestamp:
+              source: time
+              format: RFC3339Nano

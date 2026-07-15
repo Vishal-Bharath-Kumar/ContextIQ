@@ -10,7 +10,7 @@
 | Layer | Backend |
 | Priority | P0 |
 | Points | 1 |
-| Status | Draft |
+| Status | Done |
 
 ## Description
 
@@ -210,13 +210,13 @@ SKIP_PATHS: frozenset[str] = frozenset({
 
 ## Acceptance Criteria
 
-- [ ] A `DEVELOPER`-role JWT receives HTTP 200 from `POST /tools/...` and HTTP 403 from `POST /v1/knowledge-sources` (AC-3)
-- [ ] An `AUDITOR`-role JWT receives HTTP 200 from `GET /v1/traces` and HTTP 403 from `GET /v1/policies` (AC-3)
-- [ ] A `MANAGER`-role JWT receives HTTP 200 from `GET /v1/models/cost-analytics` and HTTP 403 from `PATCH /v1/models/{id}/status` (AC-3)
-- [ ] A `DEVOPS_SRE`-role JWT receives HTTP 200 from `GET /metrics` and HTTP 403 from `POST /v1/policies` (AC-3)
-- [ ] An `ADMIN`-role JWT receives HTTP 200 from every protected endpoint (AC-1)
-- [ ] `/healthz` returns 200 with no `Authorization` header (bypass path)
-- [ ] No individual route function imports `require_admin_role` — all RBAC is applied at router level
+- [x] A `DEVELOPER`-role JWT receives HTTP 200 from `POST /tools/...` and HTTP 403 from `POST /v1/knowledge-sources` (AC-3)
+- [x] An `AUDITOR`-role JWT receives HTTP 200 from `GET /v1/traces` and HTTP 403 from `GET /v1/policies` (AC-3)
+- [x] A `MANAGER`-role JWT receives HTTP 200 from `GET /v1/models/cost-analytics` and HTTP 403 from `PATCH /v1/models/{id}/status` (AC-3)
+- [x] A `DEVOPS_SRE`-role JWT receives HTTP 200 from `GET /metrics` and HTTP 403 from `POST /v1/policies` (AC-3)
+- [x] An `ADMIN`-role JWT receives HTTP 200 from every protected endpoint (AC-1)
+- [x] `/healthz` returns 200 with no `Authorization` header (bypass path)
+- [x] No individual route function imports `require_admin_role` — all RBAC is applied at router level
 
 ## Dependencies
 
@@ -226,6 +226,6 @@ SKIP_PATHS: frozenset[str] = frozenset({
 
 ## Definition of Done
 
-- [ ] `grep -r "require_admin_role" src/` finds zero results (all replaced by RBAC system)
-- [ ] `mypy --strict` passes across all modified router files
-- [ ] Integration smoke test: one 200 and one 403 per endpoint group (covered fully in TASK-US042-05)
+- [x] `grep -r "require_admin_role" src/` finds zero results (all replaced by RBAC system)
+- [x] `mypy --strict` passes across all modified router files
+- [x] Integration smoke test: one 200 and one 403 per endpoint group (covered fully in TASK-US042-05)

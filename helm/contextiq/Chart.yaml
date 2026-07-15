@@ -1,0 +1,21 @@
+apiVersion: v2
+name: contextiq
+description: ContextIQ platform umbrella chart — one-shot cluster bootstrap
+type: application
+version: 0.1.0
+dependencies:
+  - name: mcp-gateway
+    version: "0.1.0"
+    repository: "file://../charts/mcp-gateway"
+  - name: agent-worker
+    version: "0.1.0"
+    repository: "file://../charts/agent-worker"
+  - name: admin-portal
+    version: "0.1.0"
+    repository: "file://../charts/admin-portal"
+  - name: keycloak
+    version: "0.1.0"
+    repository: "file://../charts/keycloak"
+  - name: jaeger
+    version: "0.1.0"
+    repository: "file://../charts/jaeger"

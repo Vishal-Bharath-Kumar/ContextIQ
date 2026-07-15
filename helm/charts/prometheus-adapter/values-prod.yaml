@@ -1,0 +1,3 @@
+logLevel: 0
+replicas: 2
+metricsRelistInterval: 15s    # more frequent relist in prod for faster HPA reaction (AC-4)

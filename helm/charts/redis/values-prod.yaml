@@ -1,0 +1,13 @@
+redis:
+  master:
+    resources:
+      requests: { cpu: "1",    memory: "4Gi" }
+      limits:   { cpu: "4",    memory: "8Gi" }
+    persistence:
+      size: 50Gi
+  replica:
+    resources:
+      requests: { cpu: "500m", memory: "2Gi" }
+      limits:   { cpu: "2",    memory: "4Gi" }
+    persistence:
+      size: 50Gi

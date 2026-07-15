@@ -1,0 +1,22 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  # Default-deny (one per namespace)
+  - default-deny/contextiq-gateway.yaml
+  - default-deny/contextiq-agents.yaml
+  - default-deny/contextiq-data.yaml
+  - default-deny/contextiq-admin.yaml
+  - default-deny/contextiq-observability.yaml
+  - default-deny/contextiq-security.yaml
+  - default-deny/contextiq-infra.yaml
+  # Explicit allow rules
+  - allow-rules/gateway-to-agents.yaml
+  - allow-rules/gateway-to-data.yaml
+  - allow-rules/agents-to-data.yaml
+  - allow-rules/agents-to-infra.yaml
+  - allow-rules/gateway-to-security.yaml
+  - allow-rules/admin-to-gateway.yaml
+  - allow-rules/otlp-egress-all.yaml
+  - allow-rules/prometheus-scrape.yaml
+  - allow-rules/dns-egress-all.yaml
+  - allow-rules/agents-to-vault.yaml

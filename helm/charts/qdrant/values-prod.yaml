@@ -1,0 +1,6 @@
+qdrant:
+  persistence:
+    size: 200Gi
+  resources:
+    requests: { cpu: "2",  memory: "8Gi"  }
+    limits:   { cpu: "8",  memory: "32Gi" }

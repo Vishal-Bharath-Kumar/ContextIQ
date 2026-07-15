@@ -1,0 +1,44 @@
+# GCP Cloud KMS override — replaces the AWS KMS seal stanza for GCP environments.
+# Apply with: helm upgrade vault . -f values.yaml -f values-gcp.yaml
+# Credentials provided via Workload Identity — never hard-coded.
+server:
+  ha:
+    raft:
+      config: |
+        ui = true
+
+        listener "tcp" {
+          tls_disable        = 0
+          address            = "[::]:8200"
+          cluster_address    = "[::]:8201"
+          tls_cert_file      = "/vault/userconfig/vault-tls/tls.crt"
+          tls_key_file       = "/vault/userconfig/vault-tls/tls.key"
+          tls_client_ca_file = "/vault/userconfig/vault-tls/ca.crt"
+        }
+
+        storage "raft" {
+          path    = "/vault/data"
+          node_id = "VAULT_NODE_ID"
+
+          retry_join {
+            leader_api_addr     = "https://vault-0.vault-internal:8200"
+            leader_ca_cert_file = "/vault/userconfig/vault-tls/ca.crt"
+          }
+          retry_join {
+            leader_api_addr     = "https://vault-1.vault-internal:8200"
+            leader_ca_cert_file = "/vault/userconfig/vault-tls/ca.crt"
+          }
+          retry_join {
+            leader_api_addr     = "https://vault-2.vault-internal:8200"
+            leader_ca_cert_file = "/vault/userconfig/vault-tls/ca.crt"
+          }
+        }
+
+        seal "gcpckms" {
+          project    = "your-gcp-project"
+          region     = "global"
+          key_ring   = "contextiq-vault"
+          crypto_key = "vault-unseal"
+        }
+
+        service_registration "kubernetes" {}

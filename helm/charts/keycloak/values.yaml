@@ -1,0 +1,76 @@
+replicaCount: 2
+
+image:
+  repository: quay.io/keycloak/keycloak
+  pullPolicy: IfNotPresent
+  tag: "24.0.0"
+
+namespace: contextiq-security
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8080
+
+ingress:
+  enabled: false
+  className: nginx
+  host: keycloak.contextiq.internal
+  path: /
+
+resources:
+  requests:
+    cpu: "500m"
+    memory: "1Gi"
+  limits:
+    cpu: "2"
+    memory: "4Gi"
+
+readinessProbe:
+  httpGet:
+    path: /healthz
+    port: 8080
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  failureThreshold: 3
+
+livenessProbe:
+  httpGet:
+    path: /healthz
+    port: 8080
+  initialDelaySeconds: 60
+  periodSeconds: 30
+  failureThreshold: 5
+
+hpa:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 4
+  targetCPUUtilizationPercentage: 70
+
+pdb:
+  enabled: true
+  minAvailable: 1
+
+podSecurityContext:
+  runAsNonRoot: true
+  seccompProfile:
+    type: RuntimeDefault
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: false   # Keycloak writes temp files at runtime
+  runAsNonRoot: true
+  runAsUser: 1000
+  capabilities:
+    drop: ["ALL"]
+
+env:
+  KC_DB: postgres
+  KC_DB_URL: ""           # injected from Secret
+  KC_DB_USERNAME: ""      # injected from Secret
+  KC_DB_PASSWORD: ""      # injected from Secret
+  KC_HOSTNAME: "keycloak.contextiq-security.svc.cluster.local"
+  KC_HTTP_ENABLED: "true"
+  KEYCLOAK_ADMIN: ""      # injected from Secret
+  KEYCLOAK_ADMIN_PASSWORD: ""  # injected from Secret

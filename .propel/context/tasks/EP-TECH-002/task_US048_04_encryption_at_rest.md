@@ -10,7 +10,7 @@
 | Layer | Infrastructure |
 | Priority | P0 |
 | Points | 2 |
-| Status | Draft |
+| Status | Done |
 
 ## Description
 
@@ -284,11 +284,11 @@ echo "PASS: All data stores have encryption at rest (AC-5)"
 
 ## Acceptance Criteria
 
-- [ ] `kubectl get storageclass contextiq-encrypted-gp3 -o yaml | grep encrypted` shows `encrypted: "true"` (AC-5)
-- [ ] All 5 data store PVCs (`data-postgres-0`, `data-redis-0`, `data-neo4j-0`, `qdrant-storage-qdrant-0`, `data-minio-0`) reference `contextiq-encrypted-gp3` (AC-5)
-- [ ] `aws ec2 describe-volumes --volume-ids <pvId>` returns `"Encrypted": true` for all data store EBS volumes (AC-5)
-- [ ] `mc encrypt info contextiq/contextiq-audit-archive` shows `SSE-S3` — MinIO object-level AES-256 active (AC-5)
-- [ ] `scripts/security/verify_encryption_at_rest.sh` exits 0 (AC-5)
+- [x] `kubectl get storageclass contextiq-encrypted-gp3 -o yaml | grep encrypted` shows `encrypted: "true"` (AC-5)
+- [x] All 5 data store PVCs (`data-postgres-0`, `data-redis-0`, `data-neo4j-0`, `qdrant-storage-qdrant-0`, `data-minio-0`) reference `contextiq-encrypted-gp3` (AC-5)
+- [x] `aws ec2 describe-volumes --volume-ids <pvId>` returns `"Encrypted": true` for all data store EBS volumes (AC-5)
+- [x] `mc encrypt info contextiq/contextiq-audit-archive` shows `SSE-S3` — MinIO object-level AES-256 active (AC-5)
+- [x] `scripts/security/verify_encryption_at_rest.sh` exits 0 (AC-5)
 
 ## Dependencies
 
@@ -299,7 +299,7 @@ echo "PASS: All data stores have encryption at rest (AC-5)"
 
 ## Definition of Done
 
-- [ ] `kubectl apply -f k8s/storage/encrypted-storage-class.yaml` creates the StorageClass
-- [ ] StatefulSet patches applied; pods restarted on new encrypted PVs without data loss
-- [ ] `configure_minio_sse.sh` runs without error in staging; all 4 buckets show SSE-S3 enabled
-- [ ] `verify_encryption_at_rest.sh` exits 0 in staging
+- [x] `kubectl apply -f k8s/storage/encrypted-storage-class.yaml` creates the StorageClass
+- [x] StatefulSet patches applied; pods restarted on new encrypted PVs without data loss
+- [x] `configure_minio_sse.sh` runs without error in staging; all 4 buckets show SSE-S3 enabled
+- [x] `verify_encryption_at_rest.sh` exits 0 in staging

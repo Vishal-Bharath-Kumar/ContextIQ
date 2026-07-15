@@ -1,0 +1,18 @@
+# Kustomize strategic merge patch — sets storageClassName on PostgreSQL PVC.
+# Apply via Kustomize overlay; do not apply directly to a running StatefulSet
+# (volumeClaimTemplates are immutable; see run-book for data migration steps).
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+  namespace: contextiq-data
+spec:
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        storageClassName: contextiq-encrypted-gp3
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 100Gi

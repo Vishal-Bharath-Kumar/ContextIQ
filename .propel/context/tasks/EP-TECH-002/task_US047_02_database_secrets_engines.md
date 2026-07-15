@@ -10,7 +10,7 @@
 | Layer | Infrastructure / Backend |
 | Priority | P0 |
 | Points | 2 |
-| Status | Draft |
+| Status | Done |
 
 ## Description
 
@@ -257,12 +257,12 @@ echo "=== Kubernetes auth roles configured ==="
 
 ## Acceptance Criteria
 
-- [ ] `vault secrets list` shows `database/postgres/`, `database/redis/`, `database/neo4j/`, `secret/` all enabled (AC-2)
-- [ ] `vault read database/postgres/creds/mcp-gateway` returns a unique `username`/`password` with `lease_duration: 1h` (AC-2, AC-4)
-- [ ] Repeated calls to `vault read database/postgres/creds/mcp-gateway` return different credentials each time (dynamic) (AC-2)
-- [ ] All scripts are idempotent — running twice does not error or duplicate roles (AC-2)
-- [ ] `vault policy read mcp-gateway` shows only the paths the gateway service needs — no over-privileged access (AC-4, OWASP A01)
-- [ ] `vault write auth/kubernetes/role/mcp-gateway` binds correctly to `contextiq-gateway` namespace service account
+- [x] `vault secrets list` shows `database/postgres/`, `database/redis/`, `database/neo4j/`, `secret/` all enabled (AC-2)
+- [x] `vault read database/postgres/creds/mcp-gateway` returns a unique `username`/`password` with `lease_duration: 1h` (AC-2, AC-4)
+- [x] Repeated calls to `vault read database/postgres/creds/mcp-gateway` return different credentials each time (dynamic) (AC-2)
+- [x] All scripts are idempotent — running twice does not error or duplicate roles (AC-2)
+- [x] `vault policy read mcp-gateway` shows only the paths the gateway service needs — no over-privileged access (AC-4, OWASP A01)
+- [x] `vault write auth/kubernetes/role/mcp-gateway` binds correctly to `contextiq-gateway` namespace service account
 
 ## Dependencies
 
@@ -272,6 +272,6 @@ echo "=== Kubernetes auth roles configured ==="
 
 ## Definition of Done
 
-- [ ] All five `configure_*.sh` scripts run without error in staging
-- [ ] `vault read database/postgres/creds/mcp-gateway` returns credentials valid for PostgreSQL login
-- [ ] `psql "host=... user=<dynamic_user> password=<dynamic_pass>"` connects successfully
+- [x] All five `configure_*.sh` scripts run without error in staging
+- [x] `vault read database/postgres/creds/mcp-gateway` returns credentials valid for PostgreSQL login
+- [x] `psql "host=... user=<dynamic_user> password=<dynamic_pass>"` connects successfully

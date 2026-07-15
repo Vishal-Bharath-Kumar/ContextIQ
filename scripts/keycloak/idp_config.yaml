@@ -1,0 +1,18 @@
+# Maps Microsoft Entra ID security group display names to ContextIQ platform roles.
+# Group names are matched against the `groups` claim in the Entra ID ID token.
+# Must cover all 7 PlatformRole values (TASK-US042-01).
+group_role_mappings:
+  - entra_group: "ContextIQ-Admins"
+    keycloak_role: "admin"
+  - entra_group: "ContextIQ-PlatformEngineers"
+    keycloak_role: "platform_engineer"
+  - entra_group: "ContextIQ-SecurityOfficers"
+    keycloak_role: "security_officer"
+  - entra_group: "ContextIQ-Developers"
+    keycloak_role: "developer"
+  - entra_group: "ContextIQ-Managers"
+    keycloak_role: "manager"
+  - entra_group: "ContextIQ-Auditors"
+    keycloak_role: "auditor"
+  - entra_group: "ContextIQ-DevOpsSRE"
+    keycloak_role: "devops_sre"

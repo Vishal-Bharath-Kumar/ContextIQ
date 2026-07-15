@@ -10,7 +10,7 @@
 | Layer | Infrastructure |
 | Priority | P0 |
 | Points | 2 |
-| Status | Draft |
+| Status | Done |
 
 ## Description
 
@@ -270,11 +270,11 @@ pdb_summary:
 
 ## Acceptance Criteria
 
-- [ ] `kubectl get hpa -n contextiq-agents indexing-service` shows `MIN PODS: 1`, `MAX PODS: 5`, target CPU 70% (AC-1)
-- [ ] `kubectl describe hpa indexing-service -n contextiq-agents` shows `stabilizationWindowSeconds: 300` for scale-down (AC-4)
-- [ ] `helm template -f values-prod.yaml` renders `minReplicas: 2` for indexing-service in prod (AC-6)
-- [ ] `helm template -f values-dev.yaml | grep HPA` returns empty (AC-6)
-- [ ] `values-hpa-summary.yaml` lists all three services with correct min/max replicas and timing values (AC-1, AC-4)
+- [x] `kubectl get hpa -n contextiq-agents indexing-service` shows `MIN PODS: 1`, `MAX PODS: 5`, target CPU 70% (AC-1)
+- [x] `kubectl describe hpa indexing-service -n contextiq-agents` shows `stabilizationWindowSeconds: 300` for scale-down (AC-4)
+- [x] `helm template -f values-prod.yaml` renders `minReplicas: 2` for indexing-service in prod (AC-6)
+- [x] `helm template -f values-dev.yaml | grep HPA` returns empty (AC-6)
+- [x] `values-hpa-summary.yaml` lists all three services with correct min/max replicas and timing values (AC-1, AC-4)
 
 ## Dependencies
 
@@ -285,6 +285,6 @@ pdb_summary:
 
 ## Definition of Done
 
-- [ ] `helm lint helm/charts/indexing-service/` passes
-- [ ] ArgoCD shows `indexing-service` Application as `Synced / Healthy`
-- [ ] Three HPAs confirmed in staging: `kubectl get hpa -A | grep contextiq`
+- [x] `helm lint helm/charts/indexing-service/` passes
+- [x] ArgoCD shows `indexing-service` Application as `Synced / Healthy`
+- [x] Three HPAs confirmed in staging: `kubectl get hpa -A | grep contextiq`

@@ -10,7 +10,7 @@
 | Layer | Backend / Frontend |
 | Priority | P0 |
 | Points | 2 |
-| Status | Draft |
+| Status | Done |
 
 ## Description
 
@@ -389,13 +389,13 @@ describe("RequireRoles — AC-1, AC-2", () => {
 
 ## Acceptance Criteria
 
-- [ ] All 56 parametrized `test_rbac_matrix` test cases pass — 7 roles × 8 endpoint groups (AC-6)
-- [ ] `test_admin_passes_all_permissions` passes for all 8 `Permission` values (AC-1)
-- [ ] `test_uppercase_role_in_jwt_is_accepted` and `test_mixed_case_role_is_accepted` pass — case-insensitive (AC-4)
-- [ ] `test_role_change_reflected_in_next_request` — fresh JWT with updated role is immediately honoured — no server restart needed (AC-5)
-- [ ] `test_no_server_side_role_cache` — confirms absence of any user-keyed role cache in the RBAC module (AC-5)
-- [ ] `RequireRoles` React tests: allowed renders content, denied redirects, ADMIN passes all, null user redirects to /login, case-insensitive match (AC-1, AC-4)
-- [ ] Permission matrix tests: developer denied MANAGE_POLICIES, auditor denied CALL_CONTEXT_TOOLS, manager denied MANAGE_CONNECTORS (AC-2)
+- [x] All 56 parametrized `test_rbac_matrix` test cases pass — 7 roles × 8 endpoint groups (AC-6)
+- [x] `test_admin_passes_all_permissions` passes for all 8 `Permission` values (AC-1)
+- [x] `test_uppercase_role_in_jwt_is_accepted` and `test_mixed_case_role_is_accepted` pass — case-insensitive (AC-4)
+- [x] `test_role_change_reflected_in_next_request` — fresh JWT with updated role is immediately honoured — no server restart needed (AC-5)
+- [x] `test_no_server_side_role_cache` — confirms absence of any user-keyed role cache in the RBAC module (AC-5)
+- [x] `RequireRoles` React tests: allowed renders content, denied redirects, ADMIN passes all, null user redirects to /login, case-insensitive match (AC-1, AC-4)
+- [x] Permission matrix tests: developer denied MANAGE_POLICIES, auditor denied CALL_CONTEXT_TOOLS, manager denied MANAGE_CONNECTORS (AC-2)
 
 ## Dependencies
 
@@ -406,6 +406,6 @@ describe("RequireRoles — AC-1, AC-2", () => {
 
 ## Definition of Done
 
-- [ ] `pytest tests/auth/ -v` shows 56+ passing matrix tests (AC-6)
-- [ ] `pnpm test` passes all `RequireRoles` tests
-- [ ] `mypy --strict` passes on all test helper files
+- [x] `pytest tests/auth/ -v` shows 56+ passing matrix tests (AC-6)
+- [x] `pnpm test` passes all `RequireRoles` tests
+- [x] `mypy --strict` passes on all test helper files

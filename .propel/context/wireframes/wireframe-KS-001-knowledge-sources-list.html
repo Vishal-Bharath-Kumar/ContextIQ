@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<title>KS-001 — Knowledge Sources · ContextIQ Wireframe</title>
+<link rel="stylesheet" href="_wireframe-base.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="topbar-logo"><div class="topbar-logo-icon">C</div>ContextIQ</div>
+  <div class="topbar-sep"></div>
+  <nav class="topbar-breadcrumb">Knowledge Sources</nav>
+  <div class="topbar-actions"><div class="topbar-search">🔍 Search</div><button class="topbar-icon-btn">🔔</button></div>
+</header>
+<nav class="sidebar" aria-label="Main navigation">
+  <div class="sidebar-nav">
+    <a class="nav-item"><span class="icon">⊞</span>Dashboard</a>
+    <div class="nav-section">Data Sources</div>
+    <a class="nav-item"><span class="icon">⬡</span>Connectors</a>
+    <a class="nav-item active" aria-current="page"><span class="icon">🗄</span>Knowledge Sources</a>
+    <div class="nav-section">Governance</div>
+    <a class="nav-item"><span class="icon">🛡</span>Policies</a>
+    <div class="nav-section">Observability</div>
+    <a class="nav-item"><span class="icon">▶</span>Replay Explorer</a>
+    <a class="nav-item"><span class="icon">📋</span>Audit Log</a>
+    <a class="nav-item"><span class="icon">📊</span>Observability</a>
+    <div class="nav-section">Platform</div>
+    <a class="nav-item"><span class="icon">👥</span>Users</a>
+    <a class="nav-item"><span class="icon">💻</span>Models</a>
+    <a class="nav-item"><span class="icon">⚙</span>Settings</a>
+  </div>
+  <div class="sidebar-user"><div class="user-avatar">BP</div><div class="user-info"><div class="user-name">Bob PE</div><div class="user-role">Platform Engineer</div></div></div>
+</nav>
+<main class="main-content" role="main">
+  <div class="page-header">
+    <div><div class="page-title">Knowledge Sources</div></div>
+    <button class="btn btn-primary">+ Add Knowledge Source</button>
+  </div>
+  <div class="filter-bar">
+    <input class="input-wf" style="width:220px" placeholder="🔍  Filter by name…">
+    <select class="select-wf"><option>All Types</option><option>Markdown</option><option>OpenAPI</option><option>Confluence</option><option>Jira</option></select>
+    <select class="select-wf"><option>All Status</option><option>Synced</option><option>Stale</option><option>Error</option></select>
+  </div>
+  <div class="table-wrapper">
+    <table class="table-wf" aria-label="Knowledge sources">
+      <thead><tr><th>Name</th><th>Type</th><th>Connector</th><th>Status</th><th>Documents</th><th>Last Refresh</th><th>Actions</th></tr></thead>
+      <tbody>
+        <tr><td><strong>prod-docs</strong></td><td><span class="badge badge-neutral">Markdown</span></td><td><a style="color:var(--brand-blue-400);font-size:12px">confluence-docs</a></td><td><span class="badge badge-success">SYNCED</span></td><td class="mono tabular">1,204</td><td class="mono tabular">10 min ago</td><td><button class="btn btn-ghost btn-icon btn-sm">⋯</button></td></tr>
+        <tr><td><strong>api-spec</strong></td><td><span class="badge badge-neutral">OpenAPI</span></td><td><a style="color:var(--brand-blue-400);font-size:12px">rest-ext-api</a></td><td><span class="badge badge-success">SYNCED</span></td><td class="mono tabular">48</td><td class="mono tabular">1 hr ago</td><td><button class="btn btn-ghost btn-icon btn-sm">⋯</button></td></tr>
+        <tr><td><strong>wiki-confluence</strong></td><td><span class="badge badge-neutral">Confluence</span></td><td><a style="color:var(--brand-blue-400);font-size:12px">confluence-docs</a></td><td><span class="badge badge-warning">STALE</span></td><td class="mono tabular">892</td><td class="mono tabular" style="color:var(--warning-400)">2 days ago</td><td><button class="btn btn-ghost btn-icon btn-sm">⋯</button></td></tr>
+        <tr><td><strong>jira-backlog</strong></td><td><span class="badge badge-neutral">Jira</span></td><td><a style="color:var(--brand-blue-400);font-size:12px">jira-prod</a></td><td><span class="badge badge-danger">ERROR</span></td><td class="mono tabular text-muted">—</td><td class="mono tabular" style="color:var(--danger-400)">4 hrs ago</td><td><button class="btn btn-ghost btn-icon btn-sm">⋯</button></td></tr>
+      </tbody>
+    </table>
+  </div>
+</main>
+<aside class="annotation-panel">
+  <div class="ann-screen-id">KS-001</div>
+  <div class="ann-route">Route: /knowledge-sources</div>
+  <div class="ann-guard">Guard: PLATFORM_ENGINEER, ADMIN</div>
+  <div class="ann-divider"></div>
+  <div class="ann-section">Components</div>
+  <div class="ann-item"><div class="ann-component">&lt;DataTable&gt;</div><div class="ann-note">Columns: name · type · connector · status · doc count · last refresh</div></div>
+  <div class="ann-item"><div class="ann-component">&lt;StatusBadge&gt;</div><div class="ann-note">SYNCED=success · STALE=warning · ERROR=danger</div></div>
+  <div class="ann-divider"></div>
+  <div class="ann-section">Empty State</div>
+  <div class="ann-note">"No knowledge sources configured. Add a source to begin indexing."</div>
+</aside>
+</body>
+</html>
