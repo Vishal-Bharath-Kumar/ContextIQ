@@ -1,0 +1,13 @@
+{{- if .Values.grafanaDashboard.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "contextiq-common.fullname" . }}-connector-dashboard
+  namespace: {{ .Values.grafanaDashboard.namespace | default .Release.Namespace }}
+  labels:
+    {{- include "contextiq-common.labels" . | nindent 4 }}
+    grafana_dashboard: "1"
+data:
+  grafana-dashboard-connectors.json: |-
+    {{- .Files.Get "files/grafana-dashboard-connectors.json" | nindent 4 }}
+{{- end }}

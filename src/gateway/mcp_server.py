@@ -16,6 +16,7 @@ from src.gateway.config import settings
 from src.gateway.handlers.initialize import register_initialize_handler
 from src.gateway.handlers.tools_call import register_tools_call_handler
 from src.gateway.handlers.tools_list import register_tools_list_handler
+from src.gateway.tools.clarification_reply import register_clarification_reply_tool
 
 # ---------------------------------------------------------------------------
 # Server instance
@@ -33,6 +34,9 @@ register_tools_list_handler(mcp)
 
 # Register the tools/call handler (TASK-US003-01).
 register_tools_call_handler(mcp)
+
+# Register the clarification_reply tool (TASK-US011-04).
+register_clarification_reply_tool(mcp)
 
 # ---------------------------------------------------------------------------
 # SSE transport — ASGI app mounted at {mcp_path}/sse in gateway/main.py.

@@ -46,6 +46,7 @@ from src.gateway.errors.tool_errors import (
     build_tool_error,
 )
 from src.gateway.schemas.call_types import ToolCallDispatch
+from src.gateway.schemas.clarification_response import ClarificationNeededResponse
 from src.gateway.services.tool_registry import ToolRegistryService
 
 logger = logging.getLogger(__name__)
@@ -277,4 +278,9 @@ def register_tools_call_handler(
             )
 
             # 6. Serialise output as MCP TextContent.
+            # Clarification path: return a structured response, not an MCP error.
+            if isinstance(result.data, dict) and result.data.get("type") == "clarification_needed":
+                clar = ClarificationNeededResponse.model_validate(result.data)
+                return [TextContent(type="text", text=clar.model_dump_json())]
+
             return [TextContent(type="text", text=json.dumps(result.data))]
