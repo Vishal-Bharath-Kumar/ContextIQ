@@ -10,7 +10,7 @@
 | Layer | Backend / SDK |
 | Priority | P0 |
 | Points | 2 |
-| Status | Draft |
+| Status | In Progress |
 
 ## Description
 
@@ -156,12 +156,12 @@ class ConnectorAuthError(Exception):
 
 ## Acceptance Criteria
 
-- [ ] Instantiating `BaseConnector` directly raises `TypeError` (ABC enforcement)
-- [ ] A concrete subclass that omits any abstract method raises `TypeError` on instantiation
-- [ ] All 4 schema models are frozen — `model_copy()` required for updates
-- [ ] `ConnectorQuery(query="", ...)` raises `ValidationError` (`min_length=1`)
-- [ ] `ConnectorQuery(max_results=501)` raises `ValidationError` (`le=500`)
-- [ ] `HealthStatus(healthy=False, ...)` constructs without error (unhealthy states are valid)
+- [x] Instantiating `BaseConnector` directly raises `TypeError` (ABC enforcement)
+- [x] A concrete subclass that omits any abstract method raises `TypeError` on instantiation
+- [x] All 4 schema models are frozen — `model_copy()` required for updates
+- [x] `ConnectorQuery(query="", ...)` raises `ValidationError` (`min_length=1`)
+- [x] `ConnectorQuery(max_results=501)` raises `ValidationError` (`le=500`)
+- [x] `HealthStatus(healthy=False, ...)` constructs without error (unhealthy states are valid)
 
 ## Dependencies
 
@@ -169,6 +169,6 @@ class ConnectorAuthError(Exception):
 
 ## Definition of Done
 
-- [ ] Code reviewed and merged to `main`
-- [ ] Public API exported from `src/connector_sdk/__init__.py`
-- [ ] `mypy --strict` passes; no `ruff` lint errors
+- [x] Code reviewed and merged to `main`
+- [x] Public API exported from `src/connector_sdk/__init__.py`
+- [x] `mypy --strict` passes; no `ruff` lint errors

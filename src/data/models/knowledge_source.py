@@ -18,7 +18,7 @@ class KnowledgeSource(Base):
     title:           Mapped[str | None]        = mapped_column(String(512), nullable=True)
     content_hash:    Mapped[str | None]        = mapped_column(String(64),  nullable=True)
     last_indexed_at: Mapped[datetime | None]   = mapped_column(TIMESTAMP(timezone=True), nullable=True)
-    metadata:        Mapped[dict]              = mapped_column(JSONB, nullable=False, default=dict, server_default=text("'{}'::jsonb"))
+    source_metadata: Mapped[dict]              = mapped_column("metadata", JSONB, nullable=False, default=dict, server_default=text("'{}'::jsonb"))
     created_at:      Mapped[datetime]          = mapped_column(TIMESTAMP(timezone=True), nullable=False, server_default=text("now()"))
 
     connector: Mapped[ConnectorConfig]         = relationship("ConnectorConfig", back_populates="knowledge_sources")

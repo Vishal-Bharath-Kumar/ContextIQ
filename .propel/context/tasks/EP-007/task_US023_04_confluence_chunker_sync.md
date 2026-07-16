@@ -10,7 +10,7 @@
 | Layer | Backend / Data |
 | Priority | P0 |
 | Points | 2 |
-| Status | Draft |
+| Status | Done |
 
 ## Description
 
@@ -204,14 +204,14 @@ The CQL `lastModified >= "YYYY-MM-DD"` clause filters to pages updated on or aft
 
 ## Acceptance Criteria
 
-- [ ] `ConfluencePageChunker.chunk()` returns a single `PageChunk` when the page is ≤ 10 000 tokens
-- [ ] `ConfluencePageChunker.chunk()` returns multiple chunks when the page exceeds 10 000 tokens
-- [ ] Each chunk has `token_count ≤ TOKEN_CHUNK_THRESHOLD`
-- [ ] `chunk_index` is 0-based and sequential across all returned chunks
-- [ ] `sync()` uses `lastModified >= "{last_sync_date}"` in the CQL query
-- [ ] `sync()` defaults to `now - default_days` when no prior sync cursor exists
-- [ ] `sync()` writes the updated cursor to `connector_sync_state` after completion
-- [ ] `sync()` emits a `source_sync_completed` event to `contextiq.source.sync` Kafka topic
+- [x] `ConfluencePageChunker.chunk()` returns a single `PageChunk` when the page is ≤ 10 000 tokens
+- [x] `ConfluencePageChunker.chunk()` returns multiple chunks when the page exceeds 10 000 tokens
+- [x] Each chunk has `token_count ≤ TOKEN_CHUNK_THRESHOLD`
+- [x] `chunk_index` is 0-based and sequential across all returned chunks
+- [x] `sync()` uses `lastModified >= "{last_sync_date}"` in the CQL query
+- [x] `sync()` defaults to `now - default_days` when no prior sync cursor exists
+- [x] `sync()` writes the updated cursor to `connector_sync_state` after completion
+- [x] `sync()` emits a `source_sync_completed` event to `contextiq.source.sync` Kafka topic
 
 ## Dependencies
 
@@ -224,6 +224,6 @@ The CQL `lastModified >= "YYYY-MM-DD"` clause filters to pages updated on or aft
 ## Definition of Done
 
 - [ ] Code reviewed and merged to `main`
-- [ ] Chunker tests verify heading-boundary splits and hard-splits for headingless long sections
-- [ ] Sync tests mock `ConnectorSyncStore`, `ConfluenceCQLClient`, and Kafka producer
-- [ ] `mypy --strict` passes; no `ruff` lint errors
+- [x] Chunker tests verify heading-boundary splits and hard-splits for headingless long sections
+- [x] Sync tests mock `ConnectorSyncStore`, `ConfluenceCQLClient`, and Kafka producer
+- [x] `mypy --strict` passes; no `ruff` lint errors

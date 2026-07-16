@@ -21,7 +21,7 @@ class KnowledgeChunk(Base):
     content:      Mapped[str]         = mapped_column(Text, nullable=False)
     token_count:  Mapped[int | None]  = mapped_column(Integer, nullable=True)
     embedding_id: Mapped[str | None]  = mapped_column(String(128), nullable=True)
-    metadata:     Mapped[dict]        = mapped_column(JSONB, nullable=False, default=dict, server_default=text("'{}'::jsonb"))
+    chunk_metadata: Mapped[dict]        = mapped_column("metadata", JSONB, nullable=False, default=dict, server_default=text("'{}'::jsonb"))
     created_at:   Mapped[datetime]    = mapped_column(TIMESTAMP(timezone=True), nullable=False, server_default=text("now()"))
 
     source: Mapped[KnowledgeSource] = relationship("KnowledgeSource", back_populates="chunks")

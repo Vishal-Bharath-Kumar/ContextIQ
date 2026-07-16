@@ -1,0 +1,55 @@
+{{- if .Values.networkPolicy.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "contextiq-common.fullname" . }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "contextiq-common.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "contextiq-common.selectorLabels" . | nindent 6 }}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow traffic from ingress-nginx namespace only
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+      ports:
+        - port: {{ .Values.service.targetPort }}
+          protocol: TCP
+  egress:
+    # Allow egress to contextiq-agents namespace (agent workers)
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: contextiq-agents
+      ports:
+        - port: {{ .Values.networkPolicy.agentsPort }}
+          protocol: TCP
+    # Allow egress to contextiq-security namespace (Vault)
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: contextiq-security
+      ports:
+        - port: {{ .Values.networkPolicy.vaultPort }}
+          protocol: TCP
+    # Allow DNS resolution via kube-dns
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+        - podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+{{- end }}

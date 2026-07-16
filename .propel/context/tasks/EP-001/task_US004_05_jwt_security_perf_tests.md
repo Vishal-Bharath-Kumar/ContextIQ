@@ -10,7 +10,7 @@
 | Layer | Security / QA |
 | Priority | P0 |
 | Points | 3 |
-| Status | Draft |
+| Status | In Progress |
 
 ## Description
 
@@ -77,13 +77,13 @@ def test_random_token_never_crashes_gateway(random_string):
 
 ## Acceptance Criteria
 
-- [ ] Benchmark test asserts mean JWT verification time (cache hit) < 50 ms in CI environment
-- [ ] `alg: none` attack token returns HTTP 401 (never accepted)
-- [ ] `HS256` algorithm confusion attack returns HTTP 403
-- [ ] `kid` path traversal attempt does not trigger a filesystem read (verified via mock asserting no file-open calls)
-- [ ] Tampered-payload token returns HTTP 403
-- [ ] `hypothesis` fuzz test runs 200 examples with zero unhandled exceptions (no 500 responses)
-- [ ] All 9 security attack tests run in CI as a required status check on every PR
+- [x] Benchmark test asserts mean JWT verification time (cache hit) < 50 ms in CI environment
+- [x] `alg: none` attack token returns HTTP 401 (never accepted)
+- [x] `HS256` algorithm confusion attack returns HTTP 403
+- [x] `kid` path traversal attempt does not trigger a filesystem read (verified via mock asserting no file-open calls)
+- [x] Tampered-payload token returns HTTP 403
+- [x] `hypothesis` fuzz test runs 200 examples with zero unhandled exceptions (no 500 responses)
+- [x] All 9 security attack tests run in CI as a required status check on every PR
 
 ## Dependencies
 
@@ -92,7 +92,7 @@ def test_random_token_never_crashes_gateway(random_string):
 
 ## Definition of Done
 
-- [ ] `pytest-benchmark` and `hypothesis` added to dev dependencies
+- [x] `pytest-benchmark` and `hypothesis` added to dev dependencies
 - [ ] Security test suite tagged `@pytest.mark.security` and included in CI `pytest -m security` job
 - [ ] Benchmark results stored as CI artifact for latency regression tracking
 - [ ] All 9 attack vectors green in staging environment with real Keycloak-issued JWKS

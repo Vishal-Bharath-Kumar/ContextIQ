@@ -29,6 +29,7 @@ from src.knowledge_sources.routers.knowledge_source_router import router as know
 from src.model_registry.routers.model_router import router as model_router
 from src.model_router.routers.routing_weight_router import router as routing_weight_router
 from src.observability.metrics.router import metrics_router
+from src.registry.routers.tool_router import router as tool_registry_router
 
 # Module-level default client — used by the production `app` singleton.
 # Tests pass a pre-started client to `create_app()` instead of using this.
@@ -75,6 +76,7 @@ def create_app(jwks_client: JWKSClient | None = None) -> FastAPI:
     new_app.include_router(model_analytics_router)
     new_app.include_router(metrics_router)
     new_app.include_router(audit_log_router)
+    new_app.include_router(tool_registry_router)
 
     @new_app.get("/healthz")
     async def healthz() -> dict[str, str]:

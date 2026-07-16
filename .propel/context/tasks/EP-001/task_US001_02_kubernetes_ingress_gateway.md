@@ -10,7 +10,7 @@
 | Layer | Infrastructure |
 | Priority | P0 |
 | Points | 3 |
-| Status | Draft |
+| Status | In Progress |
 
 ## Description
 
@@ -56,7 +56,7 @@ Create the Kubernetes Helm chart resources for the `contextiq-gateway` service: 
 
 ## Acceptance Criteria
 
-- [ ] `helm lint` passes with no errors on the chart
+- [x] `helm lint` passes with no errors on the chart
 - [ ] `helm install --dry-run` succeeds in the target cluster
 - [ ] Deployment rolls out: `kubectl rollout status deployment/contextiq-gateway -n contextiq-gateway` succeeds
 - [ ] `GET https://<ingress-host>/mcp/sse` is reachable from outside the cluster
@@ -71,7 +71,7 @@ Create the Kubernetes Helm chart resources for the `contextiq-gateway` service: 
 
 ## Definition of Done
 
-- [ ] Helm chart merged to `infra/` in main repository
-- [ ] ArgoCD Application resource created for `contextiq-gateway`
+- [x] Helm chart merged to `infra/` in main repository
+- [x] ArgoCD Application resource created for `contextiq-gateway`
 - [ ] Deployment verified in staging environment
 - [ ] NetworkPolicy ingress/egress validated via `kubectl auth can-i` and network test pods

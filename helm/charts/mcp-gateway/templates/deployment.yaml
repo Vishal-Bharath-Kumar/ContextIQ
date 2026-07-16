@@ -38,6 +38,8 @@ spec:
             - containerPort: {{ .Values.service.targetPort }}
               name: http
           envFrom:
+            - configMapRef:
+                name: {{ include "contextiq-common.fullname" . }}-config
             - secretRef:
                 name: {{ include "contextiq-common.fullname" . }}-secrets
           env:

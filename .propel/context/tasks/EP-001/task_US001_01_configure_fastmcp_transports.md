@@ -10,7 +10,7 @@
 | Layer | Backend |
 | Priority | P0 |
 | Points | 3 |
-| Status | Draft |
+| Status | In Progress |
 
 ## Description
 
@@ -50,12 +50,12 @@ CONTEXTIQ_LOG_LEVEL=INFO
 
 ## Acceptance Criteria
 
-- [ ] FastMCP server starts without error when `uvicorn src.gateway.main:app` is run
-- [ ] `GET /healthz` returns HTTP 200 with `{"status": "ok"}`
-- [ ] SSE client can connect to `GET /mcp/sse` and receives a streaming response
-- [ ] WebSocket client can connect to `WS /mcp/ws` and completes handshake
-- [ ] Endpoint path is read from `CONTEXTIQ_MCP_PATH` env var at startup
-- [ ] Unit tests cover: server initialization, health endpoint, transport mount
+- [x] FastMCP server starts without error when `uvicorn src.gateway.main:app` is run
+- [x] `GET /healthz` returns HTTP 200 with `{"status": "ok"}`
+- [x] SSE client can connect to `GET /mcp/sse` and receives a streaming response
+- [x] WebSocket client can connect to `WS /mcp/ws` and completes handshake
+- [x] Endpoint path is read from `CONTEXTIQ_MCP_PATH` env var at startup
+- [x] Unit tests cover: server initialization, health endpoint, transport mount
 
 ## Dependencies
 

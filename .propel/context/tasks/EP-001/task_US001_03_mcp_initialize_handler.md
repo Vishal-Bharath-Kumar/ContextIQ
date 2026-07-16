@@ -10,7 +10,7 @@
 | Layer | Backend |
 | Priority | P0 |
 | Points | 2 |
-| Status | Draft |
+| Status | Done |
 
 ## Description
 
@@ -61,11 +61,11 @@ Register the MCP `initialize` message handler that responds to the protocol hand
 
 ## Acceptance Criteria
 
-- [ ] Sending an `initialize` message with a supported `protocolVersion` returns a valid `InitializeResult`
-- [ ] `serverInfo.name` is `"ContextIQ MCP Gateway"` and `serverInfo.version` matches `settings.version`
-- [ ] Sending an unsupported `protocolVersion` returns a structured MCP error (code `-32600`)
-- [ ] `clientInfo` with missing `name` or `version` fields returns MCP parse error (code `-32700`)
-- [ ] Unit tests cover: valid init, unsupported version, malformed request, missing clientInfo fields
+- [x] Sending an `initialize` message with a supported `protocolVersion` returns a valid `InitializeResult`
+- [x] `serverInfo.name` is `"ContextIQ MCP Gateway"` and `serverInfo.version` matches `settings.version`
+- [x] Sending an unsupported `protocolVersion` returns a structured MCP error (code `-32600`)
+- [x] `clientInfo` with missing `name` or `version` fields returns MCP parse error (code `-32700`)
+- [x] Unit tests cover: valid init, unsupported version, malformed request, missing clientInfo fields
 
 ## Dependencies
 
@@ -73,7 +73,7 @@ Register the MCP `initialize` message handler that responds to the protocol hand
 
 ## Definition of Done
 
-- [ ] Handler registered and responding in local dev environment
-- [ ] Unit test coverage ≥ 90% for `handlers/initialize.py`
-- [ ] `mypy --strict` passes on `handlers/` module
+- [x] Handler registered and responding in local dev environment
+- [x] Unit test coverage ≥ 90% for `handlers/initialize.py`
+- [x] `mypy --strict` passes on `handlers/` module
 - [ ] Integration test: Cursor AI dev extension can complete `initialize` handshake with local server

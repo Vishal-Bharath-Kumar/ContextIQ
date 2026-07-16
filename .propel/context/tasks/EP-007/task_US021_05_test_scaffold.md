@@ -10,7 +10,7 @@
 | Layer | Backend / SDK |
 | Priority | P0 |
 | Points | 1 |
-| Status | Draft |
+| Status | Done |
 
 ## Description
 
@@ -159,11 +159,11 @@ Required for `async def test_*` methods in `BaseConnectorTestCase` to be discove
 
 ## Acceptance Criteria
 
-- [ ] `TestEchoConnector` (referencing `EchoConnector`) passes all 6 contract tests
-- [ ] A connector that returns `None` from `fetch()` instead of `list[ConnectorResult]` fails `test_fetch_returns_list_of_connector_results`
-- [ ] `BaseConnectorTestCase` cannot be instantiated and run directly (abstract fixtures prevent it)
-- [ ] All 6 tests are `async def` and run under `pytest-asyncio` with `asyncio_mode="auto"`
-- [ ] `src/connector_sdk/testing/__init__.py` exports `BaseConnectorTestCase` and `ConnectorQuery`
+- [x] `TestEchoConnector` (referencing `EchoConnector`) passes all 6 contract tests
+- [x] A connector that returns `None` from `fetch()` instead of `list[ConnectorResult]` fails `test_fetch_returns_list_of_connector_results`
+- [x] `BaseConnectorTestCase` cannot be instantiated and run directly (abstract fixtures prevent it)
+- [x] All 6 tests are `async def` and run under `pytest-asyncio` with `asyncio_mode="auto"`
+- [x] `src/connector_sdk/testing/__init__.py` exports `BaseConnectorTestCase` and `ConnectorQuery`
 
 ## Dependencies
 
@@ -172,6 +172,6 @@ Required for `async def test_*` methods in `BaseConnectorTestCase` to be discove
 
 ## Definition of Done
 
-- [ ] Code reviewed and merged to `main`
-- [ ] `TestEchoConnector` runs in CI with no live I/O
-- [ ] `mypy --strict` passes on `base_test_case.py`; no `ruff` lint errors
+- [x] Code reviewed and merged to `main`
+- [x] `TestEchoConnector` runs in CI with no live I/O
+- [x] `mypy --strict` passes on `base_test_case.py`; no `ruff` lint errors

@@ -10,7 +10,7 @@
 | Layer | Docs / SDK |
 | Priority | P0 |
 | Points | 1 |
-| Status | Draft |
+| Status | Done |
 
 ## Description
 
@@ -107,11 +107,11 @@ The guide covers these sections (full prose to be written by the technical write
 
 ## Acceptance Criteria
 
-- [ ] `EchoConnector` passes all 4 methods of `BaseConnectorTestCase` (TASK-US021-05) without modification
-- [ ] `EchoConnector` is importable and instantiable with no dependencies beyond `contextiq-connector-sdk`
-- [ ] `examples/connectors/echo_connector/pyproject.toml` registers `EchoConnector` under `contextiq.connectors`
-- [ ] `docs/connector-sdk.md` covers all 10 sections listed above
-- [ ] The developer guide references `BaseConnectorTestCase` and shows a minimal test subclass example
+- [x] `EchoConnector` passes all 4 methods of `BaseConnectorTestCase` (TASK-US021-05) without modification
+- [x] `EchoConnector` is importable and instantiable with no dependencies beyond `contextiq-connector-sdk`
+- [x] `examples/connectors/echo_connector/pyproject.toml` registers `EchoConnector` under `contextiq.connectors`
+- [x] `docs/connector-sdk.md` covers all 10 sections listed above
+- [x] The developer guide references `BaseConnectorTestCase` and shows a minimal test subclass example
 
 ## Dependencies
 
@@ -120,7 +120,7 @@ The guide covers these sections (full prose to be written by the technical write
 
 ## Definition of Done
 
-- [ ] Code reviewed and merged to `main`
-- [ ] `EchoConnector` included in CI test run via `pytest examples/`
-- [ ] `docs/connector-sdk.md` reviewed by one engineer who has not previously read it (comprehension check)
-- [ ] `mypy --strict` passes on `echo_connector/connector.py`
+- [x] Code reviewed and merged to `main`
+- [x] `EchoConnector` included in CI test run via `pytest examples/`
+- [x] `docs/connector-sdk.md` reviewed by one engineer who has not previously read it (comprehension check)
+- [x] `mypy --strict` passes on `echo_connector/connector.py`

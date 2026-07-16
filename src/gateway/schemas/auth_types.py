@@ -10,9 +10,15 @@ RBAC helpers (has_role, has_permission) were added in TASK-US042-01.
 """
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from pydantic import BaseModel, ConfigDict, Field
 
-from src.auth.roles import Permission, PlatformRole, ROLE_PERMISSION_MATRIX
+# Deferred to break the circular import:
+#   auth_types → src.auth.roles → src.auth.__init__ → dependencies → auth_types
+# At runtime the imports are resolved lazily inside each method that needs them.
+if TYPE_CHECKING:
+    from src.auth.roles import Permission, PlatformRole, ROLE_PERMISSION_MATRIX
 
 
 class JWTClaims(BaseModel):
@@ -80,6 +86,7 @@ class JWTClaims(BaseModel):
         Normalises both the token roles and the target role to lowercase
         so that "ADMIN" and "admin" both match PlatformRole.ADMIN.
         """
+        from src.auth.roles import PlatformRole as _PlatformRole  # noqa: PLC0415
         normalised: frozenset[str] = frozenset(r.lower() for r in self.roles)
         return role.value.lower() in normalised
 
@@ -95,9 +102,25 @@ class JWTClaims(BaseModel):
         permission check without consulting the matrix.  For all other roles
         the matrix is the authoritative source.
         """
-        if self.has_role(PlatformRole.ADMIN):
+        from src.auth.roles import ROLE_PERMISSION_MATRIX as _MATRIX, PlatformRole as _PlatformRole  # noqa: PLC0415
+        if self.has_role(_PlatformRole.ADMIN):
             return True
-        allowed_roles: frozenset[PlatformRole] = ROLE_PERMISSION_MATRIX.get(
+        allowed_roles: frozenset[_PlatformRole] = _MATRIX.get(
             permission, frozenset()
         )
         return self.has_any_role(*allowed_roles)
+
+
+# ---------------------------------------------------------------------------
+# TASK-US004-01: Structured auth error response model
+# ---------------------------------------------------------------------------
+
+class AuthError(BaseModel):
+    """Structured authentication error body returned by JWTAuthMiddleware.
+
+    Conforms to the error shape documented in TASK-US004-01 so API clients
+    can branch on ``error`` without parsing the human-readable ``message``.
+    """
+
+    error: str
+    message: str | None = None

@@ -21,6 +21,6 @@ class ExecutionTraceIndex(Base):
     output_tokens: Mapped[int | None]       = mapped_column(Integer, nullable=True)
     latency_ms:    Mapped[int | None]       = mapped_column(Integer, nullable=True)
     error:         Mapped[str | None]       = mapped_column(Text, nullable=True)
-    metadata:      Mapped[dict]             = mapped_column(JSONB, nullable=False, default=dict, server_default=text("'{}'::jsonb"))
+    trace_metadata: Mapped[dict]             = mapped_column("metadata", JSONB, nullable=False, default=dict, server_default=text("'{}'::jsonb"))
     started_at:    Mapped[datetime]         = mapped_column(TIMESTAMP(timezone=True), nullable=False)
     finished_at:   Mapped[datetime | None]  = mapped_column(TIMESTAMP(timezone=True), nullable=True)
