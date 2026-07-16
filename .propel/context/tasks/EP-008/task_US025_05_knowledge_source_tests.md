@@ -10,7 +10,7 @@
 | Layer | Backend |
 | Priority | P0 |
 | Points | 1 |
-| Status | Draft |
+| Status | Done |
 
 ## Description
 
@@ -200,14 +200,14 @@ async def test_non_admin_returns_403():
 
 ## Acceptance Criteria
 
-- [ ] `test_create_knowledge_source_returns_201` passes
-- [ ] `test_response_contains_vault_path_not_token` passes (no token value in response body)
-- [ ] `test_list_returns_status_fields` passes
-- [ ] `test_toggle_inactive_does_not_delete` passes
-- [ ] `test_invalid_vault_path_returns_400` passes with descriptive `detail` message
-- [ ] `test_kafka_event_emitted_on_create` passes; topic is `knowledge.source.created`
-- [ ] `test_duplicate_source_returns_409` passes
-- [ ] `test_non_admin_returns_403` passes
+- [x] `test_create_knowledge_source_returns_201` passes
+- [x] `test_response_contains_vault_path_not_token` passes (no token value in response body)
+- [x] `test_list_returns_status_fields` passes
+- [x] `test_toggle_inactive_does_not_delete` passes
+- [x] `test_invalid_vault_path_returns_400` passes with descriptive `detail` message
+- [x] `test_kafka_event_emitted_on_create` passes; topic is `knowledge.source.created`
+- [x] `test_duplicate_source_returns_409` passes
+- [x] `test_non_admin_returns_403` passes
 
 ## Dependencies
 
@@ -218,6 +218,6 @@ async def test_non_admin_returns_403():
 
 ## Definition of Done
 
-- [ ] Code reviewed and merged to `main`
-- [ ] All 8 tests pass in CI with no live DB, Vault, or Kafka connections
-- [ ] `mypy --strict` passes; no `ruff` lint errors
+- [x] Code reviewed and merged to `main`
+- [x] All 8 tests pass in CI with no live DB, Vault, or Kafka connections
+- [x] `mypy --strict` passes; no `ruff` lint errors

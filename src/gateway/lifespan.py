@@ -69,3 +69,19 @@ async def start_cache_invalidation_subscriber(
 ) -> None:
     """Entry point launched as an asyncio task from the gateway lifespan."""
     await _subscribe_invalidation(redis, cache)
+
+
+async def start_indexing_consumer(consumer: Any) -> None:  # noqa: ANN401
+    """Entry point launched as an asyncio task from the gateway lifespan.
+
+    Calls ``consumer.start()`` then blocks inside ``consumer.run()`` until
+    the consumer is stopped or the task is cancelled.
+    """
+    try:
+        await consumer.start()
+        await consumer.run()
+    except asyncio.CancelledError:
+        logger.info("Indexing consumer task cancelled — shutting down")
+        raise
+    except Exception:
+        logger.exception("Indexing consumer task raised an unexpected error")

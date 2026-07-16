@@ -10,7 +10,7 @@
 | Layer | Backend |
 | Priority | P0 |
 | Points | 1 |
-| Status | Draft |
+| Status | Done |
 
 ## Description
 
@@ -215,11 +215,11 @@ def test_not_due_when_next_run_is_future():
 
 ## Acceptance Criteria
 
-- [ ] All 7 AC-level tests pass in CI
-- [ ] `test_retry_3_times_exponential_backoff` verifies exactly `[2.0, 4.0, 8.0]` sleep args
-- [ ] `test_kafka_event_NOT_emitted_on_failure` passes (no Kafka call on exhausted retries)
-- [ ] Prometheus delta assertion uses scoped `_value.get()` — not global registry reset
-- [ ] `_is_due()` unit tests run with no DB or external I/O
+- [x] All 7 AC-level tests pass in CI
+- [x] `test_retry_3_times_exponential_backoff` verifies exactly `[2.0, 4.0, 8.0]` sleep args
+- [x] `test_kafka_event_NOT_emitted_on_failure` passes (no Kafka call on exhausted retries)
+- [x] Prometheus delta assertion uses scoped `_value.get()` — not global registry reset
+- [x] `_is_due()` unit tests run with no DB or external I/O
 
 ## Dependencies
 
@@ -230,6 +230,6 @@ def test_not_due_when_next_run_is_future():
 
 ## Definition of Done
 
-- [ ] Code reviewed and merged to `main`
-- [ ] All tests use `AsyncMock`; no live DB, Kafka, or connectors in CI
-- [ ] `mypy --strict` passes; no `ruff` lint errors
+- [x] Code reviewed and merged to `main`
+- [x] All tests use `AsyncMock`; no live DB, Kafka, or connectors in CI
+- [x] `mypy --strict` passes; no `ruff` lint errors

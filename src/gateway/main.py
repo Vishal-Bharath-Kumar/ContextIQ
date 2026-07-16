@@ -25,7 +25,7 @@ import logging
 import os
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import anyio
 from anyio.streams.memory import MemoryObjectReceiveStream, MemoryObjectSendStream
@@ -35,16 +35,19 @@ from pydantic import TypeAdapter
 from src.connector_sdk.health_poller import ConnectorHealthPoller
 from src.connector_sdk.registry import ConnectorRegistry
 from src.gateway.config import settings
-from src.gateway.lifespan import start_cache_invalidation_subscriber
+from src.gateway.lifespan import start_cache_invalidation_subscriber, start_indexing_consumer
+from src.gateway.mcp_server import mcp, sse_app
 from src.gateway.middleware.circuit_breaker import CircuitBreakerMiddleware
 from src.gateway.middleware.context_middleware import RequestContextMiddleware
 from src.gateway.middleware.error_handler import ErrorHandlerMiddleware
 from src.gateway.middleware.jwt_auth import JWTAuthMiddleware
 from src.gateway.middleware.tracing import ConnectionTracingMiddleware
-from src.gateway.mcp_server import mcp, sse_app
 from src.gateway.state import circuit_state_gauge, gateway_breaker
 from src.gateway.telemetry import setup_telemetry
 from src.registry.cache.tool_cache import ToolListCache
+
+if TYPE_CHECKING:
+    from src.indexing.consumer import IndexingConsumer
 
 logger = logging.getLogger(__name__)
 
@@ -153,7 +156,39 @@ def create_gateway_app(jwks_client: Any = None) -> FastAPI:
             _health_poller = ConnectorHealthPoller(registry=_connector_registry)
             _health_poller.start()
             app.state.connector_health_poller = _health_poller
+
+            # Start indexing consumer (TASK-US027-04).
+            # Guarded by DATABASE_URL so the gateway can start in dev/test
+            # environments without all stores configured.
+            _consumer_task: asyncio.Task[Any] | None = None
+            _indexing_consumer = None
+            if os.environ.get("DATABASE_URL"):
+                try:
+                    _indexing_consumer = _build_indexing_consumer(_connector_registry)
+                    _consumer_task = asyncio.create_task(
+                        start_indexing_consumer(_indexing_consumer),
+                        name="indexing_consumer",
+                    )
+                    app.state.indexing_consumer = _indexing_consumer
+                    logger.info("Indexing consumer task started")
+                except Exception:
+                    logger.warning(
+                        "Could not start indexing consumer",
+                        exc_info=True,
+                    )
+
             yield
+
+            if _indexing_consumer is not None:
+                await _indexing_consumer.stop()
+            if _consumer_task is not None and not _consumer_task.done():
+                _consumer_task.cancel()
+                try:
+                    await _consumer_task
+                except asyncio.CancelledError:
+                    pass
+                logger.info("Indexing consumer task stopped")
+
             _health_poller.stop()
 
         if _invalidation_task is not None and not _invalidation_task.done():
@@ -285,6 +320,44 @@ def create_gateway_app(jwks_client: Any = None) -> FastAPI:
         return {"status": "ok", "transport": ["sse", "websocket"]}
 
     return gateway
+
+
+def _build_indexing_consumer(connector_registry: ConnectorRegistry) -> IndexingConsumer:
+    """Construct an ``IndexingConsumer`` with all required dependencies.
+
+    Dependencies that have their own ``*Settings`` classes are instantiated
+    using environment variables so no explicit configuration is needed here.
+    A fresh ``AsyncSession`` is created from the primary session factory
+    for the lifetime of the consumer background task.
+    """
+    from src.data.database import primary_session_factory  # noqa: PLC0415
+    from src.indexing.consumer import IndexingConsumer  # noqa: PLC0415
+    from src.indexing.embedding.service import EmbeddingService  # noqa: PLC0415
+    from src.indexing.pipeline import IndexingPipeline  # noqa: PLC0415
+    from src.indexing.repositories.chunk_repository import ChunkRepository  # noqa: PLC0415
+    from src.indexing.stores.deletion_handler import DeletionHandler  # noqa: PLC0415
+    from src.indexing.stores.opensearch_indexer import OpenSearchIndexer  # noqa: PLC0415
+    from src.indexing.stores.qdrant_indexer import QdrantIndexer  # noqa: PLC0415
+
+    session = primary_session_factory()()
+    chunk_repo = ChunkRepository(session)
+    qdrant = QdrantIndexer()
+    opensearch = OpenSearchIndexer()
+    embedder = EmbeddingService()
+
+    pipeline = IndexingPipeline(
+        embedder=embedder,
+        qdrant=qdrant,
+        opensearch=opensearch,
+        chunk_repo=chunk_repo,
+        registry=connector_registry,
+    )
+    deletion_handler = DeletionHandler(
+        chunk_repo=chunk_repo,
+        qdrant=qdrant,
+        opensearch=opensearch,
+    )
+    return IndexingConsumer(pipeline=pipeline, deletion_handler=deletion_handler)
 
 
 # Production ASGI singleton — consumed by uvicorn.
