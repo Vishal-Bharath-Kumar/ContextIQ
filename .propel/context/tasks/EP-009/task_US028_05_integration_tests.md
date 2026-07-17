@@ -10,7 +10,7 @@
 | Layer | Backend |
 | Priority | P0 |
 | Points | 1 |
-| Status | Draft |
+| Status | Done |
 
 ## Description
 
@@ -325,11 +325,11 @@ async def test_consumer_commits_offset_on_dlq(chunk_indexed_event):
 
 ## Acceptance Criteria
 
-- [ ] All 6 AC-level tests pass in CI without live Kafka, Neo4j, or LLM
-- [ ] `test_entity_id_mismatch_raises_validation_error` confirms `model_validator` enforcement
-- [ ] `test_extractor_raises_timeout_on_slow_llm` confirms `asyncio.TimeoutError` propagation
-- [ ] `test_consumer_sends_to_dlq_after_max_retries` confirms no further re-queue after exhaustion
-- [ ] `test_consumer_commits_offset_on_dlq` confirms at-least-once + no-infinite-loop guarantee
+- [x] All 6 AC-level tests pass in CI without live Kafka, Neo4j, or LLM
+- [x] `test_entity_id_mismatch_raises_validation_error` confirms `model_validator` enforcement
+- [x] `test_extractor_raises_timeout_on_slow_llm` confirms `asyncio.TimeoutError` propagation
+- [x] `test_consumer_sends_to_dlq_after_max_retries` confirms no further re-queue after exhaustion
+- [x] `test_consumer_commits_offset_on_dlq` confirms at-least-once + no-infinite-loop guarantee
 
 ## Dependencies
 
@@ -340,6 +340,6 @@ async def test_consumer_commits_offset_on_dlq(chunk_indexed_event):
 
 ## Definition of Done
 
-- [ ] Code reviewed and merged to `main`
-- [ ] All tests use `AsyncMock`; no live services in CI
-- [ ] `mypy --strict` passes; no `ruff` lint errors
+- [x] Code reviewed and merged to `main`
+- [x] All tests use `AsyncMock`; no live services in CI
+- [x] `mypy --strict` passes; no `ruff` lint errors

@@ -2,9 +2,11 @@ from __future__ import annotations
 
 from collections.abc import AsyncGenerator
 
+import redis.asyncio as aioredis
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.data.database import primary_session_factory, replica_session_factory
+from src.data.redis_client import create_redis_client
 
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
@@ -22,3 +24,8 @@ async def get_read_db() -> AsyncGenerator[AsyncSession, None]:
     """
     async with replica_session_factory()() as session:
         yield session
+
+
+def get_redis_client() -> aioredis.Redis:
+    """FastAPI dependency: returns the shared async Redis client (Sentinel HA)."""
+    return create_redis_client()

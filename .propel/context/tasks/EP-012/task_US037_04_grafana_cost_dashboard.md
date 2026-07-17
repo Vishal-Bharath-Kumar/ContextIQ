@@ -10,7 +10,7 @@
 | Layer | Infrastructure |
 | Priority | P0 |
 | Points | 1 |
-| Status | Draft |
+| Status | Done |
 
 ## Description
 
@@ -284,13 +284,13 @@ data:
 
 ## Acceptance Criteria
 
-- [ ] `kubectl apply -f k8s/monitoring/grafana/dashboard-ai-cost-efficiency.yaml` creates the ConfigMap
-- [ ] Grafana auto-discovers "AI Cost & Efficiency" dashboard within 60 s (AC-3)
-- [ ] Dashboard contains all four AC-3 chart types: daily cost by model (panel 1), cost per user/team (panel 2), compression savings % (panel 3), token budget utilisation (panel 4)
-- [ ] Four template variables exist: `$team`, `$model`, `$intent_type`, `$tenant_id` — matching AC-6 required filters (`date range` is the native Grafana time picker)
-- [ ] Panel 2 "Cost per Team" bar gauge groups by `team_id` label
-- [ ] Panel 3 "Compression Savings %" uses `contextiq_compression_savings_ratio_bucket` (from TASK-US037-02)
-- [ ] Panel 4 "Token Budget Utilisation" shows prompt and completion tokens split by `model_id`
+- [x] `kubectl apply -f k8s/monitoring/grafana/dashboard-ai-cost-efficiency.yaml` creates the ConfigMap
+- [x] Grafana auto-discovers "AI Cost & Efficiency" dashboard within 60 s (AC-3)
+- [x] Dashboard contains all four AC-3 chart types: daily cost by model (panel 1), cost per user/team (panel 2), compression savings % (panel 3), token budget utilisation (panel 4)
+- [x] Four template variables exist: `$team`, `$model`, `$intent_type`, `$tenant_id` — matching AC-6 required filters (`date range` is the native Grafana time picker)
+- [x] Panel 2 "Cost per Team" bar gauge groups by `team_id` label
+- [x] Panel 3 "Compression Savings %" uses `contextiq_compression_savings_ratio_bucket` (from TASK-US037-02)
+- [x] Panel 4 "Token Budget Utilisation" shows prompt and completion tokens split by `model_id`
 
 ## Dependencies
 
@@ -300,6 +300,6 @@ data:
 
 ## Definition of Done
 
-- [ ] Dashboard JSON validates via Grafana `/api/dashboards/import` (HTTP 200)
-- [ ] YAML lints with `kubectl apply --dry-run=client`
+- [x] Dashboard JSON validates via Grafana `/api/dashboards/import` (HTTP 200)
+- [x] YAML lints with `kubectl apply --dry-run=client`
 - [ ] Reviewed and merged to `main`

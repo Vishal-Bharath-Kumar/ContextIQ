@@ -113,6 +113,10 @@ async def execute(
         "final_response": None,
         "degraded_sources": None,
     }
+    if req.jwt_claims is not None:
+        initial_state["jwt_claims"] = req.jwt_claims
+    if req.tenant_id is not None:
+        initial_state["tenant_id"] = req.tenant_id
 
     config = {"configurable": {"thread_id": req.request_id}}
     t_start = time.monotonic()

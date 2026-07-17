@@ -42,6 +42,10 @@ from src.agents.nodes.retrieval import retrieval_node
 from src.agents.nodes.routing import routing_node
 from src.agents.routing import route_after_governance, route_after_intent
 from src.agents.state import AgentState
+from src.audit.trace.writer_node import trace_writer_node
+from src.governance.nodes.opa_filter_node import opa_filter_node
+from src.knowledge_graph.nodes.knowledge_graph_node import knowledge_graph_node
+from src.observability.cost.llm_metrics import llm_metrics_node
 
 
 def build_graph(
@@ -78,10 +82,14 @@ def build_graph(
     builder.add_node("intent_agent", _wrap(intent_node, "intent_agent"))
     builder.add_node("retrieval_agent", _wrap(retrieval_node, "retrieval_agent"))
     builder.add_node("governance_agent", _wrap(governance_node, "governance_agent"))
+    builder.add_node("opa_filter", _wrap(opa_filter_node, "opa_filter"))
     builder.add_node("compression_agent", _wrap(compression_node, "compression_agent"))
     builder.add_node("routing_agent", _wrap(routing_node, "routing_agent", is_final=True))
     builder.add_node("clarification_response", _wrap_terminal(clarification_node, "clarification_response"))
     builder.add_node("pipeline_failed", _wrap_terminal(failed_terminal_node, "pipeline_failed"))
+    builder.add_node("knowledge_graph", _wrap(knowledge_graph_node, "knowledge_graph"))
+    builder.add_node("llm_metrics", _wrap_terminal(llm_metrics_node, "llm_metrics"))
+    builder.add_node("trace_writer", _wrap_terminal(trace_writer_node, "trace_writer"))
 
     # ── Entry point ────────────────────────────────────────────────────
     builder.set_entry_point("intent_agent")
@@ -97,12 +105,14 @@ def build_graph(
         },
     )
 
-    # ── Retrieval → Governance (always) ───────────────────────────────
-    builder.add_edge("retrieval_agent", "governance_agent")
+    # ── Retrieval → Knowledge Graph → Governance → OPA filter ──────────
+    builder.add_edge("retrieval_agent", "knowledge_graph")
+    builder.add_edge("knowledge_graph", "governance_agent")
+    builder.add_edge("governance_agent", "opa_filter")
 
-    # ── Governance → conditional compression branch ────────────────────
+    # ── OPA filter → conditional compression branch ────────────────────
     builder.add_conditional_edges(
-        "governance_agent",
+        "opa_filter",
         route_after_governance,
         {
             "compress": "compression_agent",
@@ -115,7 +125,9 @@ def build_graph(
     builder.add_edge("compression_agent", "routing_agent")
 
     # ── Terminal edges ─────────────────────────────────────────────────
-    builder.add_edge("routing_agent", END)
+    builder.add_edge("routing_agent", "llm_metrics")
+    builder.add_edge("llm_metrics", "trace_writer")
+    builder.add_edge("trace_writer", END)
     builder.add_edge("clarification_response", END)
     builder.add_edge("pipeline_failed", END)
 

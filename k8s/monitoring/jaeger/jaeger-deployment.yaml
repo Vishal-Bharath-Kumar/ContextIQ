@@ -1,0 +1,55 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jaeger
+  namespace: monitoring
+  labels:
+    app: jaeger
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: jaeger
+  template:
+    metadata:
+      labels:
+        app: jaeger
+      annotations:
+        # Prometheus scraping is handled by Jaeger's own metrics endpoint;
+        # disable the generic pod scrape to avoid duplicate metrics.
+        prometheus.io/scrape: "false"
+    spec:
+      containers:
+        - name: jaeger
+          # AC-5, AC-6: all-in-one bundles collector + query + agent in one pod
+          image: jaegertracing/all-in-one:1.57
+          env:
+            - name: COLLECTOR_OTLP_ENABLED
+              value: "true"
+            # In-memory storage sufficient for Phase 1; replace with Elasticsearch for production
+            - name: SPAN_STORAGE_TYPE
+              value: memory
+            - name: MEMORY_MAX_TRACES
+              value: "50000"
+          ports:
+            - name: otlp-grpc
+              containerPort: 4317    # OTLP gRPC receiver (AC-5)
+            - name: otlp-http
+              containerPort: 4318    # OTLP HTTP receiver (optional fallback)
+            - name: query-http
+              containerPort: 16686   # Jaeger UI + query API (AC-6)
+            - name: collector-grpc
+              containerPort: 14250
+          resources:
+            requests:
+              cpu: 200m
+              memory: 512Mi
+            limits:
+              cpu: "1"
+              memory: 2Gi
+          readinessProbe:
+            httpGet:
+              path: "/"
+              port: 16686
+            initialDelaySeconds: 5
+            periodSeconds: 10

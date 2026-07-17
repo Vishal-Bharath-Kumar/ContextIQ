@@ -10,7 +10,7 @@
 | Layer | Backend / Data |
 | Priority | P0 |
 | Points | 1 |
-| Status | Draft |
+| Status | Done |
 
 ## Description
 
@@ -209,11 +209,11 @@ def downgrade() -> None:
 
 ## Acceptance Criteria
 
-- [ ] `PolicyCreate.rego_body` accepts multi-line Rego strings without truncation
-- [ ] `PolicyStatus` enum covers `draft`, `active`, `superseded`, `rolled_back`
-- [ ] `PolicyRecord.author` and `PolicyRecord.activated_at` are nullable-correct (author required, `activated_at` nullable until activation)
-- [ ] `uq_policy_group_version` unique constraint is present in both the ORM `__table_args__` and the Alembic migration
-- [ ] Migration `0014` revises `0013` (`create_chunk_index`)
+- [x] `PolicyCreate.rego_body` accepts multi-line Rego strings without truncation
+- [x] `PolicyStatus` enum covers `draft`, `active`, `superseded`, `rolled_back`
+- [x] `PolicyRecord.author` and `PolicyRecord.activated_at` are nullable-correct (author required, `activated_at` nullable until activation)
+- [x] `uq_policy_group_version` unique constraint is present in both the ORM `__table_args__` and the Alembic migration
+- [x] Migration `0025` revises `0024` (`create_chunk_index`) — adapted to actual project chain
 - [ ] `alembic upgrade head` succeeds; `alembic downgrade -1` drops the table cleanly
 
 ## Dependencies
@@ -223,4 +223,4 @@ def downgrade() -> None:
 ## Definition of Done
 
 - [ ] Code reviewed and merged to `main`
-- [ ] `mypy --strict` passes; no `ruff` lint errors
+- [x] `mypy --strict` passes on new files; no `ruff` lint errors

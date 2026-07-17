@@ -35,7 +35,7 @@ from pydantic import TypeAdapter
 from src.connector_sdk.health_poller import ConnectorHealthPoller
 from src.connector_sdk.registry import ConnectorRegistry
 from src.gateway.config import settings
-from src.gateway.lifespan import start_cache_invalidation_subscriber, start_indexing_consumer
+from src.gateway.lifespan import start_cache_invalidation_subscriber, start_entity_consumer, start_indexing_consumer
 from src.gateway.mcp_server import mcp, sse_app
 from src.gateway.middleware.circuit_breaker import CircuitBreakerMiddleware
 from src.gateway.middleware.context_middleware import RequestContextMiddleware
@@ -44,6 +44,8 @@ from src.gateway.middleware.jwt_auth import JWTAuthMiddleware
 from src.gateway.middleware.tracing import ConnectionTracingMiddleware
 from src.gateway.state import circuit_state_gauge, gateway_breaker
 from src.gateway.telemetry import setup_telemetry
+from src.governance.opa.bundle_loader import BundleNotReadyError, PolicyBundleLoader
+from src.governance.opa.client import OPAClient
 from src.registry.cache.tool_cache import ToolListCache
 
 if TYPE_CHECKING:
@@ -177,6 +179,48 @@ def create_gateway_app(jwks_client: Any = None) -> FastAPI:
                         exc_info=True,
                     )
 
+            # Initialise OPA client and verify bundle (TASK-US032-02).
+            # Guarded by OPA_BASE_URL so the gateway can start without an OPA
+            # sidecar in dev/test environments.
+            if os.environ.get("OPA_BASE_URL", "http://localhost:8181"):
+                _bundle_loader = PolicyBundleLoader()
+                try:
+                    app.state.bundle_info = await _bundle_loader.verify()
+                    app.state.opa_client = OPAClient()
+                    logger.info(
+                        "OPA client ready — bundle version=%s",
+                        app.state.bundle_info.version,
+                    )
+                except BundleNotReadyError:
+                    logger.critical("OPA bundle not ready — refusing to start")
+                    raise
+
+            # Start entity consumer (TASK-US028-04).
+            # Guarded by NEO4J_URI so the gateway can start without Neo4j
+            # configured in dev/test environments.
+            _entity_consumer_task: asyncio.Task[Any] | None = None
+            _entity_consumer = None
+            if os.environ.get("NEO4J_URI"):
+                try:
+                    from src.knowledge_graph.consumer import EntityConsumer  # noqa: PLC0415
+                    from src.knowledge_graph.extraction.extractor import EntityExtractor  # noqa: PLC0415
+
+                    _entity_consumer = EntityConsumer(
+                        extractor=EntityExtractor(),
+                        neo4j_store=app.state.neo4j_store,
+                    )
+                    _entity_consumer_task = asyncio.create_task(
+                        start_entity_consumer(_entity_consumer),
+                        name="entity_consumer",
+                    )
+                    app.state.entity_consumer = _entity_consumer
+                    logger.info("Entity consumer task started")
+                except Exception:
+                    logger.warning(
+                        "Could not start entity consumer",
+                        exc_info=True,
+                    )
+
             yield
 
             if _indexing_consumer is not None:
@@ -189,7 +233,21 @@ def create_gateway_app(jwks_client: Any = None) -> FastAPI:
                     pass
                 logger.info("Indexing consumer task stopped")
 
+            if _entity_consumer is not None:
+                await _entity_consumer.stop()
+            if _entity_consumer_task is not None and not _entity_consumer_task.done():
+                _entity_consumer_task.cancel()
+                try:
+                    await _entity_consumer_task
+                except asyncio.CancelledError:
+                    pass
+                logger.info("Entity consumer task stopped")
+
             _health_poller.stop()
+
+            if hasattr(app.state, "opa_client"):
+                await app.state.opa_client.close()
+                logger.info("OPA client closed")
 
         if _invalidation_task is not None and not _invalidation_task.done():
             _invalidation_task.cancel()

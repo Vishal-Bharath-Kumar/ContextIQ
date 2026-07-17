@@ -10,7 +10,7 @@
 | Layer | Backend |
 | Priority | P0 |
 | Points | 2 |
-| Status | Draft |
+| Status | Done |
 
 ## Description
 
@@ -188,13 +188,13 @@ The caller (`knowledge_graph_node`, TASK-US029-04) passes `token_budget = remain
 
 ## Acceptance Criteria
 
-- [ ] `traverse()` raises `asyncio.TimeoutError` when the Neo4j query exceeds `query_timeout_s`
-- [ ] Duplicate `entity_id` rows from Neo4j are deduplicated — each entity appears at most once in `GraphTraversalResult.items`
-- [ ] Results are sorted ascending by `hops` before budget truncation
-- [ ] `_apply_budget` with `token_budget=0` returns `([], True, 0)` without error
-- [ ] `GraphTraversalResult.truncated = True` when the budget is exhausted before all items are included
-- [ ] `lookup_entity_ids(["Auth Service"])` runs `toLower(n.name) IN ["auth service"]` (case-normalised)
-- [ ] `mypy --strict` passes
+- [x] `traverse()` raises `asyncio.TimeoutError` when the Neo4j query exceeds `query_timeout_s`
+- [x] Duplicate `entity_id` rows from Neo4j are deduplicated — each entity appears at most once in `GraphTraversalResult.items`
+- [x] Results are sorted ascending by `hops` before budget truncation
+- [x] `_apply_budget` with `token_budget=0` returns `([], True, 0)` without error
+- [x] `GraphTraversalResult.truncated = True` when the budget is exhausted before all items are included
+- [x] `lookup_entity_ids(["Auth Service"])` runs `toLower(n.name) IN ["auth service"]` (case-normalised)
+- [x] `mypy --strict` passes
 
 ## Dependencies
 
@@ -203,6 +203,6 @@ The caller (`knowledge_graph_node`, TASK-US029-04) passes `token_budget = remain
 
 ## Definition of Done
 
-- [ ] Code reviewed and merged to `main`
-- [ ] Tests mock `AsyncDriver` and `AsyncSession` via `AsyncMock`; no live Neo4j in CI
-- [ ] `mypy --strict` passes; no `ruff` lint errors
+- [x] Code reviewed and merged to `main`
+- [x] Tests mock `AsyncDriver` and `AsyncSession` via `AsyncMock`; no live Neo4j in CI
+- [x] `mypy --strict` passes; no `ruff` lint errors

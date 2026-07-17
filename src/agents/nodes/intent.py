@@ -26,6 +26,7 @@ from src.agents.planning.plan_generator import generate_execution_plan
 from src.agents.schemas.intent import IntentResult
 from src.agents.source_selector import select_sources
 from src.agents.state import AgentState, ExecutionStatus
+from src.observability.tracing.node_span import otel_node_span
 
 _tracer = trace.get_tracer("contextiq.intent_agent")
 
@@ -62,6 +63,7 @@ def _get_chain() -> object:
     return _chain
 
 
+@otel_node_span("intent.classify")
 async def intent_node(state: AgentState) -> dict:
     """LangGraph node that classifies the user prompt and updates AgentState.
 

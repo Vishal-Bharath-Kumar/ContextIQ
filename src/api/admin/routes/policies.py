@@ -1,87 +1,182 @@
-import uuid
-from typing import Annotated, Any
+from __future__ import annotations
 
-from fastapi import APIRouter, Depends
-from pydantic import BaseModel
+import logging
+import os
+import uuid
+from typing import Annotated
+
+import httpx
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.auth import require_manage_policies
-from src.gateway.schemas.auth_types import JWTClaims
-from src.audit.admin_audit_log.context import AuditContext, get_audit_context
-from src.audit.admin_audit_log.schemas import AdminActionType
+from src.api.admin.dependencies import require_admin_role
 from src.data.dependencies import get_db
-
-
-class CreatePolicyRequest(BaseModel):
-    name: str
-    rego: str
-
-router = APIRouter(
-    prefix="/v1/policies",
-    tags=["Admin — Policies"],
-    dependencies=[Depends(require_manage_policies)],
+from src.gateway.schemas.auth_types import JWTClaims
+from src.governance.policy.repository import PolicyNotFoundError, PolicyRepository
+from src.governance.policy.schemas import (
+    ActivateResponse,
+    PolicyCreate,
+    PolicyVersion,
+    RollbackResponse,
 )
+from src.governance.policy.service import (
+    PolicyAlreadyActiveError,
+    PolicyService,
+    PolicyVersionNotFoundError,
+)
+from src.governance.policy.validator import RegoValidationError, RegoValidator
 
-# Typed alias for route handlers that need the claims object (e.g. to record actor_user_id).
-AdminClaims = Annotated[JWTClaims, Depends(require_manage_policies)]
+logger = logging.getLogger(__name__)
+
+router = APIRouter(prefix="/v1/policies", tags=["Admin — Policies"])
+
+AdminClaims = Annotated[JWTClaims, Depends(require_admin_role)]
+
+_OPA_BASE_URL = os.environ.get("OPA_BASE_URL", "http://localhost:8181")
 
 
-@router.get("")
-async def list_policies() -> list[dict[str, Any]]:
-    return []
+def _build_service(session: AsyncSession) -> PolicyService:
+    """Construct a PolicyService scoped to the current request session."""
+    repo = PolicyRepository(session)
+    validator = RegoValidator(
+        client=httpx.AsyncClient(),
+        opa_base=_OPA_BASE_URL,
+    )
+    opa_client = httpx.AsyncClient()
+    return PolicyService(
+        repository=repo,
+        validator=validator,
+        opa_client=opa_client,
+        opa_base=_OPA_BASE_URL,
+    )
 
 
-@router.post("", status_code=201)
+# ------------------------------------------------------------------ #
+# POST /v1/policies — AC-1                                           #
+# ------------------------------------------------------------------ #
+
+
+@router.post(
+    "",
+    response_model=PolicyVersion,
+    status_code=status.HTTP_201_CREATED,
+    summary="Create a new governance policy version.",
+)
 async def create_policy(
-    body: CreatePolicyRequest,
-    audit: Annotated[AuditContext, Depends(get_audit_context)],
+    payload: PolicyCreate,
+    claims: AdminClaims,
     session: Annotated[AsyncSession, Depends(get_db)],
-) -> dict[str, Any]:
-    """AC-1: logs POLICY_CREATED with before_state=null, after_state=new policy fields."""
-    resource_id = str(uuid.uuid4())
-    await audit.log(
-        action=AdminActionType.POLICY_CREATED,
-        resource_type="policy",
-        resource_id=resource_id,
-        before_state=None,
-        after_state={"id": resource_id, "name": body.name, "rego": body.rego},
-    )
-    await session.commit()
-    return {"id": resource_id, "name": body.name}
+) -> PolicyVersion:
+    """
+    AC-1: Accept a Rego policy body with `name`, `description`, and `version`.
+    The `sub` claim is stored as `author` (AC-5).
+    """
+    svc = _build_service(session)
+    try:
+        result = await svc.create(payload, author=claims.sub)
+        await session.commit()
+        return result
+    except IntegrityError as exc:
+        await session.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Policy '{payload.name}' version '{payload.version}' already exists.",
+        ) from exc
 
 
-@router.patch("/{id}/activate")
+# ------------------------------------------------------------------ #
+# POST /v1/policies/{id}/activate — AC-3, AC-6                       #
+# ------------------------------------------------------------------ #
+
+
+@router.post(
+    "/{policy_id}/activate",
+    response_model=ActivateResponse,
+    summary="Activate a policy version and push it to OPA.",
+)
 async def activate_policy(
-    id: uuid.UUID,
-    audit: Annotated[AuditContext, Depends(get_audit_context)],
+    policy_id: uuid.UUID,
+    claims: AdminClaims,
     session: Annotated[AsyncSession, Depends(get_db)],
-) -> dict[str, Any]:
-    """AC-1: logs POLICY_ACTIVATED with before_state snapshot."""
-    # Placeholder: real implementation would fetch before-state and apply activation.
-    await audit.log(
-        action=AdminActionType.POLICY_ACTIVATED,
-        resource_type="policy",
-        resource_id=str(id),
-        before_state=None,   # replaced by real snapshot in full implementation
-        after_state=None,
-    )
-    await session.commit()
-    return {"id": str(id)}
+) -> ActivateResponse:
+    """
+    AC-3: Promotes the specified version to active and triggers OPA bundle refresh.
+    AC-6: Returns HTTP 422 with OPA parse error if the Rego is syntactically invalid.
+    """
+    svc = _build_service(session)
+    try:
+        result = await svc.activate(policy_id=policy_id)
+        await session.commit()
+        return result
+    except PolicyNotFoundError as exc:
+        await session.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Policy {policy_id} not found.",
+        ) from exc
+    except PolicyAlreadyActiveError as exc:
+        await session.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail=str(exc)
+        ) from exc
+    except RegoValidationError as exc:
+        await session.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={
+                "message": "Rego policy failed syntax validation.",
+                "errors": exc.errors,
+            },
+        ) from exc
 
 
-@router.post("/{id}/rollback")
+# ------------------------------------------------------------------ #
+# POST /v1/policies/{id}/rollback?version=N — AC-4                   #
+# ------------------------------------------------------------------ #
+
+
+@router.post(
+    "/{policy_id}/rollback",
+    response_model=RollbackResponse,
+    summary="Roll back to a prior policy version.",
+)
 async def rollback_policy(
-    id: uuid.UUID,
-    audit: Annotated[AuditContext, Depends(get_audit_context)],
+    policy_id: uuid.UUID,
+    claims: AdminClaims,
+    version: Annotated[str, Query(description="Target version string to restore.")],
     session: Annotated[AsyncSession, Depends(get_db)],
-) -> dict[str, Any]:
-    """AC-1: logs POLICY_ROLLED_BACK."""
-    await audit.log(
-        action=AdminActionType.POLICY_ROLLED_BACK,
-        resource_type="policy",
-        resource_id=str(id),
-        before_state=None,
-        after_state=None,
-    )
-    await session.commit()
-    return {"id": str(id)}
+) -> RollbackResponse:
+    """
+    AC-4: Restores `version` to active status within the policy group.
+    The policy group is resolved from the policy_id record.
+    """
+    svc = _build_service(session)
+    repo = PolicyRepository(session)
+    record = await repo.get_by_id(policy_id)
+    if record is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Policy {policy_id} not found.",
+        )
+    try:
+        result = await svc.rollback(
+            policy_group=record.policy_group,
+            target_version=version,
+        )
+        await session.commit()
+        return result
+    except PolicyVersionNotFoundError as exc:
+        await session.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+        ) from exc
+    except RegoValidationError as exc:
+        await session.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={
+                "message": "Rego policy for rollback target failed syntax validation.",
+                "errors": exc.errors,
+            },
+        ) from exc

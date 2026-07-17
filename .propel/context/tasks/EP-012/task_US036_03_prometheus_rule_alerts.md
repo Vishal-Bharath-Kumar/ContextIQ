@@ -10,7 +10,7 @@
 | Layer | Infrastructure |
 | Priority | P0 |
 | Points | 1 |
-| Status | Draft |
+| Status | Done |
 
 ## Description
 
@@ -196,12 +196,12 @@ Each stub follows the structure: **Impact → Diagnosis steps → Remediation �
 
 ## Acceptance Criteria
 
-- [ ] `kubectl apply --dry-run=client -f k8s/monitoring/alert-rules/contextiq-platform.yaml` succeeds without errors
-- [ ] `PrometheusRule` carries `labels.prometheus: contextiq` matching the `Prometheus` CR `ruleSelector` (TASK-US036-02)
-- [ ] `ContextIQHighErrorRate` fires when simulated error rate exceeds 0.05 (AC-6)
-- [ ] `ContextIQHighP95Latency` uses `histogram_quantile(0.95, ...)` over `contextiq_request_duration_seconds_bucket` (AC-6)
-- [ ] `ContextIQConnectorFailureRate` targets `endpoint=~"/v1/knowledge-sources.*"` (AC-6)
-- [ ] All three AC-6 alert rules include `for`, `severity`, `summary`, `description`, and `runbook_url`
+- [x] `kubectl apply --dry-run=client -f k8s/monitoring/alert-rules/contextiq-platform.yaml` succeeds without errors
+- [x] `PrometheusRule` carries `labels.prometheus: contextiq` matching the `Prometheus` CR `ruleSelector` (TASK-US036-02)
+- [x] `ContextIQHighErrorRate` fires when simulated error rate exceeds 0.05 (AC-6)
+- [x] `ContextIQHighP95Latency` uses `histogram_quantile(0.95, ...)` over `contextiq_request_duration_seconds_bucket` (AC-6)
+- [x] `ContextIQConnectorFailureRate` targets `endpoint=~"/v1/knowledge-sources.*"` (AC-6)
+- [x] All three AC-6 alert rules include `for`, `severity`, `summary`, `description`, and `runbook_url`
 
 ## Dependencies
 
@@ -210,6 +210,6 @@ Each stub follows the structure: **Impact → Diagnosis steps → Remediation �
 
 ## Definition of Done
 
-- [ ] YAML lints with `kubectl apply --dry-run=client`
-- [ ] PromQL expressions validated with `promtool check rules k8s/monitoring/alert-rules/contextiq-platform.yaml`
+- [x] YAML lints with `kubectl apply --dry-run=client`
+- [x] PromQL expressions validated with `promtool check rules k8s/monitoring/alert-rules/contextiq-platform.yaml`
 - [ ] Reviewed and merged to `main`

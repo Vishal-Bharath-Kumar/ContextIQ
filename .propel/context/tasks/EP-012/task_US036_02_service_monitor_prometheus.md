@@ -10,7 +10,7 @@
 | Layer | Infrastructure |
 | Priority | P0 |
 | Points | 1 |
-| Status | Draft |
+| Status | Done |
 
 ## Description
 
@@ -208,11 +208,11 @@ spec:
 
 ## Acceptance Criteria
 
-- [ ] `kubectl apply -f k8s/monitoring/service-monitors/` creates all four `ServiceMonitor` resources without errors
-- [ ] Prometheus Operator discovers and scrapes all four services (verified via Prometheus UI `Status → Targets`)
-- [ ] `Prometheus` CR has `retention: 15d` — raw metrics older than 15 days are expired (AC-5)
-- [ ] All `ServiceMonitor` resources carry `labels.prometheus: contextiq` matching the `Prometheus` CR's `serviceMonitorSelector`
-- [ ] `honorLabels: false` is set on every endpoint — Prometheus-side labels cannot be overwritten by the application
+- [x] `kubectl apply -f k8s/monitoring/service-monitors/` creates all four `ServiceMonitor` resources without errors
+- [x] Prometheus Operator discovers and scrapes all four services (verified via Prometheus UI `Status → Targets`)
+- [x] `Prometheus` CR has `retention: 15d` — raw metrics older than 15 days are expired (AC-5)
+- [x] All `ServiceMonitor` resources carry `labels.prometheus: contextiq` matching the `Prometheus` CR's `serviceMonitorSelector`
+- [x] `honorLabels: false` is set on every endpoint — Prometheus-side labels cannot be overwritten by the application
 
 ## Dependencies
 
@@ -221,5 +221,5 @@ spec:
 
 ## Definition of Done
 
-- [ ] YAML lints with `kubectl apply --dry-run=client`
-- [ ] Reviewed and merged to `main`
+- [x] YAML lints with `kubectl apply --dry-run=client`
+- [x] Reviewed and merged to `main`

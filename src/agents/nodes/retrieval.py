@@ -20,6 +20,7 @@ from src.agents.retrieval.parallel_dispatcher import ParallelConnectorDispatcher
 from src.agents.schemas.execution_plan import ExecutionPlan
 from src.agents.state import AgentState, ExecutionStatus
 from src.connector_sdk.registry import ConnectorRegistry
+from src.observability.tracing.node_span import otel_node_span
 
 _logger = logging.getLogger(__name__)
 
@@ -60,6 +61,7 @@ def get_connector_registry() -> ConnectorRegistry:
 # ---------------------------------------------------------------------------
 
 
+@otel_node_span("retrieval.hybrid_search")
 async def retrieval_node(state: AgentState) -> dict:
     """Dispatch connector fetches for all sources in ``execution_plan``.
 
@@ -75,6 +77,17 @@ async def retrieval_node(state: AgentState) -> dict:
     """
     plan: ExecutionPlan = state["execution_plan"]  # typed; KeyError if missing → pipeline_failed
     prompt: str = state["prompt"]
+
+    # TASK-US038-04: inject per-request OTel context into each connector instance
+    # so the @connector_span decorator can parent its child span to the root span.
+    registry = get_connector_registry()
+    otel_ctx = state.get("_otel_ctx")
+    request_id = str(state.get("request_id", ""))
+    for src in plan.sources:
+        connector = registry.get(src)
+        if connector is not None:
+            connector._otel_ctx = otel_ctx
+            connector._request_id = request_id
 
     dispatcher = ParallelConnectorDispatcher(
         connector_registry=get_connector_registry(),

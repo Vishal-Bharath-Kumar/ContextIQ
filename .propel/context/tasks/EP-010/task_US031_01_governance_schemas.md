@@ -10,7 +10,7 @@
 | Layer | Backend / Data |
 | Priority | P0 |
 | Points | 1 |
-| Status | Draft |
+| Status | Done |
 
 ## Description
 
@@ -141,13 +141,13 @@ class GovernanceScanResult(BaseModel):
 
 ## Acceptance Criteria
 
-- [ ] `DetectionFinding.requires_redaction` returns `True` for `CRITICAL` and `HIGH`, `False` for `MEDIUM`
-- [ ] `GovernanceScanResult.build()` sets `has_critical_or_high=True` when any finding is critical/high
-- [ ] `GovernanceScanResult.build()` sets `has_critical_or_high=False` when all findings are medium
-- [ ] All 11 `PatternType` values and 3 `Severity` values are present in their respective enums
-- [ ] `DetectionFinding` is frozen (`ConfigDict(frozen=True)`)
-- [ ] `match_preview` max length is 16 characters (enforced by Pydantic `max_length`)
-- [ ] `mypy --strict` passes
+- [x] `DetectionFinding.requires_redaction` returns `True` for `CRITICAL` and `HIGH`, `False` for `MEDIUM`
+- [x] `GovernanceScanResult.build()` sets `has_critical_or_high=True` when any finding is critical/high
+- [x] `GovernanceScanResult.build()` sets `has_critical_or_high=False` when all findings are medium
+- [x] All 11 `PatternType` values and 3 `Severity` values are present in their respective enums
+- [x] `DetectionFinding` is frozen (`ConfigDict(frozen=True)`)
+- [x] `match_preview` max length is 16 characters (enforced by Pydantic `max_length`)
+- [x] `mypy --strict` passes
 
 ## Dependencies
 
@@ -155,5 +155,5 @@ None — this is the foundational schema task.
 
 ## Definition of Done
 
-- [ ] Code reviewed and merged to `main`
-- [ ] `mypy --strict` passes; no `ruff` lint errors
+- [x] Code reviewed and merged to `main`
+- [x] `mypy --strict` passes; no `ruff` lint errors

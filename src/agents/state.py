@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 from enum import StrEnum
-from typing import TypedDict
+from typing import NotRequired, TypedDict
 
 from src.agents.schemas.execution_plan import ExecutionPlan
 from src.agents.schemas.intent import IntentType
+from src.governance.opa.schemas import PolicyDecision
+from src.governance.schemas.finding import DetectionFinding
+from src.knowledge_graph.traversal.schemas import GraphContextItem
 
 
 class DegradedSourceInfo(TypedDict):
@@ -58,11 +61,54 @@ class AgentState(TypedDict):
     tokens_before_compression: int | None
     tokens_after_compression: int | None
 
+    # ── Compression trace fields (TASK-US034-04) ───────────────────────
+    ranked_context_pre_compression: NotRequired[list[dict] | None]  # pre-compression snapshot
+    compression_tokens_before: NotRequired[int | None]              # aliased from tokens_before_compression
+    compression_tokens_after: NotRequired[int | None]               # aliased from tokens_after_compression
+
     # ── Governance output (EP-010) ─────────────────────────────────────
     governance_decisions: list[dict] | None  # allow/deny per chunk
     redacted_chunks: list[str] | None  # chunk IDs that were redacted
+    # New fields added by governance_node (TASK-US031-04):
+    governance_findings: NotRequired[list[DetectionFinding]]
+    context_redacted: NotRequired[bool]
+    governance_scan_ms: NotRequired[float]
+    governance_blocked: NotRequired[bool]  # True when fail-safe timeout blocked the scan
+
+    # ── OPA filter output (TASK-US032-04) ─────────────────────────────
+    jwt_claims: NotRequired[dict]  # decoded JWT claims; read by opa_filter_node
+    tenant_id: NotRequired[str]  # tenant identifier forwarded from JWT middleware
+    team_id: NotRequired[str | None]  # team extracted from JWT claims by gateway middleware
+    opa_decisions: NotRequired[list]  # PolicyDecision objects from opa_filter_node
+    opa_denied_count: NotRequired[int]  # number of chunks denied in the OPA pass
+    opa_bundle_version: NotRequired[str]  # OPA bundle version at evaluation time
+
+    # ── Audit trace (AC-7) ─────────────────────────────────────────────
+    execution_trace: NotRequired[list[dict]]  # append-only per-node audit entries
+
+    # ── Execution Replay trace (TASK-US034-04) ─────────────────────────
+    trace_id: NotRequired[str | None]          # str(UUID) set at pipeline entry
+    trace_object_key: NotRequired[str | None]  # populated by trace_writer_node after dispatch
+    trace_written: NotRequired[bool]           # True once _persist_trace task is enqueued
 
     # ── Model routing output (EP-006) ──────────────────────────────────
     selected_model: str | None
     model_routing_score: float | None
     final_response: dict | None
+
+    # ── Knowledge Graph expansion output (EP-009) ──────────────────────
+    graph_context_items: NotRequired[list[GraphContextItem]]
+    graph_traversal_skipped: NotRequired[bool]
+    graph_tokens_used: NotRequired[int]
+
+    # ── OPA authorization output (US-032) ──────────────────────────────
+    opa_decisions: NotRequired[list[PolicyDecision]]
+    opa_denied_count: NotRequired[int]
+    opa_bundle_version: NotRequired[str]
+
+    # ── LLM cost output (TASK-US037-03) ────────────────────────────────
+    llm_cost_usd: NotRequired[float | None]  # populated by llm_metrics_node
+
+    # ── OTel tracing (TASK-US038-02) ───────────────────────────────────
+    _otel_ctx: NotRequired[object | None]  # RootSpanContext — not serialised to JSON
+    otel_trace_id: NotRequired[str | None]  # 32-char hex trace ID = request_id without hyphens

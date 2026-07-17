@@ -12,15 +12,16 @@ JWKSClient backed by a respx mock without touching the module-level client.
 """
 from __future__ import annotations
 
+import logging
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
+from src.api.admin.routes.audit_log import router as audit_log_router
 from src.api.admin.routes.model_analytics import router as model_analytics_router
 from src.api.admin.routes.policies import router as policies_router
 from src.api.admin.routes.replay import router as replay_router
-from src.api.admin.routes.audit_log import router as audit_log_router
 from src.auth.jwks_client import JWKSClient
 from src.auth.keycloak_settings import KeycloakSettings
 from src.auth.middleware import JWTAuthMiddleware
@@ -28,8 +29,14 @@ from src.gateway.mcp_handler import mcp_router
 from src.knowledge_sources.routers.knowledge_source_router import router as knowledge_sources_router
 from src.model_registry.routers.model_router import router as model_router
 from src.model_router.routers.routing_weight_router import router as routing_weight_router
+from src.observability.cost.settings import LangfuseProjectSettings
+from src.observability.metrics.middleware import MetricsMiddleware
 from src.observability.metrics.router import metrics_router
+from src.observability.metrics.settings import MetricsSettings
+from src.observability.tracing.setup import setup_tracing, teardown_tracing
 from src.registry.routers.tool_router import router as tool_registry_router
+
+logger = logging.getLogger(__name__)
 
 # Module-level default client — used by the production `app` singleton.
 # Tests pass a pre-started client to `create_app()` instead of using this.
@@ -54,14 +61,25 @@ def create_app(jwks_client: JWKSClient | None = None) -> FastAPI:
 
     @asynccontextmanager
     async def _lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+        setup_tracing()  # AC-7: called once at startup
         if manage_lifecycle:
             await client.startup()
         app.state.jwks_client = client
+        _langfuse_settings = LangfuseProjectSettings()
+        logger.info(
+            "Langfuse cost recording enabled. "
+            "Ensure project data retention >= %d months (AC-5).",
+            _langfuse_settings.required_retention_months,
+        )
         yield
         if manage_lifecycle:
             await client.shutdown()
+        teardown_tracing()  # flush spans before shutdown
 
     new_app = FastAPI(title="ContextIQ", version="0.1.0", lifespan=_lifespan)
+
+    # Metrics middleware — mount BEFORE JWT so instrumentation wraps all request handling
+    new_app.add_middleware(MetricsMiddleware, settings=MetricsSettings())
 
     # JWT middleware — wraps all routes; pre-started client passed directly.
     new_app.add_middleware(JWTAuthMiddleware, jwks_client=client)

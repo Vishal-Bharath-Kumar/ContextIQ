@@ -10,7 +10,7 @@
 | Layer | Backend |
 | Priority | P0 |
 | Points | 1 |
-| Status | Draft |
+| Status | Done |
 
 ## Description
 
@@ -352,12 +352,12 @@ async def test_export_returns_404_for_unknown_id(async_client):
 
 ## Acceptance Criteria
 
-- [ ] All 5 AC-1 search filter tests pass (user_id, intent, date range, governance_blocked, model_selected)
-- [ ] AC-2 timeline tests confirm ordered steps with correct node names
-- [ ] AC-3 test confirms all 6 required fields are present and non-null in the detail response
-- [ ] AC-4 tests confirm 403 for `developer` role and 200 for `auditor` / `admin`
-- [ ] AC-5 cache-hit test confirms < 2 s response time without live MinIO
-- [ ] AC-6 export test confirms `Content-Disposition: attachment` header and valid JSON body
+- [x] All 5 AC-1 search filter tests pass (user_id, intent, date range, governance_blocked, model_selected)
+- [x] AC-2 timeline tests confirm ordered steps with correct node names
+- [x] AC-3 test confirms all 6 required fields are present and non-null in the detail response
+- [x] AC-4 tests confirm 403 for `developer` role and 200 for `auditor` / `admin`
+- [x] AC-5 cache-hit test confirms < 2 s response time without live MinIO
+- [x] AC-6 export test confirms `Content-Disposition: attachment` header and valid JSON body
 
 ## Dependencies
 
@@ -368,6 +368,6 @@ async def test_export_returns_404_for_unknown_id(async_client):
 
 ## Definition of Done
 
-- [ ] Code reviewed and merged to `main`
-- [ ] All tests mock MinIO via `moto[s3]` and Redis via `fakeredis.aioredis` — no live services in CI
-- [ ] `mypy --strict` passes; no `ruff` lint errors
+- [x] Code reviewed and merged to `main`
+- [x] All tests mock MinIO via `moto[s3]` and Redis via `fakeredis.aioredis` — no live services in CI
+- [x] `mypy --strict` passes; no `ruff` lint errors

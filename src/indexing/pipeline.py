@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 from datetime import UTC, datetime
+from typing import TYPE_CHECKING
 from uuid import UUID
 
 from src.connector_sdk.registry import ConnectorRegistry
@@ -16,6 +17,10 @@ from src.indexing.repositories.chunk_repository import ChunkRepository
 from src.indexing.schemas.chunk import ChunkMetadata, ChunkPayload
 from src.indexing.stores.opensearch_indexer import OpenSearchIndexer
 from src.indexing.stores.qdrant_indexer import QdrantIndexer
+from src.knowledge_graph.schemas.events import ChunkIndexedEvent
+
+if TYPE_CHECKING:
+    from aiokafka import AIOKafkaProducer
 
 
 class IndexingPipeline:
@@ -33,12 +38,14 @@ class IndexingPipeline:
         opensearch: OpenSearchIndexer,
         chunk_repo: ChunkRepository,
         registry: ConnectorRegistry,
+        producer: AIOKafkaProducer | None = None,
     ) -> None:
         self._embedder = embedder
         self._qdrant = qdrant
         self._opensearch = opensearch
         self._chunk_repo = chunk_repo
         self._registry = registry
+        self._producer = producer
 
     async def run_for_source(self, source_id: UUID, tenant_id: str) -> int:
         """Run the full indexing pipeline for one knowledge source.
@@ -85,4 +92,22 @@ class IndexingPipeline:
             for c in indexed_chunks
         ]
         await self._chunk_repo.upsert_batch(metadata)
+
+        if self._producer is not None:
+            for chunk in indexed_chunks:
+                event = ChunkIndexedEvent(
+                    chunk_id=chunk.payload.chunk_id,
+                    source_id=chunk.payload.source_id,
+                    tenant_id=chunk.payload.tenant_id,
+                    document_id=chunk.payload.document_id,
+                    text=chunk.payload.text,
+                    token_count=chunk.payload.token_count,
+                    embedding_model=chunk.model_id,
+                    indexed_at=now,
+                )
+                await self._producer.send_and_wait(
+                    "knowledge.chunk.indexed",
+                    value=event.model_dump_json().encode("utf-8"),
+                )
+
         return len(indexed_chunks)

@@ -16,14 +16,14 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import AsyncGenerator
-from datetime import date, datetime, timezone, timedelta
+from datetime import UTC, date, datetime, timedelta
 from types import SimpleNamespace
 from typing import Any
 
 import pytest
 import pytest_asyncio
-from sqlalchemy import insert
 from sqlalchemy.ext.asyncio import (
+    AsyncEngine,
     AsyncSession,
     async_sessionmaker,
     create_async_engine,
@@ -43,7 +43,6 @@ from src.data.dependencies import get_db, get_read_db
 from src.data.models.base import Base
 from src.main import app
 
-
 # ---------------------------------------------------------------------------
 # JWT middleware bypass (autouse — replaces real signature verification so
 # tests can inject claims via app.dependency_overrides without a signed JWT)
@@ -61,8 +60,8 @@ def bypass_jwt_middleware(monkeypatch: pytest.MonkeyPatch) -> None:
     from starlette.requests import Request
     from starlette.responses import Response
 
-    async def _passthrough(self: Any, request: Request, call_next: Any) -> Response:
-        return await call_next(request)
+    async def _passthrough(self: object, request: Request, call_next: object) -> Response:  # noqa: ANN401
+        return await call_next(request)  # type: ignore[operator]
 
     monkeypatch.setattr(JWTAuthMiddleware, "dispatch", _passthrough)
 
@@ -72,7 +71,7 @@ def bypass_jwt_middleware(monkeypatch: pytest.MonkeyPatch) -> None:
 # ---------------------------------------------------------------------------
 
 @pytest_asyncio.fixture
-async def async_engine():
+async def async_engine() -> AsyncGenerator[AsyncEngine, None]:
     """
     Per-test in-memory SQLite engine.
 
@@ -87,7 +86,7 @@ async def async_engine():
 
 
 @pytest_asyncio.fixture
-async def db_session(async_engine) -> AsyncGenerator[AsyncSession, None]:
+async def db_session(async_engine: AsyncEngine) -> AsyncGenerator[AsyncSession, None]:
     """
     Async SQLAlchemy session backed by the per-test in-memory SQLite engine.
 
@@ -129,7 +128,7 @@ def _make_audit_row(
     timestamp: datetime | None = None,
     prev_hash: str = GENESIS_PREV_HASH,
 ) -> AdminAuditLog:
-    ts = timestamp or datetime.now(timezone.utc)
+    ts = timestamp or datetime.now(UTC)
     fields = row_fields_for_hashing(
         action=action,
         resource_type=resource_type,
@@ -167,7 +166,7 @@ async def seed_mixed_audit_rows(db_session: AsyncSession) -> list[AdminAuditLog]
     """
     rows: list[AdminAuditLog] = []
     prev = GENESIS_PREV_HASH
-    base_ts = datetime(2026, 7, 9, 10, 0, 0, tzinfo=timezone.utc)
+    base_ts = datetime(2026, 7, 9, 10, 0, 0, tzinfo=UTC)
 
     for i, (action, user) in enumerate([
         ("policy.created",   "user-001"),
@@ -196,7 +195,7 @@ async def seed_60_audit_rows(db_session: AsyncSession) -> list[AdminAuditLog]:
     """Insert 60 rows so pagination cursor tests can verify page 1 ≠ page 2."""
     rows: list[AdminAuditLog] = []
     prev = GENESIS_PREV_HASH
-    base_ts = datetime(2026, 7, 9, 12, 0, 0, tzinfo=timezone.utc)
+    base_ts = datetime(2026, 7, 9, 12, 0, 0, tzinfo=UTC)
 
     for i in range(60):
         row = _make_audit_row(
@@ -223,7 +222,7 @@ async def seed_audit_rows_yesterday(db_session: AsyncSession) -> list[AdminAudit
     rows: list[AdminAuditLog] = []
     prev = GENESIS_PREV_HASH
     target_day = date(2026, 7, 9)
-    base_ts = datetime(target_day.year, target_day.month, target_day.day, 8, 0, 0, tzinfo=timezone.utc)
+    base_ts = datetime(target_day.year, target_day.month, target_day.day, 8, 0, 0, tzinfo=UTC)
 
     for i in range(3):
         row = _make_audit_row(

@@ -1,7 +1,5 @@
-"""Stub governance node — implemented in EP-010."""
+"""Governance node — re-exports the canonical implementation from governance package."""
 
-from src.agents.state import AgentState, ExecutionStatus
+from src.governance.nodes.governance_node import governance_node
 
-
-async def governance_node(state: AgentState) -> AgentState:
-    return {**state, "current_node": "governance_agent", "status": ExecutionStatus.RUNNING}
+__all__ = ["governance_node"]

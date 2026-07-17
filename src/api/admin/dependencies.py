@@ -36,3 +36,21 @@ def require_admin_role(
             detail="Admin role required.",
         )
     return claims
+
+
+def require_auditor_or_admin(
+    claims: Annotated[JWTClaims, Depends(decode_jwt_claims)],
+) -> JWTClaims:
+    """
+    AC-4 (TASK-US035-02): Raises HTTP 403 unless the JWT carries AUDITOR or ADMIN.
+
+    Uses JWTClaims.has_any_role() which normalises role values to lowercase,
+    so both 'AUDITOR' and 'auditor' (Keycloak realm role casing) are accepted.
+    Returns the claims dict for downstream use (e.g. tenant_id extraction).
+    """
+    if not claims.has_any_role(PlatformRole.AUDITOR, PlatformRole.ADMIN):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="AUDITOR or ADMIN role required to access execution traces.",
+        )
+    return claims

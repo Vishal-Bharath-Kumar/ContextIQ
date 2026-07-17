@@ -17,6 +17,7 @@ Subclassing contract
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from typing import Any
 
 from src.connector_sdk.schemas.health import HealthStatus
 from src.connector_sdk.schemas.query import ConnectorQuery
@@ -31,7 +32,37 @@ class BaseConnector(ABC):
     Subclasses must implement: ``authenticate``, ``fetch``, ``sync``, ``health_check``.
     All methods are async-first; synchronous connectors must wrap I/O in
     ``asyncio.to_thread()``.
+
+    OTel attributes (TASK-US038-04)
+    --------------------------------
+    ``connector_id``, ``source_id``, and ``connector_type`` identify the connector
+    in child spans created by the ``@connector_span`` decorator.
+    ``_otel_ctx`` and ``_request_id`` are injected per-request by ``retrieval_node``
+    before each ``fetch()`` call; both default to ``None`` / ``""`` so the decorator
+    is a no-op when running outside an OTel-instrumented request.
     """
+
+    # Connector identity — subclasses should set these as class attributes or in __init__
+    connector_id: str = ""
+    source_id: str = ""
+    connector_type: str = ""
+
+    # Per-request OTel context injected by retrieval_node before fetch() (AC-3)
+    _otel_ctx: Any = None
+    _request_id: str = ""
+
+    def __init_subclass__(cls, **kwargs: object) -> None:
+        """Auto-apply ``@connector_span`` to every subclass that defines ``fetch()``.
+
+        Called by Python at class-definition time.  Only wraps ``fetch()`` when
+        the subclass itself defines the method (``"fetch" in cls.__dict__``),
+        preventing double-wrapping in deeper inheritance chains.
+        """
+        super().__init_subclass__(**kwargs)
+        if "fetch" in cls.__dict__:
+            from src.observability.tracing.connector_span import connector_span  # noqa: PLC0415
+
+            cls.fetch = connector_span(cls.__dict__["fetch"])  # type: ignore[assignment]
 
     @abstractmethod
     async def authenticate(self) -> None:

@@ -43,6 +43,14 @@ class ExecuteRequest(BaseModel):
         default_factory=dict, description="Raw MCP tool arguments."
     )
     trace_id: str = Field(..., description="W3C traceparent trace ID propagated from the gateway.")
+    jwt_claims: dict[str, Any] | None = Field(
+        default=None,
+        description="Decoded JWT claims forwarded from the gateway for OPA policy evaluation.",
+    )
+    tenant_id: str | None = Field(
+        default=None,
+        description="Tenant identifier extracted from the JWT or host header.",
+    )
 
 
 class ExecuteResponse(BaseModel):

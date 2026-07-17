@@ -10,7 +10,7 @@
 | Layer | Backend |
 | Priority | P0 |
 | Points | 1 |
-| Status | Draft |
+| Status | Done |
 
 ## Description
 
@@ -199,12 +199,12 @@ With `poll_interval_s=30`, the maximum time between a bundle update in the OPA s
 
 ## Acceptance Criteria
 
-- [ ] `PolicyHotReloader.run()` polls every `poll_interval_s` — verified by asserting call count after `n × poll_interval_s`
-- [ ] When `active_revision` changes, `current_bundle.version` is updated
-- [ ] When `active_revision` is unchanged, `current_bundle` is not replaced (same object)
-- [ ] `on_reload` callback is invoked exactly once per detected revision change
-- [ ] Poll failure (HTTP error) is logged and the loop continues — no exception propagated to caller
-- [ ] `stop()` causes `run()` to exit after the current sleep period
+- [x] `PolicyHotReloader.run()` polls every `poll_interval_s` — verified by asserting call count after `n × poll_interval_s`
+- [x] When `active_revision` changes, `current_bundle.version` is updated
+- [x] When `active_revision` is unchanged, `current_bundle` is not replaced (same object)
+- [x] `on_reload` callback is invoked exactly once per detected revision change
+- [x] Poll failure (HTTP error) is logged and the loop continues — no exception propagated to caller
+- [x] `stop()` causes `run()` to exit after the current sleep period
 
 ## Dependencies
 
@@ -213,6 +213,6 @@ With `poll_interval_s=30`, the maximum time between a bundle update in the OPA s
 
 ## Definition of Done
 
-- [ ] Code reviewed and merged to `main`
-- [ ] Tests mock `httpx.AsyncClient` via `respx`; use `asyncio.sleep` patching to fast-forward poll cycles
-- [ ] `mypy --strict` passes; no `ruff` lint errors
+- [x] Code reviewed and merged to `main`
+- [x] Tests mock `httpx.AsyncClient` via `respx`; use `asyncio.sleep` patching to fast-forward poll cycles
+- [x] `mypy --strict` passes; no `ruff` lint errors
