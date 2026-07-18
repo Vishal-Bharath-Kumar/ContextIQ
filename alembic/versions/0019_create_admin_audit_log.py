@@ -1,14 +1,7 @@
 """create admin_audit_log with immutability trigger and SHA-256 hash chain
 
 Revision ID: 0019
-Revises:     None
-
-BUG FIX (spec): the spec set down_revision = "0018", referencing
-0018_create_model_audit_log which does not exist in this workspace.
-Setting down_revision = None makes 0019 the chain root; once 0018 is
-added it should be inserted between None and 0019 with its own
-down_revision updated accordingly.
-
+Revises:     0018
 Create Date: 2026-07-10
 """
 from __future__ import annotations
@@ -18,7 +11,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import JSONB
 
 revision      = "0019"
-down_revision = None   # see module docstring
+down_revision = "0018"
 branch_labels = None
 depends_on    = None
 
