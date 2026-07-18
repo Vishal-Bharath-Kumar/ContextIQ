@@ -1,0 +1,37 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`ConnectorStatusBadge > renders 'Active' badge with correct aria-label 1`] = `
+<span
+  aria-label="Connector status: Active"
+  class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium badge-green"
+>
+  Active
+</span>
+`;
+
+exports[`ConnectorStatusBadge > renders 'Error' badge with correct aria-label 1`] = `
+<span
+  aria-label="Connector status: Error"
+  class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium badge-red"
+>
+  Error
+</span>
+`;
+
+exports[`ConnectorStatusBadge > renders 'Inactive' badge with correct aria-label 1`] = `
+<span
+  aria-label="Connector status: Inactive"
+  class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium badge-grey"
+>
+  Inactive
+</span>
+`;
+
+exports[`ConnectorStatusBadge > renders 'Syncing' badge with correct aria-label 1`] = `
+<span
+  aria-label="Connector status: Syncing"
+  class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium badge-blue"
+>
+  Syncing
+</span>
+`;

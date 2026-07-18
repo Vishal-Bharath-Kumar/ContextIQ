@@ -1,0 +1,61 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: admin-portal
+  namespace: contextiq
+  labels:
+    app: admin-portal
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: admin-portal
+  template:
+    metadata:
+      labels:
+        app: admin-portal
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.25-alpine
+          ports:
+            - containerPort: 80
+          volumeMounts:
+            # Vite build artefacts — injected by CI as an initContainer or pre-built image
+            - name: spa-dist
+              mountPath: /usr/share/nginx/html
+            - name: nginx-config
+              mountPath: /etc/nginx/conf.d
+              readOnly: true
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 80
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          resources:
+            requests:
+              cpu:    50m
+              memory: 64Mi
+            limits:
+              cpu:    200m
+              memory: 128Mi
+          securityContext:
+            readOnlyRootFilesystem: true
+            runAsNonRoot:           true
+            runAsUser:              101   # nginx user in alpine image
+            allowPrivilegeEscalation: false
+      volumes:
+        - name: spa-dist
+          # In production CI, replace with an initContainer that copies from a
+          # build image or use a PVC seeded by the CI build job
+          emptyDir: {}
+        - name: nginx-config
+          configMap:
+            name: admin-portal-nginx-config
