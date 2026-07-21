@@ -22,6 +22,7 @@ import {
   LockClosedIcon,
   Share2Icon,
   TokensIcon,
+  WidthIcon,
 } from "@radix-ui/react-icons";
 
 import { useAuth } from "../context/AuthContext";
@@ -29,6 +30,7 @@ import { useConnectors } from "../services/connectorService";
 import { useCostAnalytics, useModels } from "../services/modelService";
 import { usePolicies } from "../services/policyService";
 import { useAuditLog } from "../services/auditLogService";
+import { useTools } from "../services/toolRegistryService";
 import { StatCard } from "../components/ui/StatCard";
 import { PageHeader } from "../components/ui/PageHeader";
 import { GlassCard } from "../components/ui/GlassCard";
@@ -62,13 +64,15 @@ export function DashboardPage() {
   const { data: policies, isLoading: policiesLoading } = usePolicies();
   const { data: costSummaries, isLoading: costLoading } = useCostAnalytics(30);
   const { data: auditPages } = useAuditLog({});
+  const { data: tools, isLoading: toolsLoading } = useTools();
 
-  const isLoading = connectorsLoading || modelsLoading || policiesLoading || costLoading;
+  const isLoading = connectorsLoading || modelsLoading || policiesLoading || costLoading || toolsLoading;
 
   const activeConnectors = connectors?.filter((c) => c.status === "active").length ?? 0;
   const totalDocuments = connectors?.reduce((sum, c) => sum + c.document_count, 0) ?? 0;
   const activeModels = models?.filter((m) => m.is_active).length ?? 0;
   const enforcedPolicies = policies?.filter((p) => p.active_version).length ?? 0;
+  const activeTools = tools?.filter((t) => t.status === "active").length ?? 0;
   const totalSpend = costSummaries?.reduce((sum, s) => sum + s.total_cost_usd, 0) ?? 0;
   const totalTokens = costSummaries?.reduce((sum, s) => sum + s.total_tokens, 0) ?? 0;
 
@@ -99,7 +103,7 @@ export function DashboardPage() {
     return Array.from(counts.entries()).map(([tier, count]) => ({ tier, count }));
   }, [models]);
 
-  const recentActivity = auditPages?.pages[0]?.items.slice(0, 6) ?? [];
+  const recentActivity = auditPages?.pages[0]?.items?.slice(0, 6) ?? [];
 
   return (
     <main aria-labelledby="dashboard-heading" className="page-layout">
@@ -118,7 +122,7 @@ export function DashboardPage() {
       {!isLoading && (
         <div className="space-y-6">
           {/* KPI row */}
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-7">
             <StatCard
               label="Active Connectors"
               value={activeConnectors}
@@ -151,20 +155,28 @@ export function DashboardPage() {
               delay={120}
             />
             <StatCard
+              label="Active Tools"
+              value={activeTools}
+              suffix={` / ${tools?.length ?? 0}`}
+              icon={<WidthIcon />}
+              accent="primary"
+              delay={160}
+            />
+            <StatCard
               label="30-Day LLM Spend"
               value={totalSpend}
               decimals={2}
               prefix="$"
               icon={<TokensIcon />}
               accent="danger"
-              delay={160}
+              delay={200}
             />
             <StatCard
               label="Tokens Processed"
               value={totalTokens}
               icon={<TokensIcon />}
               accent="info"
-              delay={200}
+              delay={240}
             />
           </div>
 

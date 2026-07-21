@@ -28,6 +28,19 @@ interface AuditLogPage {
   next_cursor: string | null;
 }
 
+const api = axios.create({
+  baseURL: import.meta.env.VITE_API_BASE_URL ?? "/api",
+});
+
+api.interceptors.request.use((cfg) => {
+  const raw = sessionStorage.getItem("admin_user");
+  if (raw) {
+    const { token } = JSON.parse(raw) as { token: string };
+    cfg.headers.Authorization = `Bearer ${token}`;
+  }
+  return cfg;
+});
+
 export const AUDIT_KEYS = {
   list: (filters: AuditLogFilters) => ["audit-log", filters] as const,
 };
@@ -44,7 +57,7 @@ export function useAuditLog(filters: AuditLogFilters) {
       if (filters.date_from)     params.set("date_from",     filters.date_from);
       if (filters.date_to)       params.set("date_to",       filters.date_to);
       if (pageParam)             params.set("cursor",        pageParam);
-      const { data } = await axios.get<AuditLogPage>(`/v1/audit-log?${params.toString()}`);
+      const { data } = await api.get<AuditLogPage>(`/v1/audit-log?${params.toString()}`);
       return data;
     },
     initialPageParam: undefined as string | undefined,

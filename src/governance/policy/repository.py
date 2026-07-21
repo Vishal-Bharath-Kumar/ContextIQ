@@ -136,6 +136,16 @@ class PolicyRepository:
         )
         return result.scalars().all()
 
+    async def list_all(self) -> Sequence[PolicyRecord]:
+        """Return every policy version across all policy groups, newest first.
+
+        Used to build the grouped list response for GET /v1/policies.
+        """
+        result = await self._session.execute(
+            select(PolicyRecord).order_by(PolicyRecord.created_at.desc())
+        )
+        return result.scalars().all()
+
     async def get_version(
         self, policy_group: str, version: str
     ) -> PolicyRecord | None:

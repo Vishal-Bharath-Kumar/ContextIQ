@@ -68,6 +68,37 @@ class PolicySummary(BaseModel):
     created_at: datetime
 
 
+class PolicyGroupSummary(BaseModel):
+    """Aggregated view of every version within one policy_group (AC-2).
+
+    ``id`` is the UUID of the most recently created version in the group —
+    the natural target for follow-up activate/rollback calls, which operate
+    on a specific version row.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    id: UUID
+    name: str  # == policy_group
+    active_version: str | None
+    versions: list[PolicyVersion]
+    latest_author: str
+    activated_at: datetime | None = None
+
+
+class RegoValidateRequest(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    rego_body: str = Field(min_length=1)
+
+
+class RegoValidateResponse(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    valid: bool
+    errors: list[str] = Field(default_factory=list)
+
+
 class ActivateResponse(BaseModel):
     model_config = ConfigDict(frozen=True)
 

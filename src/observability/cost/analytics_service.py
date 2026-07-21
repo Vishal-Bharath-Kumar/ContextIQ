@@ -35,6 +35,7 @@ class ModelCostAnalyticsService:
 
     def __init__(self, settings: LangfuseProjectSettings | None = None) -> None:
         cfg = settings or LangfuseProjectSettings()
+        self._configured = bool(cfg.public_key and cfg.secret_key)
         self._langfuse = Langfuse(
             public_key=cfg.public_key,
             secret_key=cfg.secret_key,
@@ -42,24 +43,46 @@ class ModelCostAnalyticsService:
         )
 
     async def get_model_cost_summary(self, days: int = 30) -> list[ModelCostSummary]:
+        # No project credentials configured (e.g. local dev without a Langfuse
+        # instance) — the SDK client stays uninitialized and `.api` raises
+        # AttributeError on access. Degrade to "no cost data yet" instead of 500ing.
+        if not self._configured:
+            logger.warning(
+                "Langfuse public_key/secret_key not configured — "
+                "returning empty cost analytics."
+            )
+            return []
+
         start_dt = datetime.now(UTC) - timedelta(days=days)
 
-        observations = self._langfuse.observations(
-            type="GENERATION",
-            from_start_time=start_dt,
-            limit=1000,
-        )
+        # Langfuse SDK v3+: the top-level client no longer exposes `.observations()`
+        # directly — observation queries go through the generated REST API client
+        # at `.api.observations.get_many(...)`, which returns an
+        # `ObservationsV2Response` (`.data: list[ObservationV2]`). Field names also
+        # changed: `model` -> `provided_model_name`, `calculated_total_cost` ->
+        # `total_cost`, and per-observation token usage -> `usage_details` (a
+        # dict with an aggregate "total" key alongside per-type breakdowns).
+        try:
+            response = self._langfuse.api.observations.get_many(
+                type="GENERATION",
+                from_start_time=start_dt,
+                limit=1000,
+            )
+        except Exception:
+            logger.exception("Failed to fetch observations from Langfuse; returning empty cost analytics.")
+            return []
 
         # Aggregate: {model_id: {date: {cost_usd, tokens}}}
         by_model: dict[str, dict[date, dict[str, float | int]]] = defaultdict(
             lambda: defaultdict(lambda: {"cost_usd": 0.0, "tokens": 0})
         )
 
-        for obs in observations.data:
-            model_id = obs.model or "unknown"
+        for obs in response.data:
+            model_id = obs.provided_model_name or "unknown"
             obs_date = (obs.start_time or datetime.now(UTC)).date()
-            cost_usd = obs.calculated_total_cost or 0.0
-            total_tokens = (obs.usage.total_tokens or 0) if obs.usage else 0
+            cost_usd = obs.total_cost or 0.0
+            usage_details = obs.usage_details or {}
+            total_tokens = usage_details.get("total", 0) or 0
 
             by_model[model_id][obs_date]["cost_usd"] = (
                 float(by_model[model_id][obs_date]["cost_usd"]) + cost_usd

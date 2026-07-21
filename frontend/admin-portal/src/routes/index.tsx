@@ -4,7 +4,6 @@ import { PlatformRole } from "../auth/roles";
 import { AdminLayout } from "../layouts/AdminLayout";
 import {
   RequireAuditor,
-  RequireManager,
   RequirePlatformEngineer,
   RequireRoles,
   RequireSecurityOfficer,
@@ -20,6 +19,8 @@ import { PolicyDetailPage } from "../pages/policies/PolicyDetailPage";
 import { PolicyListPage } from "../pages/policies/PolicyListPage";
 import { ReplayExplorerPage } from "../pages/traces/ReplayExplorerPage";
 import { TraceDetailPage } from "../pages/traces/TraceDetailPage";
+import { ToolFormPage } from "../pages/tools/ToolFormPage";
+import { ToolRegistryListPage } from "../pages/tools/ToolRegistryListPage";
 import { AuditLogPage } from "../pages/AuditLogPage";
 import { DashboardPage } from "../pages/DashboardPage";
 
@@ -117,6 +118,32 @@ export const ADMIN_ROUTES: RouteObject[] = [
         element: (
           <RequirePlatformEngineer>
             <RoutingWeightsPage />
+          </RequirePlatformEngineer>
+        ),
+      },
+
+      // Tool Registry — PLATFORM_ENGINEER or ADMIN
+      {
+        path: "tools",
+        element: (
+          <RequirePlatformEngineer>
+            <ToolRegistryListPage />
+          </RequirePlatformEngineer>
+        ),
+      },
+      {
+        path: "tools/add",
+        element: (
+          <RequirePlatformEngineer>
+            <ToolFormPage />
+          </RequirePlatformEngineer>
+        ),
+      },
+      {
+        path: "tools/:name/edit",
+        element: (
+          <RequirePlatformEngineer>
+            <ToolFormPage />
           </RequirePlatformEngineer>
         ),
       },

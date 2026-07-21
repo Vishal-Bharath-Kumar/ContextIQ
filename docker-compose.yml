@@ -192,7 +192,10 @@ services:
     ports:
       - "26379:26379"
     healthcheck:
-      test: ["CMD-SHELL", "redis-cli --tls --insecure -p 26379 ping | grep -q PONG || exit 1"]
+      # -a required now that sentinel.conf sets requirepass (needed so our
+      # Sentinel-aware Redis client's AUTH on the sentinel connection itself
+      # succeeds instead of failing with AuthenticationError/MasterNotFoundError).
+      test: ["CMD-SHELL", "redis-cli --tls --insecure -a contextiq_dev -p 26379 ping | grep -q PONG || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 10

@@ -44,7 +44,7 @@ const MOCK_ENTRIES = [
 ];
 
 const server = setupServer(
-  http.get("/v1/audit-log", () =>
+  http.get("/api/v1/audit-log", () =>
     HttpResponse.json({ items: MOCK_ENTRIES, next_cursor: null })
   )
 );

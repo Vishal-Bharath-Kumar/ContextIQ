@@ -91,7 +91,7 @@ function PolicyDetailPage() {
   const onSubmit = async (fields: PolicyFormFields) => {
     setSaveError(null);
     try {
-      await createPolicy({ ...fields, rego_body: regoBody });
+      await createPolicy({ ...fields, description: fields.description ?? "", rego_body: regoBody });
       navigate("/policies");
     } catch {
       setSaveError("Failed to save policy draft. Please try again.");
