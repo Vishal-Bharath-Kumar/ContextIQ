@@ -27,6 +27,13 @@ TOPICS: list[TopicSpec] = [
         consumer_groups=("indexing-service",),
     ),
     TopicSpec(
+        name="knowledge.document.deleted",
+        partitions=6,
+        replication_factor=3,
+        retention_ms=7 * 24 * 60 * 60 * 1000,     # 7 days
+        consumer_groups=("indexing-service",),
+    ),
+    TopicSpec(
         name="knowledge.chunk.indexed",
         partitions=12,
         replication_factor=3,

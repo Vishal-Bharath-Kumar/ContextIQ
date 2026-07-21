@@ -31,6 +31,7 @@ _SKIP_PATHS: frozenset[str] = frozenset({
     "/healthz",
     "/auth/health/ready",
     "/auth/health/live",
+    "/auth/dev-login",  # local-dev-only login route (src/auth/dev_login.py); 404s unless enabled
     "/docs",
     "/redoc",
     "/openapi.json",

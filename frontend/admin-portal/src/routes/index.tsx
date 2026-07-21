@@ -21,8 +21,15 @@ import { PolicyListPage } from "../pages/policies/PolicyListPage";
 import { ReplayExplorerPage } from "../pages/traces/ReplayExplorerPage";
 import { TraceDetailPage } from "../pages/traces/TraceDetailPage";
 import { AuditLogPage } from "../pages/AuditLogPage";
+import { DashboardPage } from "../pages/DashboardPage";
 
 export const ADMIN_ROUTES: RouteObject[] = [
+  // Public routes — must NOT sit under the guarded "/" parent below, otherwise
+  // an unauthenticated visit to any path (including /login itself) triggers
+  // an infinite redirect loop: guard -> Navigate to /login -> re-matches the
+  // same guarded parent -> guard -> Navigate to /login -> ... (blank screen).
+  { path: "/login", element: <LoginPage /> },
+  { path: "/403", element: <ForbiddenPage /> },
   {
     path: "/",
     element: (
@@ -42,6 +49,8 @@ export const ADMIN_ROUTES: RouteObject[] = [
       </RequireRoles>
     ),
     children: [
+      { index: true, element: <DashboardPage /> },
+
       // Connectors — PLATFORM_ENGINEER or ADMIN
       {
         path: "connectors",
@@ -137,9 +146,6 @@ export const ADMIN_ROUTES: RouteObject[] = [
         ),
       },
 
-      // Error pages — no role guard
-      { path: "403", element: <ForbiddenPage /> },
-      { path: "login", element: <LoginPage /> },
     ],
   },
 ];

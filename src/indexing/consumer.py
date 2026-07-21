@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 
 from aiokafka import AIOKafkaConsumer
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -16,6 +17,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from src.indexing.pipeline import IndexingPipeline
 from src.indexing.schemas.events import DocumentDeletedEvent, SourceSyncedEvent
 from src.indexing.stores.deletion_handler import DeletionHandler
+from src.kafka.consumer_base import _sasl_kwargs
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +34,10 @@ class IndexingConsumerSettings(BaseSettings):
         env_file=".env",
     )
 
-    kafka_bootstrap_servers: str = "localhost:9092"
+    # Falls back to the standard KAFKA_BOOTSTRAP_SERVERS env var (used by
+    # every other Kafka client in this codebase) when the
+    # INDEXING_CONSUMER_-prefixed override isn't set.
+    kafka_bootstrap_servers: str = os.environ.get("KAFKA_BOOTSTRAP_SERVERS", "localhost:9092")
     group_id: str = "contextiq-indexing"
     sync_topic: str = "knowledge.source.synced"
     deletion_topic: str = "knowledge.document.deleted"
@@ -93,6 +98,7 @@ class IndexingConsumer:
             value_deserializer=lambda v: json.loads(v.decode("utf-8")),
             enable_auto_commit=self._settings.enable_auto_commit,
             max_poll_records=self._settings.max_poll_records,
+            **_sasl_kwargs(),
         )
         await self._consumer.start()
         self._running = True

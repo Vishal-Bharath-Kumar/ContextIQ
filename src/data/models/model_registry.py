@@ -18,7 +18,12 @@ class ModelStatus(str, enum.Enum):
 
 
 class ModelRegistry(Base):
-    __tablename__ = "model_registry"
+    # NOTE: table renamed from "model_registry" to "model_registry_legacy" to
+    # avoid a name collision with the actively-used model_registry table
+    # from src/model_registry/models/model.py (EP-006 Dynamic Model Routing,
+    # migration 0010). This class is not imported by any active
+    # router/service/repository — see alembic/versions/0020_create_core_app_tables.py.
+    __tablename__ = "model_registry_legacy"
 
     id:                    Mapped[uuid.UUID]      = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()"))
     model_id:              Mapped[str]            = mapped_column(String(255), nullable=False, unique=True)

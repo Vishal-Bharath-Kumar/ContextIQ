@@ -42,6 +42,7 @@ from src.agents.checkpointer import get_redis_checkpointer
 from src.agents.events.state_event_publisher import StateEventPublisher
 from src.agents.graph import build_graph
 from src.agents.source_selector import FALLBACK_SOURCES, _validate_source_map
+from src.events.producer import _sasl_kwargs
 
 logger = logging.getLogger(__name__)
 
@@ -58,7 +59,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     bootstrap_servers = os.environ.get("KAFKA_BOOTSTRAP_SERVERS", "localhost:9092")
     logger.info("agent_worker: starting Kafka producer (bootstrap=%s)", bootstrap_servers)
-    producer = AIOKafkaProducer(bootstrap_servers=bootstrap_servers)
+    producer = AIOKafkaProducer(bootstrap_servers=bootstrap_servers, **_sasl_kwargs())
     await producer.start()
     app.state.kafka_producer = producer
     state_publisher = StateEventPublisher(producer)

@@ -47,7 +47,7 @@ export function IntentWeightCard({ entry }: Props) {
     save({ intentType: entry.intent_type, weights });
 
   return (
-    <div className="border rounded-lg p-4">
+    <div className="glass-card p-4">
       <div className="flex items-center justify-between mb-3">
         <h3 className="font-medium text-sm capitalize">
           {entry.intent_type.replace(/_/g, " ")}

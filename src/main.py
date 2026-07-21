@@ -22,6 +22,7 @@ from src.api.admin.routes.audit_log import router as audit_log_router
 from src.api.admin.routes.model_analytics import router as model_analytics_router
 from src.api.admin.routes.policies import router as policies_router
 from src.api.admin.routes.replay import router as replay_router
+from src.auth.dev_login import router as dev_login_router
 from src.auth.jwks_client import JWKSClient
 from src.auth.keycloak_settings import KeycloakSettings
 from src.auth.middleware import JWTAuthMiddleware
@@ -83,6 +84,11 @@ def create_app(jwks_client: JWKSClient | None = None) -> FastAPI:
 
     # JWT middleware — wraps all routes; pre-started client passed directly.
     new_app.add_middleware(JWTAuthMiddleware, jwks_client=client)
+
+    # Local-dev-only login route (returns 404 unless CONTEXTIQ_DEV_LOGIN_ENABLED=true).
+    # Registered before the protected routers; its own path is in JWTAuthMiddleware's
+    # _SKIP_PATHS since it's how a client obtains a token in the first place.
+    new_app.include_router(dev_login_router)
 
     # Protected routers — RBAC guards applied at router level (TASK-US042-03)
     new_app.include_router(mcp_router)

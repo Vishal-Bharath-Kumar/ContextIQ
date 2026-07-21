@@ -31,6 +31,12 @@ class KeycloakSettings(BaseSettings):
     audience:   str       = "contextiq-mcp-gateway"
     algorithms: list[str] = ["RS256"]
 
+    # Confidential client credentials — only required by the local-dev
+    # password-grant login route (src/auth/dev_login.py). Never set/used in
+    # production, which relies on the full browser-redirect OIDC flow instead.
+    client_id:     str = "contextiq-mcp-gateway"
+    client_secret: str = ""
+
     @property
     def jwks_uri(self) -> str:
         """Full URI for Keycloak's JWKS endpoint."""
@@ -40,3 +46,8 @@ class KeycloakSettings(BaseSettings):
     def issuer(self) -> str:
         """Expected `iss` claim value for tokens issued by this realm."""
         return f"{self.url}/realms/{self.realm}"
+
+    @property
+    def token_uri(self) -> str:
+        """Full URI for Keycloak's token endpoint (password/client_credentials grants)."""
+        return f"{self.url}/realms/{self.realm}/protocol/openid-connect/token"

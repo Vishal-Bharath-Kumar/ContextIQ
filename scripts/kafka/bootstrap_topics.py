@@ -63,11 +63,16 @@ def _make_admin() -> KafkaAdminClient:
     raise RuntimeError("unreachable")
 
 
-def _retention_config(spec: TopicSpec) -> dict[str, str]:
+def _retention_config(spec: TopicSpec, replication_cap: int = 3) -> dict[str, str]:
+    # min.insync.replicas must never exceed the replication factor actually
+    # in use, or acks=all produces would fail with NOT_ENOUGH_REPLICAS.
+    # Production runs 3 brokers (min.insync.replicas=2); a single-broker
+    # local/dev cluster falls back to 1.
+    min_isr = min(2, replication_cap)
     return {
         "retention.ms":        str(spec.retention_ms),
         "cleanup.policy":      spec.cleanup_policy,
-        "min.insync.replicas": "2",     # durability: 2-of-3 brokers must ack
+        "min.insync.replicas": str(min_isr),   # durability: N-1 of replication_cap brokers must ack
         "compression.type":    "lz4",   # compress all topics for bandwidth efficiency
     }
 
@@ -76,6 +81,15 @@ def main() -> int:
     _log("topic_bootstrap_start", topics=[t.name for t in TOPICS])
 
     admin = _make_admin()
+
+    # Cap replication factor to the number of brokers actually registered in
+    # the cluster. In production (3+ brokers) this is a no-op — min() returns
+    # the configured replication_factor unchanged. It allows the same topic
+    # registry to bootstrap correctly against a single-broker local/dev
+    # Kafka cluster, where a replication_factor of 3 would otherwise be
+    # unsatisfiable.
+    replication_cap = max(1, len(admin.describe_cluster()["brokers"]))
+    _log("broker_count", count=replication_cap)
 
     # Fetch existing topics
     existing_topics: set[str] = set(admin.list_topics())
@@ -87,9 +101,11 @@ def main() -> int:
         if spec.name in existing_topics:
             _log("topic_already_exists", topic=spec.name)
             # Validate partition count (cannot be reduced, only increased)
-            # kafka-python describe_topics() returns namedtuples — use .partitions attribute
+            # kafka-python describe_topics() returns a list of dicts — the
+            # partition list is under the "partitions" key, not a namedtuple
+            # attribute.
             meta = admin.describe_topics([spec.name])
-            actual_partitions: int = len(meta[0].partitions) if meta else spec.partitions
+            actual_partitions: int = len(meta[0]["partitions"]) if meta else spec.partitions
             if actual_partitions != spec.partitions:
                 _log(
                     "topic_partition_drift",
@@ -113,8 +129,8 @@ def main() -> int:
                 NewTopic(
                     name=spec.name,
                     num_partitions=spec.partitions,
-                    replication_factor=spec.replication_factor,
-                    topic_configs=_retention_config(spec),
+                    replication_factor=min(spec.replication_factor, replication_cap),
+                    topic_configs=_retention_config(spec, replication_cap),
                 )
             )
 
@@ -126,19 +142,32 @@ def main() -> int:
             _log("some_topics_already_exist_race_condition", level="WARNING")
 
     # Apply/update retention configs for all pre-existing topics (idempotent).
-    # alter_configs() requires {ConfigResource: {key: value}}, not {str: {key: value}}.
-    config_resources: dict[ConfigResource, dict[str, str]] = {
-        ConfigResource(ConfigResourceType.TOPIC, spec.name): _retention_config(spec)
+    # alter_configs() takes a list of ConfigResource objects that already
+    # carry their `configs` dict — not a {ConfigResource: dict} mapping.
+    config_resources: list[ConfigResource] = [
+        ConfigResource(
+            ConfigResourceType.TOPIC, spec.name,
+            configs=_retention_config(spec, replication_cap),
+        )
         for spec in TOPICS
         if spec.name in existing_topics
-    }
+    ]
     if config_resources:
         admin.alter_configs(config_resources)
         _log("retention_configs_applied", topic_count=len(config_resources))
 
-    # Final verification — all 6 topics must be present
-    final_topics: set[str] = set(admin.list_topics())
-    missing = [spec.name for spec in TOPICS if spec.name not in final_topics]
+    # Final verification — all 6 topics must be present.
+    # create_topics() can return before the new topics are visible in
+    # cluster metadata, so retry briefly instead of failing immediately.
+    missing: list[str] = []
+    for attempt in range(1, MAX_RETRIES + 1):
+        final_topics: set[str] = set(admin.list_topics())
+        missing = [spec.name for spec in TOPICS if spec.name not in final_topics]
+        if not missing:
+            break
+        _log("topic_verification_pending", attempt=attempt, missing_topics=missing)
+        time.sleep(RETRY_DELAY_S)
+
     if missing:
         _log("topic_bootstrap_failed", missing_topics=missing)
         admin.close()

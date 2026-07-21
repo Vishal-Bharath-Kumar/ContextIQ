@@ -39,9 +39,12 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.execute(
-        "CREATE TYPE latency_tier_enum AS ENUM ('fast', 'medium', 'slow')"
-    )
+    # NOTE: The latency_tier_enum type is created automatically by
+    # create_table() below (via the sa.Enum column definition) rather than
+    # via a manual op.execute("CREATE TYPE ...") — SQLAlchemy's create_type=False
+    # flag does not reliably suppress duplicate creation unless checkfirst=True
+    # is also passed, so a separate manual CREATE TYPE would double-create it
+    # within this same migration and fail.
     op.create_table(
         "model_registry",
         sa.Column(
@@ -63,7 +66,7 @@ def upgrade() -> None:
             "capabilities",
             JSONB(),
             nullable=False,
-            server_default="'[]'::jsonb",
+            server_default=sa.text("'[]'::jsonb"),
         ),
         sa.Column(
             "is_active",

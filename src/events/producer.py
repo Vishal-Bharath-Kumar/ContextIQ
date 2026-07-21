@@ -10,6 +10,7 @@ installed (it will be mocked before the function is called).
 from __future__ import annotations
 
 import os
+import ssl
 from typing import Any
 
 BOOTSTRAP_SERVERS: str = os.environ.get(
@@ -21,12 +22,14 @@ _producer: Any = None  # AIOKafkaProducer at runtime; Any to avoid import at mod
 
 
 def _sasl_kwargs() -> dict[str, Any]:
+    # aiokafka expects an ssl.SSLContext object (unlike kafka-python's sync
+    # clients, which accept a raw ssl_cafile path).
     return {
         "security_protocol": "SASL_SSL",
         "sasl_mechanism": "SCRAM-SHA-512",
         "sasl_plain_username": os.environ.get("KAFKA_USERNAME", ""),
         "sasl_plain_password": os.environ.get("KAFKA_PASSWORD", ""),
-        "ssl_cafile": "/tls/ca.crt",
+        "ssl_context": ssl.create_default_context(cafile="/tls/ca.crt"),
     }
 
 

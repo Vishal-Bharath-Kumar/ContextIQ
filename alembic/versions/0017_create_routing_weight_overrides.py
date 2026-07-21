@@ -1,7 +1,7 @@
 """create routing_weight_overrides
 
 Revision ID: 0017
-Revises:     0027
+Revises:     0010
 Create Date: 2026-07-18
 """
 from __future__ import annotations
@@ -11,7 +11,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision = "0017"
-down_revision = "0027"
+down_revision = "0010"
 branch_labels = None
 depends_on = None
 

@@ -15,27 +15,31 @@ down_revision = "0019"
 branch_labels = None
 depends_on = None
 
-# Enums defined once; reused across tables
+# Enums defined once; reused across tables.
+# create_type=False because upgrade() explicitly calls .create(bind,
+# checkfirst=True) on each before they're used as column types below —
+# leaving create_type=True would make create_table() attempt to create
+# them a second time within the same migration and fail.
 CONNECTOR_TYPE_ENUM = ENUM(
     "confluence", "jira", "github", "gitlab", "slack", "sharepoint",
     "notion", "web_crawler", "custom",
     name="connector_type_enum",
-    create_type=True,
+    create_type=False,
 )
 SYNC_STATUS_ENUM = ENUM(
     "pending", "running", "success", "failed", "cancelled",
     name="sync_status_enum",
-    create_type=True,
+    create_type=False,
 )
 POLICY_TYPE_ENUM = ENUM(
     "routing", "access_control", "cost_limit", "rate_limit",
     name="policy_type_enum",
-    create_type=True,
+    create_type=False,
 )
 MODEL_STATUS_ENUM = ENUM(
     "active", "deprecated", "retired",
     name="model_status_enum",
-    create_type=True,
+    create_type=False,
 )
 
 
@@ -122,10 +126,17 @@ def upgrade() -> None:
     op.create_index("ix_knowledge_chunk_embedding_id", "knowledge_chunk", ["embedding_id"])
 
     # -----------------------------------------------------------------------
-    # Table 4: model_registry
+    # Table 4: model_registry_legacy
+    #
+    # NOTE: Named "model_registry_legacy" (not "model_registry") to avoid a
+    # table-name collision with the actively-used model_registry table
+    # created by migration 0010 (src/model_registry/models/model.py,
+    # EP-006 Dynamic Model Routing). This table backs the unused ORM scaffold
+    # at src/data/models/model_registry.py, which is not imported by any
+    # active router/service/repository.
     # -----------------------------------------------------------------------
     op.create_table(
-        "model_registry",
+        "model_registry_legacy",
         sa.Column("id",                    UUID(as_uuid=True), primary_key=True,
                   server_default=sa.text("gen_random_uuid()")),
         sa.Column("model_id",              sa.String(255), nullable=False, unique=True,
@@ -144,8 +155,8 @@ def upgrade() -> None:
         sa.Column("updated_at",   sa.TIMESTAMP(timezone=True), nullable=False,
                   server_default=sa.text("now()")),
     )
-    op.create_index("ix_model_registry_provider", "model_registry", ["provider"])
-    op.create_index("ix_model_registry_status",   "model_registry", ["status"])
+    op.create_index("ix_model_registry_legacy_provider", "model_registry_legacy", ["provider"])
+    op.create_index("ix_model_registry_legacy_status",   "model_registry_legacy", ["status"])
 
     # -----------------------------------------------------------------------
     # Table 5: policy
@@ -261,7 +272,7 @@ def downgrade() -> None:
     op.drop_table("execution_trace_index")
     op.drop_table("audit_log")
     op.drop_table("policy")
-    op.drop_table("model_registry")
+    op.drop_table("model_registry_legacy")
     op.drop_table("knowledge_chunk")
     op.drop_table("knowledge_source")
     op.drop_table("connector_config")

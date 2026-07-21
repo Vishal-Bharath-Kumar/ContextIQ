@@ -1,0 +1,80 @@
+{
+  "realm": "contextiq",
+  "enabled": true,
+  "displayName": "ContextIQ",
+  "sslRequired": "none",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "resetPasswordAllowed": true,
+  "editUsernameAllowed": false,
+  "bruteForceProtected": false,
+  "accessTokenLifespan": 3600,
+  "ssoSessionIdleTimeout": 1800,
+  "ssoSessionMaxLifespan": 36000,
+  "roles": {
+    "realm": [
+      { "name": "admin",            "description": "Full administrative access" },
+      { "name": "developer",        "description": "Can call MCP context tools" },
+      { "name": "platform_engineer","description": "Manages connectors and models" },
+      { "name": "devops_sre",       "description": "Read metrics and traces" },
+      { "name": "security_officer", "description": "Manages policies" },
+      { "name": "manager",          "description": "Read cost analytics" },
+      { "name": "auditor",          "description": "Read execution traces" }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "contextiq-mcp-gateway",
+      "name": "ContextIQ MCP Gateway",
+      "enabled": true,
+      "publicClient": false,
+      "secret": "contextiq-dev-client-secret",
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": true,
+      "authorizationServicesEnabled": false,
+      "redirectUris": ["http://localhost:3000/*", "http://localhost:8080/*"],
+      "webOrigins": ["http://localhost:3000", "http://localhost:8080"],
+      "defaultClientScopes": ["openid", "profile", "email", "roles", "basic"],
+      "protocol": "openid-connect",
+      "attributes": {
+        "access.token.lifespan": "3600"
+      }
+    }
+  ],
+  "users": [
+    {
+      "username": "admin",
+      "email": "admin@contextiq.local",
+      "firstName": "Admin",
+      "lastName": "User",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "admin",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["admin", "developer", "platform_engineer"]
+    },
+    {
+      "username": "developer",
+      "email": "developer@contextiq.local",
+      "firstName": "Dev",
+      "lastName": "User",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "developer",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["developer"]
+    }
+  ]
+}

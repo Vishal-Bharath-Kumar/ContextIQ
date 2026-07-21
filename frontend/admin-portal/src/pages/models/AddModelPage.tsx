@@ -32,9 +32,7 @@ export function AddModelPage() {
       navigate("/models");
     } catch (err: unknown) {
       if (axios.isAxiosError(err) && err.response?.status === 409) {
-        setServerError(
-          `Model '${data.model_id}' is already registered.`
-        );
+        setServerError("A model with this ID is already registered.");
       } else {
         setServerError("An unexpected error occurred. Please try again.");
       }
@@ -151,7 +149,10 @@ export function AddModelPage() {
           <legend className="text-sm font-medium mb-2">Capabilities</legend>
           <div className="grid grid-cols-2 gap-2">
             {CAPABILITY_OPTIONS.map((cap) => (
-              <label key={cap} className="flex items-center gap-2 text-sm">
+              <label
+                key={cap}
+                className="flex items-center gap-2 rounded-lg border border-border bg-white/50 px-2.5 py-1.5 text-sm transition-colors hover:bg-white/80"
+              >
                 <input
                   type="checkbox"
                   value={cap}
@@ -177,6 +178,7 @@ export function AddModelPage() {
           {isPending ? "Registering…" : "Register Model"}
         </button>
       </form>
-    </div>
+      </GlassCard>
+    </main>
   );
 }

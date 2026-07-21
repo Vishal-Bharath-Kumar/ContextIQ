@@ -1,12 +1,20 @@
 """Create knowledge_sources table for EP-008 (Knowledge Source Management).
 
-Revision ID: 0021
-Revises:     0020
+Revision ID: 0021a
+Revises:     0022
 Create Date: 2026-07-16
 
 Creates the `knowledge_sources` table which stores connector registrations
 managed via the Admin API (US-025).  This is distinct from the existing
 `knowledge_source` table which tracks individual indexed documents.
+
+NOTE: Revision id renumbered from "0021" to "0021a" to resolve a duplicate
+revision-id collision with migration 0002_create_tool_registry.py (which
+also claims revision "0021"). This migration is placed after 0022
+(tool_connector_fk) instead of directly after 0020, since 0022's own chain
+position is already fixed by 0023_create_sync_jobs.py's down_revision, and
+sync_jobs.py has a hard FK dependency on knowledge_sources.id so this
+migration must still run before it.
 
 New PostgreSQL enum types introduced here:
   - ks_connector_type_enum  (github | confluence | jira | grafana)
@@ -22,22 +30,20 @@ from sqlalchemy.dialects import postgresql
 
 from alembic import op
 
-revision      = "0021"
-down_revision = "0020"
+revision      = "0021a"
+down_revision = "0022"
 branch_labels = None
 depends_on    = None
 
 
 def upgrade() -> None:
-    op.execute(
-        "CREATE TYPE ks_connector_type_enum AS ENUM "
-        "('github', 'confluence', 'jira', 'grafana')"
-    )
-    op.execute(
-        "CREATE TYPE source_status_enum AS ENUM "
-        "('active', 'inactive', 'syncing', 'error')"
-    )
-
+    # NOTE: ks_connector_type_enum and source_status_enum are created
+    # automatically by create_table() below (via the sa.Enum column
+    # definitions) rather than via manual op.execute("CREATE TYPE ...")
+    # calls — SQLAlchemy's create_type=False flag does not reliably suppress
+    # duplicate creation unless checkfirst=True is also passed, so separate
+    # manual CREATE TYPE statements would double-create them within this
+    # same migration and fail.
     op.create_table(
         "knowledge_sources",
         sa.Column(
@@ -48,7 +54,7 @@ def upgrade() -> None:
         ),
         sa.Column(
             "connector_type",
-            sa.Enum(name="ks_connector_type_enum"),
+            sa.Enum("github", "confluence", "jira", "grafana", name="ks_connector_type_enum"),
             nullable=False,
         ),
         sa.Column("credentials_vault_path", sa.String(512), nullable=False),
@@ -67,7 +73,7 @@ def upgrade() -> None:
         ),
         sa.Column(
             "status",
-            sa.Enum(name="source_status_enum"),
+            sa.Enum("active", "inactive", "syncing", "error", name="source_status_enum"),
             nullable=False,
             server_default="active",
         ),
