@@ -33,7 +33,7 @@ class GitHubConnectorConfig(BaseSettings):
         description="Commit history look-back window in days (AC-4).",
     )
     base_url: str = "https://api.github.com"
-    vault_path: str = "secret/data/github/token"
+    vault_path: str = "connectors/github/token"
     vault_role_id: str = ""
     vault_secret_id: str = Field(
         default="",

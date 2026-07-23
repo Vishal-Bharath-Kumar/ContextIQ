@@ -16,12 +16,12 @@ WORKDIR /app
 
 COPY pyproject.toml uv.lock ./
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --frozen --no-dev --no-install-project
+    uv sync --frozen --no-dev --no-install-project --all-extras
 
 COPY src/ ./src/
 
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --frozen --no-dev
+    uv sync --frozen --no-dev --all-extras
 
 # ---- Stage 2: runtime image ---------------------------------------------
 FROM python:${PYTHON_VERSION}-slim-bookworm AS runtime
@@ -30,7 +30,9 @@ ARG GIT_SHA=unknown
 ARG GIT_REF=unknown
 
 RUN groupadd --gid 10001 appgroup && \
-    useradd --uid 10001 --gid appgroup --no-create-home appuser
+    useradd --uid 10001 --gid appgroup --create-home --home-dir /home/appuser appuser && \
+    mkdir -p /home/appuser/.cache/huggingface /home/appuser/.cache/fastembed && \
+    chown -R appuser:appgroup /home/appuser
 
 WORKDIR /app
 
@@ -40,6 +42,10 @@ COPY --from=builder --chown=appuser:appgroup /app/src   /app/src
 ENV PATH="/app/.venv/bin:$PATH" \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
+    HOME=/home/appuser \
+    XDG_CACHE_HOME=/home/appuser/.cache \
+    HF_HOME=/home/appuser/.cache/huggingface \
+    FASTEMBED_CACHE_PATH=/home/appuser/.cache/fastembed \
     GIT_SHA=${GIT_SHA} \
     GIT_REF=${GIT_REF}
 

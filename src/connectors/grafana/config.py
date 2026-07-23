@@ -31,7 +31,7 @@ class GrafanaConnectorConfig(BaseSettings):
     dashboard_uids: list[str] = Field(default_factory=list)  # scope annotations to specific dashboards
     lookback_hours: int = 24  # annotation/alert history window
     max_results: int = 100
-    vault_path: str = "secret/data/grafana/token"
+    vault_path: str = "connectors/grafana/token"
     vault_role_id: str = ""
     vault_secret_id: str = Field(
         default="",

@@ -40,6 +40,7 @@ class KnowledgeSourceRecord(Base):
     id: Mapped[UUID] = mapped_column(
         PgUUID(as_uuid=True), primary_key=True, default=uuid4
     )
+    name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     connector_type: Mapped[str] = mapped_column(
         _KS_CONNECTOR_TYPE, nullable=False
     )

@@ -54,3 +54,13 @@ async def get_kafka_producer() -> Any:
         )
         await _producer.start()
     return _producer
+
+
+async def close_kafka_producer() -> None:
+    """Stop and clear the singleton producer if it was started."""
+    global _producer  # noqa: PLW0603
+    if _producer is None:
+        return
+
+    await _producer.stop()
+    _producer = None

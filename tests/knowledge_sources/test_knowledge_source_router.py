@@ -15,6 +15,7 @@ Acceptance criteria covered:
 from __future__ import annotations
 
 import datetime as dt
+from collections.abc import Iterator
 from unittest.mock import AsyncMock
 from uuid import uuid4
 
@@ -25,7 +26,10 @@ from httpx import ASGITransport, AsyncClient
 from src.auth.dependencies import decode_jwt_claims
 from src.auth.roles import PlatformRole
 from src.auth.testing import make_test_claims
+from src.data.dependencies import get_db
 from src.knowledge_sources.dependencies import get_knowledge_source_service
+from src.knowledge_sources.repositories.audit_repository import AuditRepository
+from src.knowledge_sources.routers.knowledge_source_router import get_audit_repo
 from src.knowledge_sources.schemas.knowledge_source import (
     ConnectorType,
     KnowledgeSourceResponse,
@@ -46,6 +50,7 @@ _SOURCE_ID = uuid4()
 
 _SAMPLE_RESPONSE = KnowledgeSourceResponse(
     id=_SOURCE_ID,
+    name="Acme GitHub",
     connector_type=ConnectorType.GITHUB,
     credentials_vault_path="secret/contextiq/github/acme",
     scope="acme-org/api-service",
@@ -60,6 +65,7 @@ _SAMPLE_RESPONSE = KnowledgeSourceResponse(
 )
 
 _VALID_PAYLOAD = {
+    "name": "Acme GitHub",
     "connector_type": "github",
     "credentials_vault_path": "secret/contextiq/github/acme",
     "scope": "acme-org/api-service",
@@ -77,6 +83,25 @@ def _mock_service(**kwargs: object) -> AsyncMock:
         else:
             getattr(svc, method).return_value = value
     return svc
+
+
+async def _mock_db_session() -> AsyncMock:  # type: ignore[misc]
+    """Yield a mock AsyncSession so routes with Depends(get_db) skip the real DB."""
+    session = AsyncMock()
+    session.commit = AsyncMock()
+    yield session
+
+
+@pytest.fixture(autouse=True)
+def _override_db_and_audit() -> Iterator[None]:
+    """Override get_db/get_audit_repo for every test in this module (TASK-US039-04
+    added audit logging to the create/toggle routes; this file predates that change
+    and only mocks KnowledgeSourceService)."""
+    app.dependency_overrides[get_db] = _mock_db_session
+    app.dependency_overrides[get_audit_repo] = lambda: AsyncMock(spec=AuditRepository)
+    yield
+    app.dependency_overrides.pop(get_db, None)
+    app.dependency_overrides.pop(get_audit_repo, None)
 
 
 # ---------------------------------------------------------------------------
@@ -259,13 +284,14 @@ async def test_toggle_status_unknown_id_returns_404() -> None:
         ("POST", "/v1/knowledge-sources", _VALID_PAYLOAD),
         ("GET", "/v1/knowledge-sources", None),
         ("PATCH", f"/v1/knowledge-sources/{_SOURCE_ID}/status", {"active": False}),
+        ("DELETE", f"/v1/knowledge-sources/{_SOURCE_ID}", None),
     ],
 )
 @pytest.mark.asyncio
 async def test_non_admin_returns_403(
     method: str, path: str, body: dict | None
 ) -> None:
-    """AC-7: Non-admin requests to all three endpoints return HTTP 403."""
+    """AC-7: Non-admin requests to all endpoints return HTTP 403."""
     app.dependency_overrides[decode_jwt_claims] = lambda: _DEVELOPER_CLAIMS
     try:
         async with AsyncClient(
@@ -275,8 +301,54 @@ async def test_non_admin_returns_403(
                 response = await client.post(path, json=body)
             elif method == "GET":
                 response = await client.get(path)
-            else:
+            elif method == "PATCH":
                 response = await client.patch(path, json=body)
+            else:
+                response = await client.delete(path)
         assert response.status_code == 403
     finally:
         app.dependency_overrides.pop(decode_jwt_claims, None)
+
+
+# ---------------------------------------------------------------------------
+# DELETE /{source_id} — permanently delete a knowledge source
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_delete_knowledge_source_returns_204() -> None:
+    svc = _mock_service(delete=None)
+    app.dependency_overrides[decode_jwt_claims] = lambda: _ADMIN_CLAIMS
+    app.dependency_overrides[get_knowledge_source_service] = lambda: svc
+    try:
+        async with AsyncClient(
+            transport=ASGITransport(app), base_url="http://test"
+        ) as client:
+            response = await client.delete(f"/v1/knowledge-sources/{_SOURCE_ID}")
+        assert response.status_code == 204
+        svc.delete.assert_awaited_once_with(_SOURCE_ID)
+    finally:
+        app.dependency_overrides.pop(decode_jwt_claims, None)
+        app.dependency_overrides.pop(get_knowledge_source_service, None)
+
+
+@pytest.mark.asyncio
+async def test_delete_knowledge_source_unknown_id_returns_404() -> None:
+    unknown_id = uuid4()
+    svc = _mock_service(
+        delete=HTTPException(
+            status_code=404,
+            detail=f"Knowledge source {unknown_id} not found",
+        )
+    )
+    app.dependency_overrides[decode_jwt_claims] = lambda: _ADMIN_CLAIMS
+    app.dependency_overrides[get_knowledge_source_service] = lambda: svc
+    try:
+        async with AsyncClient(
+            transport=ASGITransport(app), base_url="http://test"
+        ) as client:
+            response = await client.delete(f"/v1/knowledge-sources/{unknown_id}")
+        assert response.status_code == 404
+    finally:
+        app.dependency_overrides.pop(decode_jwt_claims, None)
+        app.dependency_overrides.pop(get_knowledge_source_service, None)

@@ -73,6 +73,7 @@ class TestKnowledgeSourceRecord:
 class TestKnowledgeSourceCreate:
     def test_valid_minimal(self) -> None:
         payload = KnowledgeSourceCreate(
+            name="Acme GitHub",
             connector_type=ConnectorType.GITHUB,
             credentials_vault_path="secret/contextiq/github/acme",
             scope="acme-org/api-service",
@@ -82,6 +83,7 @@ class TestKnowledgeSourceCreate:
 
     def test_valid_custom_schedule(self) -> None:
         payload = KnowledgeSourceCreate(
+            name="Wiki Confluence",
             connector_type=ConnectorType.CONFLUENCE,
             credentials_vault_path="secret/contextiq/confluence/wiki",
             scope="WIKI",
@@ -92,6 +94,7 @@ class TestKnowledgeSourceCreate:
     def test_invalid_cron_six_fields_raises(self) -> None:
         with pytest.raises(ValidationError) as exc_info:
             KnowledgeSourceCreate(
+                name="Proj Jira",
                 connector_type=ConnectorType.JIRA,
                 credentials_vault_path="secret/contextiq/jira/proj",
                 scope="PROJ",
@@ -102,6 +105,7 @@ class TestKnowledgeSourceCreate:
     def test_invalid_token_budget_exceeds_max_raises(self) -> None:
         with pytest.raises(ValidationError):
             KnowledgeSourceCreate(
+                name="Acme GitHub",
                 connector_type=ConnectorType.GITHUB,
                 credentials_vault_path="secret/contextiq/github/acme",
                 scope="acme-org/api-service",
@@ -111,6 +115,7 @@ class TestKnowledgeSourceCreate:
     def test_invalid_vault_path_with_spaces_raises(self) -> None:
         with pytest.raises(ValidationError) as exc_info:
             KnowledgeSourceCreate(
+                name="Acme GitHub",
                 connector_type=ConnectorType.GITHUB,
                 credentials_vault_path="secret/contextiq/bad path",
                 scope="acme-org/api-service",
@@ -119,6 +124,7 @@ class TestKnowledgeSourceCreate:
 
     def test_token_budget_weight_zero_is_valid(self) -> None:
         payload = KnowledgeSourceCreate(
+            name="Ops Grafana",
             connector_type=ConnectorType.GRAFANA,
             credentials_vault_path="secret/contextiq/grafana/ops",
             scope="ops-dashboard",
@@ -128,6 +134,7 @@ class TestKnowledgeSourceCreate:
 
     def test_token_budget_weight_max_is_valid(self) -> None:
         payload = KnowledgeSourceCreate(
+            name="Ops Grafana",
             connector_type=ConnectorType.GRAFANA,
             credentials_vault_path="secret/contextiq/grafana/ops",
             scope="ops-dashboard",

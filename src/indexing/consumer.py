@@ -38,7 +38,7 @@ class IndexingConsumerSettings(BaseSettings):
     # every other Kafka client in this codebase) when the
     # INDEXING_CONSUMER_-prefixed override isn't set.
     kafka_bootstrap_servers: str = os.environ.get("KAFKA_BOOTSTRAP_SERVERS", "localhost:9092")
-    group_id: str = "contextiq-indexing"
+    group_id: str = "contextiq-indexing-v2"  # v2: fresh group to bypass phantom consumer issue
     sync_topic: str = "knowledge.source.synced"
     deletion_topic: str = "knowledge.document.deleted"
     # Max Kafka messages fetched per poll iteration.
@@ -47,6 +47,10 @@ class IndexingConsumerSettings(BaseSettings):
     poll_timeout_ms: int = 1000
     # At-least-once: commit only after successful processing.
     enable_auto_commit: bool = False
+    # Session timeout (ms) - time before Kafka considers consumer dead
+    session_timeout_ms: int = 60000  # 60 seconds
+    # Max poll interval (ms) - max time between poll() calls before rebalance
+    max_poll_interval_ms: int = 300000  # 5 minutes
 
 
 class IndexingConsumer:
@@ -98,14 +102,23 @@ class IndexingConsumer:
             value_deserializer=lambda v: json.loads(v.decode("utf-8")),
             enable_auto_commit=self._settings.enable_auto_commit,
             max_poll_records=self._settings.max_poll_records,
+            session_timeout_ms=self._settings.session_timeout_ms,
+            max_poll_interval_ms=self._settings.max_poll_interval_ms,
             **_sasl_kwargs(),
         )
         await self._consumer.start()
         self._running = True
-        logger.info(
-            "IndexingConsumer started on topics: %s, %s",
-            self._settings.sync_topic,
-            self._settings.deletion_topic,
+        logger.warning(
+            "indexing_consumer_started",
+            extra={
+                "sync_topic": self._settings.sync_topic,
+                "deletion_topic": self._settings.deletion_topic,
+                "group_id": self._settings.group_id,
+                "bootstrap_servers": self._settings.kafka_bootstrap_servers,
+                "enable_auto_commit": self._settings.enable_auto_commit,
+                "session_timeout_ms": self._settings.session_timeout_ms,
+                "max_poll_interval_ms": self._settings.max_poll_interval_ms,
+            },
         )
 
     async def stop(self) -> None:
@@ -125,15 +138,60 @@ class IndexingConsumer:
         if self._consumer is None:
             raise RuntimeError("Call start() before run()")
 
+        print(f"🔄 CONSUMER_LOOP: entering async-for poll loop, partitions={sorted([tp.partition for tp in self._consumer.assignment()])}")
         async for msg in self._consumer:
+            print(f"📨 CONSUMER_LOOP: received message from partition={msg.partition} offset={msg.offset}")
             if not self._running:
                 break
-            await self._handle_message(msg)
-            await self._consumer.commit()
+            payload = msg.value if isinstance(msg.value, dict) else {}
+            event_type = payload.get("event_type", "") if isinstance(payload, dict) else ""
+            source_id = payload.get("source_id") if isinstance(payload, dict) else None
+            job_id = payload.get("job_id") if isinstance(payload, dict) else None
 
-    async def _handle_message(self, msg: object) -> None:  # type: ignore[type-arg]
+            logger.warning(
+                "indexing_consumer_message_received",
+                extra={
+                    "topic": msg.topic,
+                    "partition": msg.partition,
+                    "offset": msg.offset,
+                    "event_type": event_type,
+                    "source_id": str(source_id) if source_id is not None else None,
+                    "job_id": str(job_id) if job_id is not None else None,
+                },
+            )
+
+            result = await self._handle_message(msg)
+            logger.warning(
+                "indexing_consumer_message_handled",
+                extra={
+                    "topic": msg.topic,
+                    "partition": msg.partition,
+                    "offset": msg.offset,
+                    "event_type": result["event_type"],
+                    "source_id": result["source_id"],
+                    "job_id": result["job_id"],
+                    "status": result["status"],
+                },
+            )
+
+            await self._consumer.commit()
+            logger.warning(
+                "indexing_consumer_offset_committed",
+                extra={
+                    "topic": msg.topic,
+                    "partition": msg.partition,
+                    "offset": msg.offset,
+                    "event_type": result["event_type"],
+                    "source_id": result["source_id"],
+                    "job_id": result["job_id"],
+                },
+            )
+
+    async def _handle_message(self, msg: object) -> dict[str, str | None]:  # type: ignore[type-arg]
         payload = msg.value  # type: ignore[union-attr]
         event_type = payload.get("event_type", "") if isinstance(payload, dict) else ""
+        source_id = payload.get("source_id") if isinstance(payload, dict) else None
+        job_id = payload.get("job_id") if isinstance(payload, dict) else None
 
         try:
             if event_type == "knowledge_source_synced":
@@ -165,8 +223,20 @@ class IndexingConsumer:
                     "IndexingConsumer: unknown event_type=%s — skipping",
                     event_type,
                 )
+            return {
+                "event_type": event_type,
+                "source_id": str(source_id) if source_id is not None else None,
+                "job_id": str(job_id) if job_id is not None else None,
+                "status": "ok",
+            }
         except Exception:
             # Log and skip the message rather than crashing the consumer loop.
             # The commit below will advance the offset; this is intentional:
             # poison-pill messages must not halt the pipeline for all sources.
             logger.exception("IndexingConsumer: failed to process message; skipping")
+            return {
+                "event_type": event_type,
+                "source_id": str(source_id) if source_id is not None else None,
+                "job_id": str(job_id) if job_id is not None else None,
+                "status": "failed",
+            }

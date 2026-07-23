@@ -6,15 +6,34 @@ export const typeSchema = z.object({
 });
 
 export const credentialsSchema = z.object({
-  // vault_path is the path in Vault where the secret is stored.
-  // The UI sends ONLY the vault_path — actual credentials are never transmitted
-  // through the Admin Portal API (AC-2: "stored in Vault").
-  vault_path: z
+  // credentials_vault_path is the KV v2 sub-path where the secret is stored,
+  // e.g. "connectors/github/my-org-pat". The backend passes this value
+  // straight to hvac's kv.v2 calls with mount_point="secret" supplied
+  // separately (see vault_validator.py / connectors/*/auth.py) — do NOT
+  // include a "secret/data/" prefix here, it would double-nest and never
+  // resolve. The UI sends ONLY this path — actual credentials are never
+  // transmitted through the Admin Portal API (AC-2: "stored in Vault").
+  // Field name must match the backend's KnowledgeSourceCreate.credentials_vault_path.
+  // Character set MUST match the backend's own validator
+  // (KnowledgeSourceCreate.validate_vault_path_format in
+  // src/knowledge_sources/schemas/knowledge_source.py: `^[a-zA-Z0-9/_\-.]+$`)
+  // — it allows uppercase letters and dots (e.g. GitHub org names, semver-ish
+  // secret names). A stricter frontend regex silently rejects otherwise-valid
+  // paths before they ever reach the API.
+  credentials_vault_path: z
     .string()
     .regex(
-      /^secret\/data\/[a-z0-9\-/_]+$/,
-      "Must be a valid Vault secret path"
+      /^[a-zA-Z0-9/_\-.]+$/,
+      "Must be a valid Vault KV v2 path, e.g. connectors/github/my-org-pat"
     ),
+  // Optional raw secret (e.g. a GitHub PAT). When provided, the backend
+  // writes it to Vault at credentials_vault_path on your behalf — you do NOT
+  // need to pre-populate Vault via the CLI. Leave blank if the secret is
+  // already stored at that path. Never persisted by the Admin Portal itself;
+  // it goes straight through to the API over HTTPS and then into Vault.
+  // NOTE: blank string is stripped out before the POST body is sent (see
+  // AddConnectorPage.tsx) — the backend rejects an empty credential_value.
+  credential_value: z.string().optional(),
 });
 
 export const scopeSchema = z.object({

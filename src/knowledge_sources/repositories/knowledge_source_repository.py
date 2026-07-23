@@ -6,9 +6,10 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import distinct, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.indexing.models.chunk import ChunkRecord
 from src.knowledge_sources.models.knowledge_source import KnowledgeSourceRecord
 from src.knowledge_sources.schemas.knowledge_source import (
     KnowledgeSourceCreate,
@@ -39,6 +40,7 @@ class KnowledgeSourceRepository:
 
     async def create(self, payload: KnowledgeSourceCreate) -> KnowledgeSourceRecord:
         record = KnowledgeSourceRecord(
+            name=payload.name,
             connector_type=payload.connector_type,
             credentials_vault_path=payload.credentials_vault_path,
             scope=payload.scope,
@@ -67,6 +69,28 @@ class KnowledgeSourceRepository:
         )
         return list(result.scalars().all())
 
+    async def get_indexed_document_counts(
+        self, source_ids: list[UUID]
+    ) -> dict[UUID, int]:
+        """Return indexed distinct-document counts keyed by source_id.
+
+        Counts are derived from ``chunk_index`` to reflect what is actually
+        present in retrieval/indexing storage, which can diverge from the
+        sync metadata counter.
+        """
+        if not source_ids:
+            return {}
+
+        result = await self._session.execute(
+            select(
+                ChunkRecord.source_id,
+                func.count(distinct(ChunkRecord.document_id)),
+            )
+            .where(ChunkRecord.source_id.in_(source_ids))
+            .group_by(ChunkRecord.source_id)
+        )
+        return {row[0]: row[1] for row in result.all()}
+
     async def set_active(
         self, source_id: UUID, is_active: bool
     ) -> KnowledgeSourceRecord | None:
@@ -77,3 +101,17 @@ class KnowledgeSourceRepository:
         record.status = SourceStatus.ACTIVE if is_active else SourceStatus.INACTIVE
         await self._session.flush()
         return record
+
+    async def delete(self, source_id: UUID) -> bool:
+        """Permanently delete a knowledge source record.
+
+        Returns ``True`` if a record was found and deleted, ``False`` if no
+        record exists for *source_id*. Does not delete already-indexed
+        chunks/vectors — see the router docstring for AC details.
+        """
+        record = await self.get_by_id(source_id)
+        if record is None:
+            return False
+        await self._session.delete(record)
+        await self._session.flush()
+        return True

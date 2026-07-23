@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import asyncio
 from datetime import UTC, datetime
+from uuid import UUID
 
 import httpx
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -30,6 +31,7 @@ from src.connectors.github.search_client import GitHubSearchClient
 from src.connectors.github.sync_client import GitHubCommitsClient
 from src.connectors.github.sync_store import ConnectorSyncStore
 from src.events.producer import get_kafka_producer
+from src.indexing.schemas.chunk import ChunkPayload
 
 
 class GitHubConnector(BaseConnector):
@@ -161,12 +163,18 @@ class GitHubConnector(BaseConnector):
         if self._credential is None:
             raise ConnectorAuthError("authenticate() has not been called")
 
-        sync_store = ConnectorSyncStore(self._session)  # type: ignore[arg-type]
+        sync_store = ConnectorSyncStore(self._session) if self._session is not None else None
         commits_client = GitHubCommitsClient(self._config)
         auth = self._auth_header()
         now = datetime.now(tz=UTC)
 
-        last_sync = await sync_store.get_last_sync_at("github")
+        last_sync: datetime | None = None
+        if sync_store is not None:
+            try:
+                last_sync = await sync_store.get_last_sync_at("github")
+            except Exception:
+                last_sync = None  # table may not exist yet; fall back to default lookback
+
         if last_sync is None:
             from datetime import timedelta
 
@@ -188,7 +196,11 @@ class GitHubConnector(BaseConnector):
                 items_failed += 1
                 errors.append(f"{repo}: {type(exc).__name__}: {exc}")
 
-        await sync_store.set_last_sync_at("github", now)
+        if sync_store is not None:
+            try:
+                await sync_store.set_last_sync_at("github", now)
+            except Exception:
+                pass  # best-effort; failure here does not invalidate the sync result
         await self._emit_sync_event(items_processed=items_processed, synced_at=now)
 
         return SyncResult(
@@ -213,6 +225,75 @@ class GitHubConnector(BaseConnector):
             "contextiq.source.sync",
             value=json.dumps(event).encode(),
         )
+
+    async def get_chunks(
+        self,
+        source_id: UUID,
+        tenant_id: str,
+        max_files_per_repo: int = 50,
+    ) -> list[ChunkPayload]:
+        """
+        Fetch a full text snapshot of this connector's configured repos for
+        the EP-008 indexing pipeline.
+
+        Unlike ``fetch()`` (GitHub Code Search — requires search keywords and
+        cannot enumerate "everything"), this uses the Git Trees API via
+        ``GitHubContentClient.list_repo_files()`` to list indexable files,
+        then fetches each file's content. One ``ChunkPayload`` is produced per
+        file (no further splitting yet — large files are naturally capped at
+        2000 chars by ``fetch_content_and_commit``'s excerpt truncation).
+
+        Repos/files that fail to list or fetch are skipped so one bad repo
+        does not fail the whole batch.
+
+        Raises:
+            ConnectorAuthError: when ``authenticate()`` has not been called.
+        """
+        if self._credential is None:
+            raise ConnectorAuthError("authenticate() has not been called")
+
+        auth = self._auth_header()
+        content_client = GitHubContentClient(self._config)
+        chunks: list[ChunkPayload] = []
+
+        async with httpx.AsyncClient(timeout=self._config.request_timeout_s) as client:
+            for repo in self._config.repos:
+                try:
+                    paths = await content_client.list_repo_files(
+                        client=client,
+                        repo=repo,
+                        auth_header=auth,
+                        max_files=max_files_per_repo,
+                    )
+                except Exception:
+                    continue  # skip repos we can't list; do not fail the whole batch
+
+                tasks = [
+                    content_client.fetch_content_and_commit(
+                        client=client, repo=repo, file_path=path, auth_header=auth
+                    )
+                    for path in paths
+                ]
+                results = await asyncio.gather(*tasks, return_exceptions=True)
+
+                for path, result in zip(paths, results, strict=False):
+                    if isinstance(result, BaseException):
+                        continue  # skip files that could not be fetched
+                    excerpt, sha, _committed_at = result
+                    if not excerpt.strip():
+                        continue  # skip empty files
+                    chunks.append(
+                        ChunkPayload(
+                            source_id=source_id,
+                            tenant_id=tenant_id,
+                            document_id=f"github:{repo}:{sha}",
+                            text=excerpt,
+                            token_count=max(1, len(excerpt) // 4),
+                            metadata={"repository": repo, "file_path": path},
+                        )
+                    )
+
+        return chunks
 
     async def health_check(self) -> HealthStatus:
         """

@@ -65,10 +65,21 @@ class ConnectorRegistry:
         -----
         Connectors whose ``authenticate()`` raises are registered with
         ``enabled=False`` so the rest of the platform remains available.
+        Connectors that fail to even instantiate (e.g. missing required
+        deployment config, such as an unset ``base_url``) are skipped
+        entirely with a warning rather than crashing application startup.
         """
         classes = connector_classes if connector_classes is not None else discover_connectors()
         for connector_id, cls in classes.items():
-            instance = cls()
+            try:
+                instance = cls()
+            except Exception as exc:  # noqa: BLE001
+                _logger.warning(
+                    "connector_instantiation_failed",
+                    extra={"connector_id": connector_id, "error": str(exc)},
+                )
+                continue
+
             enabled = True
             try:
                 await instance.authenticate()
@@ -92,6 +103,27 @@ class ConnectorRegistry:
         """
         record = self._records.get(connector_id)
         return record.instance if (record and record.enabled) else None
+
+    def register(
+        self,
+        connector_id: str,
+        instance: BaseConnector,
+        enabled: bool = True,
+    ) -> None:
+        """Register a single pre-built, pre-authenticated connector instance.
+
+        Unlike :meth:`load` (entry-point discovery, one shared instance per
+        connector *type*), this lets a caller register connectors under any
+        key — e.g. the indexing pipeline registers one instance per
+        knowledge-source UUID, since each source has its own Vault
+        credentials and scope (repo/project/space).
+        """
+        self._records[connector_id] = ConnectorRecord(
+            connector_id=connector_id,
+            cls=type(instance),
+            instance=instance,
+            enabled=enabled,
+        )
 
     def all_enabled(self) -> list[BaseConnector]:
         """Return all connector instances whose ``enabled`` flag is ``True``."""

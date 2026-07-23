@@ -20,6 +20,13 @@ class TopicSpec:
 # AC-2: canonical topic table
 TOPICS: list[TopicSpec] = [
     TopicSpec(
+        name="knowledge.source.created",
+        partitions=6,
+        replication_factor=3,
+        retention_ms=7 * 24 * 60 * 60 * 1000,     # 7 days
+        consumer_groups=(),
+    ),
+    TopicSpec(
         name="knowledge.source.synced",
         partitions=6,
         replication_factor=3,
@@ -67,6 +74,13 @@ TOPICS: list[TopicSpec] = [
         replication_factor=3,
         retention_ms=60 * 60 * 1000,               # 1 hour
         consumer_groups=("health-monitor",),
+    ),
+    TopicSpec(
+        name="contextiq.source.sync",
+        partitions=6,
+        replication_factor=3,
+        retention_ms=7 * 24 * 60 * 60 * 1000,     # 7 days
+        consumer_groups=("context-cache-invalidator",),
     ),
 ]
 

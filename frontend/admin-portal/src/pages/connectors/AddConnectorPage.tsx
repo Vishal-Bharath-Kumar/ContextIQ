@@ -44,6 +44,11 @@ export function AddConnectorPage() {
   async function handleScheduleNext(data: ScheduleFields) {
     setSubmitError(null);
     const payload = { ...wizardData, ...data } as ConnectorCreatePayload;
+    // credential_value is optional — omit it entirely rather than sending an
+    // empty string, which the backend's SecretStr(min_length=1) rejects.
+    if (!payload.credential_value) {
+      delete payload.credential_value;
+    }
     try {
       await mutateAsync(payload);
       navigate("/connectors");

@@ -43,7 +43,7 @@ class ConfluenceConnectorConfig(BaseSettings):
         description="Space keys to index, e.g. ['~ENG', 'ARCH']. Empty = all accessible spaces.",
     )
     email: str = ""  # Cloud only: user email for basic auth
-    vault_path: str = "secret/data/confluence/token"
+    vault_path: str = "connectors/confluence/token"
     vault_role_id: str = ""
     vault_secret_id: str = Field(
         default="",

@@ -46,6 +46,7 @@ _SOURCE_ID = uuid4()
 
 _SAMPLE_RESPONSE = KnowledgeSourceResponse(
     id=_SOURCE_ID,
+    name="Test Connector",
     connector_type=ConnectorType.GITHUB,
     credentials_vault_path="secret/contextiq/github/test",
     scope="my-org/my-repo",
@@ -60,6 +61,7 @@ _SAMPLE_RESPONSE = KnowledgeSourceResponse(
 )
 
 _VALID_PAYLOAD = {
+    "name": "Test Connector",
     "connector_type": "github",
     "credentials_vault_path": "secret/contextiq/github/test",
     "scope": "my-org/my-repo",

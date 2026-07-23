@@ -12,7 +12,7 @@ from datetime import datetime
 from enum import StrEnum
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_validator
 
 
 class ConnectorType(StrEnum):
@@ -30,11 +30,27 @@ class SourceStatus(StrEnum):
 
 
 class KnowledgeSourceCreate(BaseModel):
+    name: str = Field(
+        min_length=2,
+        max_length=255,
+        description="Human-readable connector name shown in the Admin Portal.",
+    )
     connector_type:          ConnectorType
     credentials_vault_path:  str = Field(
         min_length=1,
         max_length=512,
         description="Vault KV v2 path where connector credentials are stored",
+    )
+    credential_value: SecretStr | None = Field(
+        default=None,
+        min_length=1,
+        max_length=8192,
+        description=(
+            "Raw secret value (e.g. GitHub PAT) to write to "
+            "credentials_vault_path in Vault on creation. Optional — omit if "
+            "the secret already exists at that path. Never persisted to "
+            "PostgreSQL or echoed back in any response."
+        ),
     )
     scope: str = Field(
         min_length=1,
@@ -78,6 +94,7 @@ class KnowledgeSourceResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id:                     UUID
+    name:                   str | None
     connector_type:         ConnectorType
     credentials_vault_path: str
     scope:                  str

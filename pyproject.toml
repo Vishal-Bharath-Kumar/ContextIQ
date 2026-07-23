@@ -19,7 +19,8 @@ dependencies = [
   "pydantic-settings>=2.2",
   "httpx>=0.27",
   "redis[asyncio]>=5.0",
-  "aiokafka>=0.11",
+  "aiokafka[lz4]>=0.11",
+  "cramjam>=2.11",
   "kafka-python>=2.0,<3.0",
   "qdrant-client>=1.9",
   "neo4j>=5.19",
@@ -71,9 +72,10 @@ scripts = [
 # Third-party packages register themselves the same way in their own pyproject.toml
 # ---------------------------------------------------------------------------
 [project.entry-points."contextiq.connectors"]
-# Example (uncomment when first-party connectors are added):
-# github     = "contextiq_github_connector.connector:GitHubConnector"
-# confluence = "contextiq_confluence_connector.connector:ConfluenceConnector"
+github     = "src.connectors.github.connector:GitHubConnector"
+confluence = "src.connectors.confluence.connector:ConfluenceConnector"
+jira       = "src.connectors.jira.connector:JiraConnector"
+grafana    = "src.connectors.grafana.connector:GrafanaConnector"
 
 [build-system]
 requires      = ["hatchling"]

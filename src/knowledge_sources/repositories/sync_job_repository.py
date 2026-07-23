@@ -43,7 +43,7 @@ class SyncJobRepository:
         record = await self._get(job_id)
         if record:
             record.status = SyncJobStatus.SUCCEEDED
-            record.completed_at = datetime.now(tz=UTC)
+            record.completed_at = datetime.utcnow()
             record.duration_s = duration_s
             record.items_processed = items_processed
             record.items_failed = items_failed
@@ -55,7 +55,7 @@ class SyncJobRepository:
         record = await self._get(job_id)
         if record:
             record.status = SyncJobStatus.FAILED
-            record.completed_at = datetime.now(tz=UTC)
+            record.completed_at = datetime.utcnow()
             record.duration_s = duration_s
             record.error_message = error_message[:2000]
             await self._session.flush()

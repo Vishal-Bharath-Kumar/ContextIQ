@@ -72,7 +72,7 @@ describe("ConnectorToggle", () => {
     ).toBeInTheDocument();
   });
 
-  it("fires PATCH /v1/knowledge-sources/{id}/status with status='active' when enabling", async () => {
+  it("fires PATCH /v1/knowledge-sources/{id}/status with active=true when enabling", async () => {
     let capturedBody: unknown = null;
     server.use(
       http.patch("/api/v1/knowledge-sources/ks-003/status", async ({ request }) => {
@@ -85,11 +85,11 @@ describe("ConnectorToggle", () => {
     await user.click(screen.getByRole("switch", { name: "Enable connector" }));
 
     await waitFor(() => {
-      expect(capturedBody).toEqual({ status: "active" });
+      expect(capturedBody).toEqual({ active: true });
     });
   });
 
-  it("fires PATCH /v1/knowledge-sources/{id}/status with status='inactive' when disabling", async () => {
+  it("fires PATCH /v1/knowledge-sources/{id}/status with active=false when disabling", async () => {
     let capturedBody: unknown = null;
     server.use(
       http.patch("/api/v1/knowledge-sources/ks-004/status", async ({ request }) => {
@@ -102,7 +102,7 @@ describe("ConnectorToggle", () => {
     await user.click(screen.getByRole("switch", { name: "Disable connector" }));
 
     await waitFor(() => {
-      expect(capturedBody).toEqual({ status: "inactive" });
+      expect(capturedBody).toEqual({ active: false });
     });
   });
 

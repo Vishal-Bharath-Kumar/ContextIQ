@@ -22,6 +22,9 @@ class ChunkRepository:
 
     async def upsert_batch(self, chunks: list[ChunkMetadata]) -> None:
         """INSERT … ON CONFLICT (chunk_id) DO UPDATE — idempotent re-indexing."""
+        if not chunks:
+            return
+
         stmt = (
             insert(ChunkRecord)
             .values([c.model_dump() for c in chunks])

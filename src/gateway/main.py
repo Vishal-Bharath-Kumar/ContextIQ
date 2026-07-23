@@ -409,6 +409,11 @@ def _build_indexing_consumer(connector_registry: ConnectorRegistry) -> IndexingC
         opensearch=opensearch,
         chunk_repo=chunk_repo,
         registry=connector_registry,
+        # Enables lazily building a per-knowledge-source connector (from the
+        # knowledge_sources table) the first time a source is synced, since
+        # connector_registry only holds one shared, unscoped instance per
+        # connector TYPE (entry-point discovery), not per source.
+        session_factory=primary_session_factory(),
     )
     deletion_handler = DeletionHandler(
         chunk_repo=chunk_repo,

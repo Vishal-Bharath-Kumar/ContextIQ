@@ -43,6 +43,7 @@ from src.auth.dependencies import decode_jwt_claims
 from src.auth.roles import PlatformRole
 from src.auth.testing import make_test_claims
 from src.data.dependencies import get_db
+from src.knowledge_sources.models.connector_audit_log import ConnectorAuditLog
 from src.knowledge_sources.models.knowledge_source import KnowledgeSourceRecord
 from src.knowledge_sources.vault_validator import VaultPathValidator, VaultValidationResult
 from src.main import app
@@ -52,6 +53,7 @@ from src.main import app
 # ---------------------------------------------------------------------------
 
 VALID_PAYLOAD: dict[str, object] = {
+    "name": "Acme Backend",
     "connector_type": "github",
     "credentials_vault_path": "secret/data/github/token",
     "scope": "acme/backend",
@@ -87,7 +89,7 @@ async def async_engine() -> AsyncGenerator[AsyncEngine, None]:
     async with engine.begin() as conn:
         await conn.run_sync(
             KnowledgeSourceRecord.__table__.metadata.create_all,
-            tables=[KnowledgeSourceRecord.__table__],
+            tables=[KnowledgeSourceRecord.__table__, ConnectorAuditLog.__table__],
         )
     yield engine
     await engine.dispose()

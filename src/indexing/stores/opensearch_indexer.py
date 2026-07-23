@@ -86,3 +86,7 @@ class OpenSearchIndexer:
             index=name,
             body={"query": {"term": {"document_id": document_id}}},
         )
+
+    async def close(self) -> None:
+        """Close the underlying async HTTP client/session."""
+        await self._client.close()

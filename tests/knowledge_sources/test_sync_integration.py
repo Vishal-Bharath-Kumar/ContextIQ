@@ -269,6 +269,16 @@ async def test_kafka_synced_event_emitted_on_success(
     assert topic == "knowledge.source.synced"
     assert payload["event_type"] == "knowledge_source_synced"
     assert payload["items_processed"] == 42
+    # tenant_id is required by SourceSyncedEvent (src/indexing/schemas/events.py)
+    # — omitting it made IndexingConsumer silently drop every sync event.
+    assert payload["tenant_id"] == "default"
+
+    # The whole point of this event is for IndexingConsumer to validate and
+    # consume it — assert that actually works end-to-end against the real
+    # schema, not just that a "tenant_id" key happens to be present.
+    from src.indexing.schemas.events import SourceSyncedEvent
+
+    SourceSyncedEvent.model_validate(payload)
 
 
 async def test_kafka_event_NOT_emitted_on_failure(

@@ -41,7 +41,7 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Wire the pipeline/consumer, start the consume loop, and clean up on shutdown."""
-    logger.info("indexing: wiring pipeline dependencies")
+    logger.warning("indexing: wiring pipeline dependencies")
 
     # A single AsyncSession is safe here because IndexingConsumer.run() processes
     # messages sequentially (one `await` at a time), never concurrently.
@@ -51,6 +51,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     opensearch = OpenSearchIndexer()
     embedder = EmbeddingService()
     registry = ConnectorRegistry()
+    logger.warning("indexing: loading connector registry")
+    await registry.load()
+    logger.warning("indexing: connector registry loaded")
 
     pipeline = IndexingPipeline(
         embedder=embedder,
@@ -58,6 +61,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         opensearch=opensearch,
         chunk_repo=chunk_repo,
         registry=registry,
+        # Enables lazily building a per-knowledge-source connector (from the
+        # knowledge_sources table) the first time a source is synced, since
+        # the entry-point registry.load() above only holds one shared,
+        # unscoped instance per connector TYPE, not per source.
+        session_factory=primary_session_factory(),
     )
     deletion_handler = DeletionHandler(
         chunk_repo=chunk_repo,
@@ -67,21 +75,23 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     consumer = IndexingConsumer(pipeline, deletion_handler)
     await consumer.start()
+    logger.warning("indexing: consumer started")
     app.state.consumer = consumer
     consume_task = asyncio.create_task(consumer.run())
-    logger.info("indexing: consume loop started")
+    logger.warning("indexing: consume loop started")
 
     yield
 
-    logger.info("indexing: shutdown — stopping consumer")
+    logger.warning("indexing: shutdown — stopping consumer")
     await consumer.stop()
     consume_task.cancel()
     try:
         await consume_task
     except asyncio.CancelledError:
         pass
+    await pipeline.close()
     await session.close()
-    logger.info("indexing: shutdown complete")
+    logger.warning("indexing: shutdown complete")
 
 
 def create_app() -> FastAPI:

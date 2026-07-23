@@ -65,6 +65,19 @@ def _make_connector(sync_result: SyncResult | None = None) -> AsyncMock:
     return connector
 
 
+def _patch_build_connector(executor: SyncJobExecutor, connector: object):
+    """Return a patch that makes _build_connector_for_source return *connector*.
+
+    Use inside each test's ``with (...)`` block to avoid hitting real Vault
+    from the per-source connector builder introduced in executor.py.
+    """
+    return patch.object(
+        executor,
+        "_build_connector_for_source",
+        new=AsyncMock(return_value=connector),
+    )
+
+
 # Fast settings — tiny backoff_base_s so mocked sleep args still match spec
 _FAST_SETTINGS = SyncExecutorSettings(
     max_retries=3,
@@ -137,6 +150,7 @@ class TestSyncJobExecutorSuccess:
         executor = SyncJobExecutor(db_session, registry, _FAST_SETTINGS)
 
         with (
+            _patch_build_connector(executor, connector),
             patch("src.knowledge_sources.sync.executor.sync_duration_seconds"),
             patch("src.knowledge_sources.sync.executor.sync_document_count_delta"),
             patch("src.knowledge_sources.sync.executor.sync_retries_total"),
@@ -157,6 +171,7 @@ class TestSyncJobExecutorSuccess:
         executor = SyncJobExecutor(db_session, registry, _FAST_SETTINGS)
 
         with (
+            _patch_build_connector(executor, connector),
             patch("src.knowledge_sources.sync.executor.sync_duration_seconds"),
             patch("src.knowledge_sources.sync.executor.sync_document_count_delta"),
             patch("src.knowledge_sources.sync.executor.sync_retries_total"),
@@ -181,6 +196,7 @@ class TestSyncJobExecutorSuccess:
         executor = SyncJobExecutor(db_session, registry, _FAST_SETTINGS)
 
         with (
+            _patch_build_connector(executor, connector),
             patch("src.knowledge_sources.sync.executor.sync_duration_seconds"),
             patch("src.knowledge_sources.sync.executor.sync_document_count_delta"),
             patch("src.knowledge_sources.sync.executor.sync_retries_total"),
@@ -203,6 +219,7 @@ class TestSyncJobExecutorSuccess:
         emit_mock = AsyncMock()
 
         with (
+            _patch_build_connector(executor, connector),
             patch("src.knowledge_sources.sync.executor.sync_duration_seconds"),
             patch("src.knowledge_sources.sync.executor.sync_document_count_delta"),
             patch("src.knowledge_sources.sync.executor.sync_retries_total"),
@@ -220,6 +237,7 @@ class TestSyncJobExecutorSuccess:
         executor = SyncJobExecutor(db_session, registry, _FAST_SETTINGS)
 
         with (
+            _patch_build_connector(executor, connector),
             patch("src.knowledge_sources.sync.executor.sync_duration_seconds"),
             patch("src.knowledge_sources.sync.executor.sync_document_count_delta"),
             patch("src.knowledge_sources.sync.executor.sync_retries_total"),
@@ -249,6 +267,7 @@ class TestSyncJobExecutorOneRetry:
         executor = SyncJobExecutor(db_session, registry, _FAST_SETTINGS)
 
         with (
+            _patch_build_connector(executor, connector),
             patch("src.knowledge_sources.sync.executor.asyncio.sleep", new_callable=AsyncMock),
             patch("src.knowledge_sources.sync.executor.sync_duration_seconds"),
             patch("src.knowledge_sources.sync.executor.sync_document_count_delta"),
@@ -277,6 +296,7 @@ class TestSyncJobExecutorOneRetry:
         emit_mock = AsyncMock()
 
         with (
+            _patch_build_connector(executor, connector),
             patch("src.knowledge_sources.sync.executor.asyncio.sleep", new_callable=AsyncMock),
             patch("src.knowledge_sources.sync.executor.sync_duration_seconds"),
             patch("src.knowledge_sources.sync.executor.sync_document_count_delta"),
@@ -303,6 +323,7 @@ class TestSyncJobExecutorAllFailed:
         executor = SyncJobExecutor(db_session, registry, _FAST_SETTINGS)
 
         with (
+            _patch_build_connector(executor, connector),
             patch("src.knowledge_sources.sync.executor.asyncio.sleep", new_callable=AsyncMock),
             patch("src.knowledge_sources.sync.executor.sync_duration_seconds"),
             patch("src.knowledge_sources.sync.executor.sync_document_count_delta"),
@@ -324,6 +345,7 @@ class TestSyncJobExecutorAllFailed:
         executor = SyncJobExecutor(db_session, registry, _FAST_SETTINGS)
 
         with (
+            _patch_build_connector(executor, connector),
             patch("src.knowledge_sources.sync.executor.asyncio.sleep", new_callable=AsyncMock),
             patch("src.knowledge_sources.sync.executor.sync_duration_seconds"),
             patch("src.knowledge_sources.sync.executor.sync_document_count_delta"),
@@ -344,6 +366,7 @@ class TestSyncJobExecutorAllFailed:
         emit_mock = AsyncMock()
 
         with (
+            _patch_build_connector(executor, connector),
             patch("src.knowledge_sources.sync.executor.asyncio.sleep", new_callable=AsyncMock),
             patch("src.knowledge_sources.sync.executor.sync_duration_seconds"),
             patch("src.knowledge_sources.sync.executor.sync_document_count_delta"),
@@ -363,6 +386,7 @@ class TestSyncJobExecutorAllFailed:
         executor = SyncJobExecutor(db_session, registry, _FAST_SETTINGS)
 
         with (
+            _patch_build_connector(executor, connector),
             patch("src.knowledge_sources.sync.executor.asyncio.sleep", new_callable=AsyncMock),
             patch("src.knowledge_sources.sync.executor.sync_duration_seconds"),
             patch("src.knowledge_sources.sync.executor.sync_document_count_delta"),
@@ -389,6 +413,7 @@ class TestSyncJobExecutorBackoff:
 
         sleep_mock = AsyncMock()
         with (
+            _patch_build_connector(executor, connector),
             patch("src.knowledge_sources.sync.executor.asyncio.sleep", sleep_mock),
             patch("src.knowledge_sources.sync.executor.sync_duration_seconds"),
             patch("src.knowledge_sources.sync.executor.sync_document_count_delta"),
@@ -419,6 +444,7 @@ class TestSyncJobExecutorMetrics:
         doc_counter = MagicMock()
 
         with (
+            _patch_build_connector(executor, connector),
             patch(
                 "src.knowledge_sources.sync.executor.sync_duration_seconds",
                 duration_hist,
@@ -451,6 +477,7 @@ class TestSyncJobExecutorMetrics:
         doc_counter.labels.return_value.inc = MagicMock()
 
         with (
+            _patch_build_connector(executor, connector),
             patch("src.knowledge_sources.sync.executor.sync_duration_seconds"),
             patch(
                 "src.knowledge_sources.sync.executor.sync_document_count_delta",
@@ -480,6 +507,7 @@ class TestSyncJobExecutorMetrics:
         duration_hist = MagicMock()
 
         with (
+            _patch_build_connector(executor, connector),
             patch("src.knowledge_sources.sync.executor.asyncio.sleep", new_callable=AsyncMock),
             patch(
                 "src.knowledge_sources.sync.executor.sync_duration_seconds",
@@ -518,10 +546,16 @@ class TestSyncJobExecutorEdgeCases:
         self, db_session: AsyncSession, source_record: KnowledgeSourceRecord
     ) -> None:
         registry = MagicMock(spec=ConnectorRegistry)
-        registry.get.return_value = None
         executor = SyncJobExecutor(db_session, registry, _FAST_SETTINGS)
 
-        with pytest.raises(ValueError, match="No active connector"):
+        with (
+            patch.object(
+                executor,
+                "_build_connector_for_source",
+                AsyncMock(side_effect=ValueError("No connector implementation for 'github'")),
+            ),
+            pytest.raises(ValueError, match="No connector implementation"),
+        ):
             await executor.run(source_record.id)
 
     async def test_sync_count_4_calls_total_for_3_retries(
@@ -533,6 +567,7 @@ class TestSyncJobExecutorEdgeCases:
         executor = SyncJobExecutor(db_session, registry, _FAST_SETTINGS)
 
         with (
+            _patch_build_connector(executor, connector),
             patch("src.knowledge_sources.sync.executor.asyncio.sleep", new_callable=AsyncMock),
             patch("src.knowledge_sources.sync.executor.sync_duration_seconds"),
             patch("src.knowledge_sources.sync.executor.sync_document_count_delta"),

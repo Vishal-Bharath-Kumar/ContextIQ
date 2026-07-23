@@ -46,8 +46,19 @@ from src.knowledge_sources.vault_validator import VaultValidationResult
 # ---------------------------------------------------------------------------
 
 _VALID_PAYLOAD = KnowledgeSourceCreate(
+    name="Acme GitHub",
     connector_type=ConnectorType.GITHUB,
     credentials_vault_path="secret/contextiq/github/acme",
+    scope="acme-org/api-service",
+    sync_schedule="0 */6 * * *",
+    token_budget_weight=1.0,
+)
+
+_PAYLOAD_WITH_CREDENTIAL = KnowledgeSourceCreate(
+    name="Acme GitHub",
+    connector_type=ConnectorType.GITHUB,
+    credentials_vault_path="connectors/github/acme",
+    credential_value="ghp_real_token_value",
     scope="acme-org/api-service",
     sync_schedule="0 */6 * * *",
     token_budget_weight=1.0,
@@ -67,6 +78,24 @@ def _fail_validator(message: str = "Path not found") -> AsyncMock:
     """VaultPathValidator that always returns valid=False."""
     mock = AsyncMock()
     mock.validate = AsyncMock(
+        return_value=VaultValidationResult(valid=False, message=message)
+    )
+    return mock
+
+
+def _ok_writer() -> AsyncMock:
+    """VaultCredentialWriter that always returns valid=True."""
+    mock = AsyncMock()
+    mock.write = AsyncMock(
+        return_value=VaultValidationResult(valid=True, message="Credential stored in Vault")
+    )
+    return mock
+
+
+def _fail_writer(message: str = "Vault write failed") -> AsyncMock:
+    """VaultCredentialWriter that always returns valid=False."""
+    mock = AsyncMock()
+    mock.write = AsyncMock(
         return_value=VaultValidationResult(valid=False, message=message)
     )
     return mock
@@ -183,6 +212,82 @@ class TestCreateVaultValidation:
         from sqlalchemy import select
         result = await db_session.execute(select(KnowledgeSourceRecord))
         assert result.scalars().all() == []
+
+
+# ---------------------------------------------------------------------------
+# credential_value: writes to Vault instead of requiring the path to pre-exist
+# ---------------------------------------------------------------------------
+
+
+class TestCreateWithCredentialValue:
+    @pytest.mark.asyncio
+    async def test_writes_credential_to_vault_instead_of_validating_path(
+        self, db_session: AsyncSession
+    ) -> None:
+        writer = _ok_writer()
+        validator = _ok_validator()
+        kafka_mock = _mock_kafka_producer()
+        with patch(
+            "src.events.producer.get_kafka_producer",
+            new=AsyncMock(return_value=kafka_mock),
+        ):
+            svc = KnowledgeSourceService(
+                session=db_session, validator=validator, writer=writer
+            )
+            response = await svc.create(_PAYLOAD_WITH_CREDENTIAL)
+
+        writer.write.assert_awaited_once_with(
+            "connectors/github/acme", "ghp_real_token_value"
+        )
+        validator.validate.assert_not_awaited()
+        assert response.scope == "acme-org/api-service"
+
+    @pytest.mark.asyncio
+    async def test_raises_400_when_vault_write_fails(
+        self, db_session: AsyncSession
+    ) -> None:
+        writer = _fail_writer("Vault path exists but platform role lacks write permission")
+        svc = KnowledgeSourceService(session=db_session, writer=writer)
+
+        with pytest.raises(HTTPException) as exc_info:
+            await svc.create(_PAYLOAD_WITH_CREDENTIAL)
+
+        assert exc_info.value.status_code == 400
+        assert "lacks write permission" in exc_info.value.detail
+
+    @pytest.mark.asyncio
+    async def test_no_db_write_when_vault_write_fails(
+        self, db_session: AsyncSession
+    ) -> None:
+        writer = _fail_writer()
+        svc = KnowledgeSourceService(session=db_session, writer=writer)
+
+        with pytest.raises(HTTPException):
+            await svc.create(_PAYLOAD_WITH_CREDENTIAL)
+
+        from sqlalchemy import select
+        result = await db_session.execute(select(KnowledgeSourceRecord))
+        assert result.scalars().all() == []
+
+    @pytest.mark.asyncio
+    async def test_falls_back_to_validator_when_credential_value_omitted(
+        self, db_session: AsyncSession
+    ) -> None:
+        """Backward compatible: without credential_value, path-exists validation still runs."""
+        writer = _ok_writer()
+        validator = _ok_validator()
+        kafka_mock = _mock_kafka_producer()
+        with patch(
+            "src.events.producer.get_kafka_producer",
+            new=AsyncMock(return_value=kafka_mock),
+        ):
+            svc = KnowledgeSourceService(
+                session=db_session, validator=validator, writer=writer
+            )
+            await svc.create(_VALID_PAYLOAD)
+
+        validator.validate.assert_awaited_once()
+        writer.write.assert_not_awaited()
 
 
 # ---------------------------------------------------------------------------
@@ -400,3 +505,42 @@ class TestToggleActive:
             await svc.toggle_active(uuid4(), is_active=False)
 
         assert exc_info.value.status_code == 404
+
+
+class TestDelete:
+    @pytest.mark.asyncio
+    async def test_delete_removes_record(self, db_session: AsyncSession) -> None:
+        record = await _insert_source(db_session)
+        svc = KnowledgeSourceService(session=db_session, validator=_ok_validator())
+
+        await svc.delete(record.id)
+
+        from sqlalchemy import select
+        result = await db_session.execute(
+            select(KnowledgeSourceRecord).where(KnowledgeSourceRecord.id == record.id)
+        )
+        assert result.scalar_one_or_none() is None
+
+    @pytest.mark.asyncio
+    async def test_delete_unknown_id_raises_404(
+        self, db_session: AsyncSession
+    ) -> None:
+        svc = KnowledgeSourceService(session=db_session, validator=_ok_validator())
+
+        with pytest.raises(HTTPException) as exc_info:
+            await svc.delete(uuid4())
+
+        assert exc_info.value.status_code == 404
+
+    @pytest.mark.asyncio
+    async def test_delete_does_not_affect_other_records(
+        self, db_session: AsyncSession
+    ) -> None:
+        keep = await _insert_source(db_session, scope="keep-me")
+        remove = await _insert_source(db_session, scope="remove-me")
+        svc = KnowledgeSourceService(session=db_session, validator=_ok_validator())
+
+        await svc.delete(remove.id)
+
+        remaining = await svc.list_all()
+        assert [r.id for r in remaining] == [keep.id]

@@ -26,8 +26,11 @@ from src.auth.dev_login import router as dev_login_router
 from src.auth.jwks_client import JWKSClient
 from src.auth.keycloak_settings import KeycloakSettings
 from src.auth.middleware import JWTAuthMiddleware
+from src.connector_sdk.registry import ConnectorRegistry
+from src.data.database import primary_session_factory
 from src.gateway.mcp_handler import mcp_router
 from src.knowledge_sources.routers.knowledge_source_router import router as knowledge_sources_router
+from src.knowledge_sources.sync.scheduler import CronSyncScheduler
 from src.model_registry.routers.model_router import router as model_router
 from src.model_router.routers.routing_weight_router import router as routing_weight_router
 from src.observability.cost.settings import LangfuseProjectSettings
@@ -72,7 +75,26 @@ def create_app(jwks_client: JWKSClient | None = None) -> FastAPI:
             "Ensure project data retention >= %d months (AC-5).",
             _langfuse_settings.required_retention_months,
         )
+
+        # Initialise ConnectorRegistry (TASK-US021-02) so the real GitHub/
+        # Confluence/Jira/Grafana connectors are discovered and available to
+        # the knowledge-sources sync endpoints/scheduler via app.state.
+        # Connectors that fail authenticate() are registered as disabled so
+        # the API continues serving the rest of the platform.
+        connector_registry = ConnectorRegistry()
+        await connector_registry.load()
+        app.state.connector_registry = connector_registry
+
+        scheduler = CronSyncScheduler(
+            session_factory=primary_session_factory(),
+            registry=connector_registry,
+        )
+        scheduler.start()
+        app.state.sync_scheduler = scheduler
+
         yield
+
+        scheduler.stop()
         if manage_lifecycle:
             await client.shutdown()
         teardown_tracing()  # flush spans before shutdown

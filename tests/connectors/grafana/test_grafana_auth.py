@@ -74,7 +74,7 @@ class TestGrafanaConnectorConfig:
         assert config.lookback_hours == 24
         assert config.dashboard_uids == []
         assert config.vault_addr == "https://vault.internal:8200"
-        assert config.vault_path == "secret/data/grafana/token"
+        assert config.vault_path == "connectors/grafana/token"
         assert config.request_timeout_s == 10.0
 
     def test_enabled_false(self) -> None:

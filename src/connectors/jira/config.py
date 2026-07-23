@@ -33,7 +33,7 @@ class JiraConnectorConfig(BaseSettings):
     projects: list[str] = Field(default_factory=list)  # e.g. ["OPS", "INFRA"]
     max_results: int = 50
     default_days: int = 30
-    vault_path: str = "secret/data/jira/token"
+    vault_path: str = "connectors/jira/token"
     vault_role_id: str = ""
     vault_secret_id: str = Field(
         default="",

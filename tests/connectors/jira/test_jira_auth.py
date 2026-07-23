@@ -76,7 +76,7 @@ class TestJiraConnectorConfig:
         assert config.default_days == 30
         assert config.projects == []
         assert config.vault_addr == "https://vault.internal:8200"
-        assert config.vault_path == "secret/data/jira/token"
+        assert config.vault_path == "connectors/jira/token"
         assert config.request_timeout_s == 10.0
 
     def test_enabled_false(self) -> None:

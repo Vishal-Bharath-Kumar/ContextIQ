@@ -26,6 +26,7 @@ from src.knowledge_sources.schemas.knowledge_source import (
     KnowledgeSourceCreate,
     KnowledgeSourceResponse,
 )
+from src.knowledge_sources.vault_credential_writer import VaultCredentialWriter
 from src.knowledge_sources.vault_validator import VaultPathValidator
 
 _KAFKA_TOPIC = "knowledge.source.created"
@@ -36,16 +37,28 @@ class KnowledgeSourceService:
         self,
         session: AsyncSession,
         validator: VaultPathValidator | None = None,
+        writer: VaultCredentialWriter | None = None,
     ) -> None:
         self._repo = KnowledgeSourceRepository(session)
         self._session = session
         self._validator = validator or VaultPathValidator()
+        self._writer = writer or VaultCredentialWriter()
 
     async def create(self, payload: KnowledgeSourceCreate) -> KnowledgeSourceResponse:
-        # AC-5: validate Vault path before writing to DB
-        vault_result = await self._validator.validate(payload.credentials_vault_path)
-        if not vault_result.valid:
-            raise HTTPException(status_code=400, detail=vault_result.message)
+        # AC-5: validate Vault path before writing to DB. When the caller
+        # supplied a raw credential_value (Add Connector wizard UI), write it
+        # to Vault first instead of requiring the path to already exist.
+        if payload.credential_value is not None:
+            write_result = await self._writer.write(
+                payload.credentials_vault_path,
+                payload.credential_value.get_secret_value(),
+            )
+            if not write_result.valid:
+                raise HTTPException(status_code=400, detail=write_result.message)
+        else:
+            vault_result = await self._validator.validate(payload.credentials_vault_path)
+            if not vault_result.valid:
+                raise HTTPException(status_code=400, detail=vault_result.message)
 
         # 409 guard: duplicate (connector_type, scope)
         existing = await self._repo.get_by_connector_and_scope(
@@ -67,7 +80,21 @@ class KnowledgeSourceService:
 
     async def list_all(self) -> list[KnowledgeSourceResponse]:
         records = await self._repo.list_all()
-        return [KnowledgeSourceResponse.model_validate(r) for r in records]
+        indexed_counts = await self._repo.get_indexed_document_counts(
+            [record.id for record in records]
+        )
+
+        responses: list[KnowledgeSourceResponse] = []
+        for record in records:
+            response = KnowledgeSourceResponse.model_validate(record)
+            responses.append(
+                response.model_copy(
+                    update={
+                        "document_count": int(indexed_counts.get(record.id, 0))
+                    }
+                )
+            )
+        return responses
 
     async def toggle_active(
         self, source_id: UUID, is_active: bool
@@ -80,6 +107,26 @@ class KnowledgeSourceService:
             )
         await self._session.commit()
         return KnowledgeSourceResponse.model_validate(record)
+
+    async def delete(self, source_id: UUID) -> None:
+        """Permanently delete a knowledge source.
+
+        Sync-job history and connector-audit-log entries cascade-delete via
+        FK (ON DELETE CASCADE). Indexed chunks/vectors in Qdrant, OpenSearch,
+        and the PostgreSQL chunk index are NOT deleted here — there is no FK
+        link to knowledge_sources.id for them, so they become orphaned; full
+        cross-store cleanup is a known follow-up.
+
+        Raises:
+            HTTPException: 404 if source_id does not exist.
+        """
+        deleted = await self._repo.delete(source_id)
+        if not deleted:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Knowledge source {source_id} not found",
+            )
+        await self._session.commit()
 
     async def _emit_creation_event(
         self, source_id: UUID, payload: KnowledgeSourceCreate

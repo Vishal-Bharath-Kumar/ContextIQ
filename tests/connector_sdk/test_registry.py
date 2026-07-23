@@ -243,6 +243,51 @@ class TestConnectorRegistryGet:
 
 
 @pytest.mark.asyncio
+class TestConnectorRegistryRegister:
+    """Covers register() — used by IndexingPipeline to add per-source
+    connectors (keyed by knowledge_source UUID) outside of entry-point
+    discovery (which only registers one shared instance per connector TYPE)."""
+
+    async def test_register_makes_connector_retrievable_via_get(self) -> None:
+        StubCls = _make_stub()
+        instance = StubCls()
+        registry = ConnectorRegistry()
+
+        registry.register("some-source-id", instance)
+
+        assert registry.get("some-source-id") is instance
+
+    async def test_register_defaults_to_enabled(self) -> None:
+        StubCls = _make_stub()
+        instance = StubCls()
+        registry = ConnectorRegistry()
+
+        registry.register("some-source-id", instance)
+
+        assert instance in registry.all_enabled()
+
+    async def test_register_can_mark_disabled(self) -> None:
+        StubCls = _make_stub()
+        instance = StubCls()
+        registry = ConnectorRegistry()
+
+        registry.register("some-source-id", instance, enabled=False)
+
+        assert registry.get("some-source-id") is None
+        assert instance not in registry.all_enabled()
+
+    async def test_register_overwrites_existing_entry(self) -> None:
+        StubCls = _make_stub()
+        first, second = StubCls(), StubCls()
+        registry = ConnectorRegistry()
+
+        registry.register("some-source-id", first)
+        registry.register("some-source-id", second)
+
+        assert registry.get("some-source-id") is second
+
+
+@pytest.mark.asyncio
 class TestConnectorRegistryAllEnabled:
     async def test_all_enabled_returns_only_enabled_instances(self) -> None:
         """all_enabled() returns only instances with enabled=True."""

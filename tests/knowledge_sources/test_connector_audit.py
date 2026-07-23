@@ -20,6 +20,7 @@ from httpx import ASGITransport, AsyncClient
 from src.auth.dependencies import decode_jwt_claims
 from src.auth.roles import PlatformRole
 from src.auth.testing import make_test_claims
+from src.connector_sdk.schemas.health import HealthStatus
 from src.data.dependencies import get_db
 from src.knowledge_sources.dependencies import get_knowledge_source_service
 from src.knowledge_sources.repositories.audit_repository import AuditRepository
@@ -47,6 +48,7 @@ _SOURCE_ID = uuid4()
 
 _SAMPLE_RESPONSE = KnowledgeSourceResponse(
     id=_SOURCE_ID,
+    name="Acme GitHub",
     connector_type=ConnectorType.GITHUB,
     credentials_vault_path="secret/contextiq/github/acme",
     scope="acme-org/api-service",
@@ -61,6 +63,7 @@ _SAMPLE_RESPONSE = KnowledgeSourceResponse(
 )
 
 _VALID_PAYLOAD = {
+    "name": "Acme GitHub",
     "connector_type": "github",
     "credentials_vault_path": "secret/contextiq/github/acme",
     "scope": "acme-org/api-service",
@@ -99,7 +102,12 @@ async def test_health_check_service_success() -> None:
     repo_mock.get_by_id.return_value = record
 
     connector_mock = AsyncMock()
-    connector_mock.health_check = AsyncMock(return_value=None)
+    connector_mock.authenticate = AsyncMock(return_value=None)
+    connector_mock.health_check = AsyncMock(
+        return_value=HealthStatus(healthy=True, message="ok", checked_at=_NOW)
+    )
+    connector_cls = MagicMock(return_value=connector_mock)
+    config_cls = MagicMock()
 
     session_mock = AsyncMock()
 
@@ -107,12 +115,9 @@ async def test_health_check_service_success() -> None:
         "src.knowledge_sources.services.health_check_service.KnowledgeSourceRepository",
         return_value=repo_mock,
     ), patch(
-        "src.knowledge_sources.services.health_check_service.importlib.import_module"
-    ) as mock_import:
-        mock_module = MagicMock()
-        mock_module.GithubConnector.return_value = connector_mock
-        mock_import.return_value = mock_module
-
+        "src.knowledge_sources.services.health_check_service.CONNECTOR_CLASS_MAP",
+        {"github": (connector_cls, config_cls)},
+    ):
         svc = HealthCheckService(session_mock)
         result = await svc.run(_SOURCE_ID)
 
@@ -133,7 +138,9 @@ async def test_health_check_service_connector_error() -> None:
     repo_mock.get_by_id.return_value = record
 
     connector_mock = AsyncMock()
-    connector_mock.health_check = AsyncMock(side_effect=ConnectionError("timeout"))
+    connector_mock.authenticate = AsyncMock(side_effect=ConnectionError("timeout"))
+    connector_cls = MagicMock(return_value=connector_mock)
+    config_cls = MagicMock()
 
     session_mock = AsyncMock()
 
@@ -141,12 +148,9 @@ async def test_health_check_service_connector_error() -> None:
         "src.knowledge_sources.services.health_check_service.KnowledgeSourceRepository",
         return_value=repo_mock,
     ), patch(
-        "src.knowledge_sources.services.health_check_service.importlib.import_module"
-    ) as mock_import:
-        mock_module = MagicMock()
-        mock_module.GithubConnector.return_value = connector_mock
-        mock_import.return_value = mock_module
-
+        "src.knowledge_sources.services.health_check_service.CONNECTOR_CLASS_MAP",
+        {"github": (connector_cls, config_cls)},
+    ):
         svc = HealthCheckService(session_mock)
         result = await svc.run(_SOURCE_ID)
 
@@ -190,9 +194,6 @@ async def test_health_check_service_unimplemented_connector() -> None:
     with patch(
         "src.knowledge_sources.services.health_check_service.KnowledgeSourceRepository",
         return_value=repo_mock,
-    ), patch(
-        "src.knowledge_sources.services.health_check_service.importlib.import_module",
-        side_effect=ImportError("no module"),
     ):
         svc = HealthCheckService(session_mock)
         with pytest.raises(HTTPException) as exc_info:

@@ -47,6 +47,8 @@ x-app-env-vars: &app-env-vars
     KAFKA_PASSWORD: "contextiq_dev"
     # ── Qdrant ───────────────────────────────────────────────────────────────
     QDRANT_URL: "http://qdrant:6333"
+    # ── OpenSearch ────────────────────────────────────────────────────────────
+    OPENSEARCH_URL: "http://opensearch:9200"
     # ── Neo4j ────────────────────────────────────────────────────────────────
     NEO4J_URI: "bolt://neo4j:7687"
     NEO4J_USERNAME: "neo4j"
@@ -94,6 +96,8 @@ x-app-depends: &app-depends   # Common service dependencies
   kafka:
     condition: service_healthy
   qdrant:
+    condition: service_healthy
+  opensearch:
     condition: service_healthy
   neo4j:
     condition: service_healthy
@@ -244,6 +248,25 @@ services:
       start_period: 20s
     restart: unless-stopped
 
+  # ── OpenSearch (BM25 keyword index for retrieval/indexing) ───────────────
+  opensearch:
+    image: opensearchproject/opensearch:2.11.1
+    environment:
+      discovery.type: "single-node"
+      plugins.security.disabled: "true"
+      OPENSEARCH_JAVA_OPTS: "-Xms512m -Xmx512m"
+    volumes:
+      - opensearch-data:/usr/share/opensearch/data
+    ports:
+      - "9200:9200"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:9200 >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 60s
+    restart: unless-stopped
+
   # ── Neo4j 5 (Knowledge Graph) ─────────────────────────────────────────────
   neo4j:
     image: neo4j:5
@@ -296,6 +319,48 @@ services:
         mc mb --ignore-existing local/contextiq-audit-archive &&
         mc mb --ignore-existing local/contextiq-traces &&
         echo 'MinIO buckets ready.'
+      "
+
+  # ── HashiCorp Vault (dev mode — LOCAL DEV ONLY, in-memory, non-persistent) ─
+  # Backs the knowledge_sources feature's VaultPathValidator (AC-5) and the
+  # per-connector token providers (src/connectors/*/auth.py). NOT for
+  # production use — real deployments use the k8s Vault (see scripts/vault/).
+  vault:
+    image: hashicorp/vault:1.15
+    cap_add:
+      - IPC_LOCK
+    environment:
+      VAULT_DEV_ROOT_TOKEN_ID: "contextiq-dev-root-token"
+      VAULT_DEV_LISTEN_ADDRESS: "0.0.0.0:8200"
+      VAULT_ADDR: "http://127.0.0.1:8200"
+    ports:
+      - "8200:8200"
+    healthcheck:
+      test: ["CMD-SHELL", "vault status -format=json | grep -q '\"sealed\": false'"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+
+  # ── Vault bootstrap (one-shot): AppRole + local dev connector secrets ──────
+  vault-init:
+    image: hashicorp/vault:1.15
+    depends_on:
+      vault:
+        condition: service_healthy
+    environment:
+      VAULT_ADDR: "http://vault:8200"
+      VAULT_TOKEN: "contextiq-dev-root-token"
+    entrypoint: >
+      sh -c "
+        vault auth enable approle 2>/dev/null || true &&
+        printf '%s\n' 'path \"secret/data/connectors/*\" { capabilities = [\"read\", \"create\", \"update\"] }' 'path \"secret/metadata/connectors/*\" { capabilities = [\"read\", \"list\"] }' | vault policy write contextiq-connectors - &&
+        vault write auth/approle/role/contextiq-connectors token_policies=\"contextiq-connectors\" secret_id_ttl=0 token_ttl=1h token_max_ttl=4h &&
+        vault write auth/approle/role/contextiq-connectors/role-id role_id=contextiq-connectors-role &&
+        (vault write auth/approle/role/contextiq-connectors/custom-secret-id secret_id=contextiq-connectors-secret 2>/dev/null || true) &&
+        (vault kv get -format=json secret/connectors/github/my-org-pat >/dev/null 2>&1 || vault kv put secret/connectors/github/my-org-pat token=ghp_local_dev_dummy_token_1234 token_type=pat) &&
+        echo 'Vault bootstrap complete.'
       "
 
   # ── Keycloak (Identity Provider) ─────────────────────────────────────────
@@ -395,6 +460,8 @@ services:
       dockerfile: Dockerfile
     depends_on:
       <<: *app-depends
+      vault-init:
+        condition: service_completed_successfully
     env_file: *app-env-file
     environment:
       <<: *app-env-vars
@@ -403,6 +470,21 @@ services:
       # flow. Real Keycloak-issued JWTs are still returned/validated normally
       # — this is NOT an auth bypass. Never set in production.
       CONTEXTIQ_DEV_LOGIN_ENABLED: "true"
+      # ── Vault (knowledge_sources VaultPathValidator — local dev only) ──────
+      KNOWLEDGE_SOURCE_VAULT_ADDR: "http://vault:8200"
+      KNOWLEDGE_SOURCE_VAULT_ROLE_ID: "contextiq-connectors-role"
+      KNOWLEDGE_SOURCE_VAULT_SECRET_ID: "contextiq-connectors-secret"
+      KNOWLEDGE_SOURCE_VAULT_MOUNT: "secret"
+      # ── GitHub connector's own Vault AppRole (src/connectors/github/auth.py) ──
+      # Reuses the same contextiq-connectors AppRole seeded by vault-init;
+      # required for GitHubTokenProvider.authenticate() to succeed at all —
+      # without these the connector registers as enabled=False (auth failed).
+      GITHUB_CONNECTOR_VAULT_ADDR: "http://vault:8200"
+      GITHUB_CONNECTOR_VAULT_ROLE_ID: "contextiq-connectors-role"
+      GITHUB_CONNECTOR_VAULT_SECRET_ID: "contextiq-connectors-secret"
+      # Matches the dev secret vault-init seeds at secret/connectors/github/my-org-pat.
+      # Overwrite this secret with a real PAT (see docs) instead of changing this path.
+      GITHUB_CONNECTOR_VAULT_PATH: "connectors/github/my-org-pat"
     volumes:
       *app-volumes
     ports:
@@ -423,11 +505,17 @@ services:
       dockerfile: Dockerfile.agent
     depends_on:
       <<: *app-depends
+      vault-init:
+        condition: service_completed_successfully
     env_file: *app-env-file
     environment:
       <<: *app-env-vars
       OTEL_SERVICE_NAME: "contextiq-agent-worker"
       REDIS_URL: "rediss://:contextiq_dev@redis:6379/0?ssl_cert_reqs=none"
+      GITHUB_CONNECTOR_VAULT_ADDR: "http://vault:8200"
+      GITHUB_CONNECTOR_VAULT_ROLE_ID: "contextiq-connectors-role"
+      GITHUB_CONNECTOR_VAULT_SECRET_ID: "contextiq-connectors-secret"
+      GITHUB_CONNECTOR_VAULT_PATH: "connectors/github/my-org-pat"
     volumes:
       *app-volumes
     ports:
@@ -448,13 +536,27 @@ services:
       dockerfile: Dockerfile.indexing
     depends_on:
       <<: *app-depends
+      vault-init:
+        condition: service_completed_successfully
     env_file: *app-env-file
     environment:
       <<: *app-env-vars
       OTEL_SERVICE_NAME: "contextiq-indexing"
+      # ── Vault (knowledge_sources config used during indexing connector build)
+      # Matches API settings so indexing can resolve connector credentials too.
+      KNOWLEDGE_SOURCE_VAULT_ADDR: "http://vault:8200"
+      KNOWLEDGE_SOURCE_VAULT_ROLE_ID: "contextiq-connectors-role"
+      KNOWLEDGE_SOURCE_VAULT_SECRET_ID: "contextiq-connectors-secret"
+      KNOWLEDGE_SOURCE_VAULT_MOUNT: "secret"
       # Use the local fastembed model (BAAI/bge-small-en-v1.5) instead of
       # LiteLLM/OpenAI so this service works without an external API key.
       EMBEDDING_USE_LOCAL_MODEL: "true"
+      # bge-small-en-v1.5 emits 384-dim vectors; Qdrant collection must match.
+      QDRANT_VECTOR_SIZE: "384"
+      GITHUB_CONNECTOR_VAULT_ADDR: "http://vault:8200"
+      GITHUB_CONNECTOR_VAULT_ROLE_ID: "contextiq-connectors-role"
+      GITHUB_CONNECTOR_VAULT_SECRET_ID: "contextiq-connectors-secret"
+      GITHUB_CONNECTOR_VAULT_PATH: "connectors/github/my-org-pat"
     volumes:
       *app-volumes
     restart: unless-stopped
@@ -485,6 +587,7 @@ volumes:
   sentinel-data:    # Redis Sentinel's writable runtime config copy
   kafka-data:       # Kafka log data
   qdrant-data:      # Qdrant vector storage
+  opensearch-data:  # OpenSearch index data
   neo4j-data:       # Neo4j graph data
   minio-data:       # MinIO object storage
 

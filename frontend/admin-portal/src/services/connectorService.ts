@@ -3,7 +3,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 export interface ConnectorSummary {
   id: string;
-  name: string;
+  // Nullable: connectors created before the name column was added have no name.
+  name: string | null;
   connector_type: string;
   status: "active" | "inactive" | "syncing" | "error";
   last_sync_at: string | null; // ISO-8601
@@ -44,7 +45,7 @@ export function useToggleConnector() {
   return useMutation({
     mutationFn: ({ id, enabled }: { id: string; enabled: boolean }) =>
       api.patch(`/v1/knowledge-sources/${id}/status`, {
-        status: enabled ? "active" : "inactive",
+        active: enabled,
       }),
     onSuccess: () => qc.invalidateQueries({ queryKey: CONNECTOR_KEYS.all }),
   });
@@ -55,6 +56,32 @@ export function useCreateConnector() {
   return useMutation({
     mutationFn: (payload: import("../schemas/connectorWizard").ConnectorCreatePayload) =>
       api.post("/v1/knowledge-sources", payload).then((r) => r.data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: CONNECTOR_KEYS.all }),
+  });
+}
+
+export function useDeleteConnector() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.delete(`/v1/knowledge-sources/${id}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: CONNECTOR_KEYS.all }),
+  });
+}
+
+export interface SyncTriggerResult {
+  job_id: string;
+  message: string;
+}
+
+export function useTriggerSync() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      api
+        .post<SyncTriggerResult>(`/v1/knowledge-sources/${id}/sync`)
+        .then((r) => r.data),
+    // Sync runs in the background; refresh the list so status/last_sync_at/
+    // document_count pick up the "syncing" -> "active" transition.
     onSuccess: () => qc.invalidateQueries({ queryKey: CONNECTOR_KEYS.all }),
   });
 }

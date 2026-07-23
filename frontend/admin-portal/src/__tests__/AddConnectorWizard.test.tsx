@@ -6,7 +6,7 @@
  *  - Cron validation error on invalid input
  *  - Form submission payload sent to POST /v1/knowledge-sources
  *
- * AC-2: All four fields (connector_type, vault_path, scope, sync_schedule)
+ * AC-2: All four fields (connector_type, credentials_vault_path, scope, sync_schedule)
  *       are merged and sent on final submit.
  * AC-7: Each step's legend is in the document; errors use role="alert";
  *       WizardStepper marks current step with aria-current="step".
@@ -173,7 +173,7 @@ describe("Step 4: Schedule cron validation", () => {
     );
     await user.type(
       screen.getByLabelText(/vault secret path/i),
-      "secret/data/connectors/jira/my-cloud-token"
+      "connectors/jira/my-cloud-token"
     );
     await user.click(screen.getByRole("button", { name: /next/i }));
 
@@ -214,7 +214,7 @@ describe("Step 4: Schedule cron validation", () => {
       expect(capturedBody).toMatchObject({
         connector_type: "jira",
         name: "my-jira",
-        vault_path: "secret/data/connectors/jira/my-cloud-token",
+        credentials_vault_path: "connectors/jira/my-cloud-token",
         scope: "PLATFORM",
         sync_schedule: "0 2 * * *",
       })

@@ -124,3 +124,7 @@ class QdrantIndexer:
             points_selector=[str(cid) for cid in chunk_ids],
             wait=True,
         )
+
+    async def close(self) -> None:
+        """Close the underlying async HTTP client/session."""
+        await self._client.close()
