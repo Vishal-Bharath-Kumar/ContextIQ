@@ -6,6 +6,7 @@ import { z } from "zod";
 
 import {
   useCreatePolicy,
+  useUpdatePolicy,
   usePolicyDetail,
   useValidateRego,
 } from "../../services/policyService";
@@ -14,6 +15,8 @@ import { ValidationErrorPanel } from "../../components/policies/ValidationErrorP
 import { PreviewImpactPanel } from "../../components/policies/PreviewImpactPanel";
 import { PolicyAuditTrailPanel } from "../../components/policies/PolicyAuditTrailPanel";
 import { ActivatePolicyDialog } from "../../components/policies/ActivatePolicyDialog";
+import { DeactivatePolicyDialog } from "../../components/policies/DeactivatePolicyDialog";
+import { DeletePolicyDialog } from "../../components/policies/DeletePolicyDialog";
 import { GlassCard } from "../../components/ui/GlassCard";
 import { PageHeader } from "../../components/ui/PageHeader";
 
@@ -44,8 +47,11 @@ function PolicyDetailPage() {
   const isNew = !id;
 
   const { data: policy, isLoading: isPolicyLoading } = usePolicyDetail(id);
-  const { mutateAsync: createPolicy, isPending: isSaving } = useCreatePolicy();
+  const { mutateAsync: createPolicy, isPending: isCreating } = useCreatePolicy();
+  const { mutateAsync: updatePolicy, isPending: isUpdating } = useUpdatePolicy();
   const { mutate: validateRego, data: validation, isPending: isValidating } = useValidateRego();
+
+  const isSaving = isCreating || isUpdating;
 
   const [regoBody, setRegoBody] = useState(DEFAULT_REGO_TEMPLATE);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -91,10 +97,35 @@ function PolicyDetailPage() {
   const onSubmit = async (fields: PolicyFormFields) => {
     setSaveError(null);
     try {
-      await createPolicy({ ...fields, description: fields.description ?? "", rego_body: regoBody });
-      navigate("/policies");
-    } catch {
-      setSaveError("Failed to save policy draft. Please try again.");
+      if (isNew) {
+        // Create new policy - returns the created PolicyVersion
+        const result = await createPolicy({ 
+          ...fields, 
+          description: fields.description ?? "", 
+          rego_body: regoBody 
+        });
+        // Navigate to the newly created policy's detail page
+        navigate(`/policies/${result.id}`);
+      } else {
+        // Update existing policy (only DRAFT policies can be updated)
+        if (!selectedVersion?.id) {
+          setSaveError("Cannot update: no policy version selected.");
+          return;
+        }
+        const result = await updatePolicy({
+          policyId: selectedVersion.id,
+          description: fields.description,
+          rego_body: regoBody,
+        });
+        // Navigate to the updated policy's detail page
+        navigate(`/policies/${result.id}`);
+      }
+    } catch (error: any) {
+      if (error?.response?.status === 400 && error?.response?.data?.detail) {
+        setSaveError(error.response.data.detail);
+      } else {
+        setSaveError(`Failed to ${isNew ? "create" : "update"} policy. Please try again.`);
+      }
     }
   };
 
@@ -104,6 +135,10 @@ function PolicyDetailPage() {
       ? `Edit Policy: ${policy.name}`
       : "Edit Policy";
 
+  const isActive = !isNew && policy?.active_version !== null;
+  const canDelete = !isNew && !isActive && selectedVersion && 
+    (selectedVersion.status === "draft" || selectedVersion.status === "superseded");
+
   return (
     <main aria-labelledby="policy-detail-heading" className="page-layout max-w-4xl">
       <PageHeader
@@ -111,8 +146,22 @@ function PolicyDetailPage() {
         title={heading}
         subtitle="Author, validate, and preview OPA/Rego governance policies before activation."
         actions={
-          !isNew && policy?.active_version ? (
-            <ActivatePolicyDialog policyId={policy.id} policyName={policy.name} />
+          !isNew && policy ? (
+            <div className="flex items-center gap-2">
+              {isActive ? (
+                <DeactivatePolicyDialog policyId={policy.id} policyName={policy.name} />
+              ) : (
+                <ActivatePolicyDialog policyId={policy.id} policyName={policy.name} />
+              )}
+              {canDelete && selectedVersion && (
+                <DeletePolicyDialog 
+                  policyId={selectedVersion.id} 
+                  policyVersion={selectedVersion.version}
+                  policyStatus={selectedVersion.status}
+                  redirectAfterDelete={true}
+                />
+              )}
+            </div>
           ) : undefined
         }
       />

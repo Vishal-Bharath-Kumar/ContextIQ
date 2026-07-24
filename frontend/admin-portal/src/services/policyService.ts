@@ -94,16 +94,47 @@ export function useActivatePolicy() {
   });
 }
 
-export function useRollbackPolicy() {
+export function useDeactivatePolicy() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ policyId, version }: { policyId: string; version: string }) =>
+    mutationFn: (policyId: string) =>
+      api.post<PolicyVersion>(`/v1/policies/${policyId}/deactivate`).then((r) => r.data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: POLICY_KEYS.all }),
+  });
+}
+
+export function useUpdatePolicy() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      policyId,
+      description,
+      rego_body,
+    }: {
+      policyId: string;
+      description?: string;
+      rego_body?: string;
+    }) =>
       api
-        .post(`/v1/policies/${policyId}/rollback?version=${encodeURIComponent(version)}`)
+        .put<PolicyVersion>(`/v1/policies/${policyId}`, {
+          description,
+          rego_body,
+        })
         .then((r) => r.data),
     onSuccess: (_data, { policyId }) => {
       qc.invalidateQueries({ queryKey: POLICY_KEYS.all });
       qc.invalidateQueries({ queryKey: POLICY_KEYS.detail(policyId) });
+    },
+  });
+}
+
+export function useDeletePolicy() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (policyId: string) =>
+      api.delete(`/v1/policies/${policyId}`).then((r) => r.data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: POLICY_KEYS.all });
     },
   });
 }

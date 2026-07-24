@@ -14,18 +14,23 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.api.admin.dependencies import require_admin_role
 from src.data.dependencies import get_db
 from src.gateway.schemas.auth_types import JWTClaims
+from src.governance.policy.audit_repository import PolicyAuditRepository
 from src.governance.policy.models import PolicyRecord
 from src.governance.policy.repository import PolicyNotFoundError, PolicyRepository
 from src.governance.policy.schemas import (
     ActivateResponse,
+    PolicyAuditEntry,
     PolicyCreate,
     PolicyGroupSummary,
+    PolicyPreviewRequest,
+    PolicyPreviewResult,
     PolicyStatus,
+    PolicyUpdate,
     PolicyVersion,
     RegoValidateRequest,
     RegoValidateResponse,
-    RollbackResponse,
 )
+from src.governance.policy.preview_service import PolicyPreviewService
 from src.governance.policy.service import (
     PolicyAlreadyActiveError,
     PolicyService,
@@ -45,6 +50,7 @@ _OPA_BASE_URL = os.environ.get("OPA_BASE_URL", "http://localhost:8181")
 def _build_service(session: AsyncSession) -> PolicyService:
     """Construct a PolicyService scoped to the current request session."""
     repo = PolicyRepository(session)
+    audit_repo = PolicyAuditRepository(session)
     validator = RegoValidator(
         client=httpx.AsyncClient(),
         opa_base=_OPA_BASE_URL,
@@ -55,6 +61,7 @@ def _build_service(session: AsyncSession) -> PolicyService:
         validator=validator,
         opa_client=opa_client,
         opa_base=_OPA_BASE_URL,
+        audit_repository=audit_repo,
     )
 
 
@@ -138,32 +145,6 @@ async def validate_policy(
 
 
 # ------------------------------------------------------------------ #
-# GET /v1/policies/{id} — single policy group detail (AC-2)          #
-# ------------------------------------------------------------------ #
-
-
-@router.get(
-    "/{policy_id}",
-    response_model=PolicyGroupSummary,
-    summary="Fetch one policy group (resolved via any of its version IDs).",
-)
-async def get_policy_detail(
-    policy_id: uuid.UUID,
-    claims: AdminClaims,
-    session: Annotated[AsyncSession, Depends(get_db)],
-) -> PolicyGroupSummary:
-    repo = PolicyRepository(session)
-    record = await repo.get_by_id(policy_id)
-    if record is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Policy {policy_id} not found.",
-        )
-    versions = await repo.list_versions(record.policy_group)
-    return _group_to_summary(list(versions))
-
-
-# ------------------------------------------------------------------ #
 # POST /v1/policies — AC-1                                           #
 # ------------------------------------------------------------------ #
 
@@ -194,6 +175,113 @@ async def create_policy(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"Policy '{payload.name}' version '{payload.version}' already exists.",
         ) from exc
+
+
+# ------------------------------------------------------------------ #
+# PUT /v1/policies/{id} — Update a policy version                    #
+# ------------------------------------------------------------------ #
+
+
+@router.put(
+    "/{policy_id}",
+    response_model=PolicyVersion,
+    summary="Update an existing policy version (DRAFT only).",
+)
+async def update_policy(
+    policy_id: uuid.UUID,
+    payload: PolicyUpdate,
+    claims: AdminClaims,
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> PolicyVersion:
+    """
+    Update the description and/or rego_body of an existing policy version.
+    Only DRAFT policies can be updated.
+    """
+    svc = _build_service(session)
+    try:
+        result = await svc.update(
+            policy_id=policy_id,
+            description=payload.description,
+            rego_body=payload.rego_body,
+            author=claims.sub,
+        )
+        await session.commit()
+        return result
+    except PolicyNotFoundError as exc:
+        await session.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Policy {policy_id} not found.",
+        ) from exc
+    except ValueError as exc:
+        await session.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+
+
+# ------------------------------------------------------------------ #
+# DELETE /v1/policies/{id} — Delete a policy version                 #
+# ------------------------------------------------------------------ #
+
+
+@router.delete(
+    "/{policy_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Delete a policy version (DRAFT or SUPERSEDED only).",
+)
+async def delete_policy(
+    policy_id: uuid.UUID,
+    claims: AdminClaims,
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> None:
+    """
+    Delete a policy version. Only DRAFT or SUPERSEDED policies can be deleted.
+    Active policies must be deactivated first.
+    """
+    svc = _build_service(session)
+    try:
+        await svc.delete(policy_id=policy_id, author=claims.sub)
+        await session.commit()
+    except PolicyNotFoundError as exc:
+        await session.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Policy {policy_id} not found.",
+        ) from exc
+    except ValueError as exc:
+        await session.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+
+
+# ------------------------------------------------------------------ #
+# GET /v1/policies/{id} — single policy group detail (AC-2)          #
+# ------------------------------------------------------------------ #
+
+
+@router.get(
+    "/{policy_id}",
+    response_model=PolicyGroupSummary,
+    summary="Fetch one policy group (resolved via any of its version IDs).",
+)
+async def get_policy_detail(
+    policy_id: uuid.UUID,
+    claims: AdminClaims,
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> PolicyGroupSummary:
+    repo = PolicyRepository(session)
+    record = await repo.get_by_id(policy_id)
+    if record is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Policy {policy_id} not found.",
+        )
+    versions = await repo.list_versions(record.policy_group)
+    return _group_to_summary(list(versions))
 
 
 # ------------------------------------------------------------------ #
@@ -243,51 +331,116 @@ async def activate_policy(
 
 
 # ------------------------------------------------------------------ #
-# POST /v1/policies/{id}/rollback?version=N — AC-4                   #
+# POST /v1/policies/{id}/deactivate — Deactivate active policy      #
 # ------------------------------------------------------------------ #
 
 
 @router.post(
-    "/{policy_id}/rollback",
-    response_model=RollbackResponse,
-    summary="Roll back to a prior policy version.",
+    "/{policy_id}/deactivate",
+    response_model=PolicyVersion,
+    summary="Deactivate an active policy and remove it from OPA.",
 )
-async def rollback_policy(
+async def deactivate_policy(
     policy_id: uuid.UUID,
     claims: AdminClaims,
-    version: Annotated[str, Query(description="Target version string to restore.")],
     session: Annotated[AsyncSession, Depends(get_db)],
-) -> RollbackResponse:
+) -> PolicyVersion:
     """
-    AC-4: Restores `version` to active status within the policy group.
-    The policy group is resolved from the policy_id record.
+    Deactivate an active policy version and remove it from OPA.
+    The policy status changes to SUPERSEDED.
     """
     svc = _build_service(session)
-    repo = PolicyRepository(session)
-    record = await repo.get_by_id(policy_id)
-    if record is None:
+    try:
+        result = await svc.deactivate(policy_id=policy_id, author=claims.sub)
+        await session.commit()
+        return result
+    except PolicyNotFoundError as exc:
+        await session.rollback()
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Policy {policy_id} not found.",
-        )
+        ) from exc
+    except ValueError as exc:
+        await session.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+
+
+# ------------------------------------------------------------------ #
+# POST /v1/policies/{id}/preview — AC-3 policy impact simulation     #
+# ------------------------------------------------------------------ #
+
+
+@router.post(
+    "/{policy_id}/preview",
+    response_model=PolicyPreviewResult,
+    summary="Simulate a draft policy against recent execution traces.",
+)
+async def preview_policy(
+    policy_id: uuid.UUID,
+    request: PolicyPreviewRequest,
+    claims: AdminClaims,
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> PolicyPreviewResult:
+    """
+    AC-3: Temporarily push the Rego body to OPA, evaluate against the last
+    100 execution traces, and return allow/deny statistics.
+    The temporary policy is deleted afterward.
+    """
+    preview_svc = PolicyPreviewService(
+        session=session,
+        opa_client=httpx.AsyncClient(),
+        opa_base=_OPA_BASE_URL,
+    )
     try:
-        result = await svc.rollback(
-            policy_group=record.policy_group,
-            target_version=version,
-        )
-        await session.commit()
+        result = await preview_svc.preview(policy_id=policy_id, request=request)
         return result
-    except PolicyVersionNotFoundError as exc:
-        await session.rollback()
+    except httpx.ConnectError as exc:
+        logger.error("Failed to connect to OPA for policy preview: %s", exc)
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="OPA service is not available. Policy preview requires OPA to be running.",
         ) from exc
-    except RegoValidationError as exc:
-        await session.rollback()
+    except httpx.HTTPStatusError as exc:
+        logger.error("OPA returned error during policy preview: %s", exc)
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail={
-                "message": "Rego policy for rollback target failed syntax validation.",
-                "errors": exc.errors,
-            },
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"OPA service error: {exc.response.text if exc.response else str(exc)}",
         ) from exc
+
+
+# ------------------------------------------------------------------ #
+# GET /v1/policies/{id}/audit — fetch policy audit trail             #
+# ------------------------------------------------------------------ #
+
+
+@router.get(
+    "/{policy_id}/audit",
+    response_model=list[PolicyAuditEntry],
+    summary="Retrieve audit trail for a policy.",
+)
+async def get_policy_audit(
+    policy_id: uuid.UUID,
+    claims: AdminClaims,
+    session: Annotated[AsyncSession, Depends(get_db)],
+    limit: Annotated[int, Query(ge=1, le=500)] = 50,
+) -> list[PolicyAuditEntry]:
+    """
+    Return audit log entries for the specified policy, newest first.
+    Defaults to last 50 entries; maximum 500.
+    """
+    audit_repo = PolicyAuditRepository(session)
+    entries = await audit_repo.get_for_policy(policy_id, limit=limit)
+    return [
+        PolicyAuditEntry(
+            id=e.id,
+            policy_id=e.policy_id,
+            event_type=e.event_type,
+            actor_user_id=e.actor_user_id,
+            detail=e.detail,
+            created_at=e.created_at,
+        )
+        for e in entries
+    ]

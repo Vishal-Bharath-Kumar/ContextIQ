@@ -18,13 +18,13 @@ from datetime import UTC, datetime
 
 import httpx
 
+from src.governance.policy.audit_repository import PolicyAuditRepository
 from src.governance.policy.repository import PolicyNotFoundError, PolicyRepository
 from src.governance.policy.schemas import (
     ActivateResponse,
     PolicyCreate,
     PolicyStatus,
     PolicyVersion,
-    RollbackResponse,
 )
 from src.governance.policy.validator import RegoValidationError, RegoValidator
 
@@ -54,11 +54,13 @@ class PolicyService:
         validator: RegoValidator,
         opa_client: httpx.AsyncClient,
         opa_base: str = "http://localhost:8181",
+        audit_repository: PolicyAuditRepository | None = None,
     ) -> None:
         self._repo = repository
         self._validator = validator
         self._opa = opa_client
         self._opa_base = opa_base.rstrip("/")
+        self._audit = audit_repository
 
     # ------------------------------------------------------------------ #
     # AC-1 — Create new policy version                                    #
@@ -88,6 +90,16 @@ class PolicyService:
             payload.version,
             author,
         )
+        
+        # Log audit event
+        if self._audit:
+            await self._audit.log(
+                policy_id=record.id,
+                event_type="policy.created",
+                actor_user_id=author,
+                detail=f"Created version {payload.version} in group {payload.name}",
+            )
+        
         return _to_version(record)
 
     # ------------------------------------------------------------------ #
@@ -135,6 +147,16 @@ class PolicyService:
             updated.version,
             bundle_push_ok,
         )
+        
+        # Log audit event
+        if self._audit:
+            await self._audit.log(
+                policy_id=policy_id,
+                event_type="policy.activated",
+                actor_user_id=record.author,
+                detail=f"Activated version {updated.version} in group {updated.policy_group}",
+            )
+        
         return ActivateResponse(
             activated_version=updated.version,
             bundle_push_ok=bundle_push_ok,
@@ -142,59 +164,133 @@ class PolicyService:
         )
 
     # ------------------------------------------------------------------ #
-    # AC-4 — Roll back to a prior version                                 #
+    # Update a policy version                                             #
     # ------------------------------------------------------------------ #
 
-    async def rollback(
+    async def update(
         self,
         *,
-        policy_group: str,
-        target_version: str,
-    ) -> RollbackResponse:
-        """Roll back to a prior policy version.
-
-        1. Locate the currently active version and the target version.
-        2. Push the target Rego to OPA.
-        3. Demote the current active to ROLLED_BACK; promote the target to ACTIVE.
-        4. Record activated_at on the restored version (AC-5).
+        policy_id: uuid.UUID,
+        description: str | None = None,
+        rego_body: str | None = None,
+        author: str,
+    ) -> PolicyVersion:
+        """Update an existing policy version.
+        
+        Only DRAFT policies can be updated.
         """
-        current_active = await self._repo.get_active(policy_group)
-        if current_active is None:
-            raise PolicyVersionNotFoundError(
-                f"No active policy found for group '{policy_group}'."
-            )
-
-        target = await self._repo.get_version(policy_group, target_version)
-        if target is None:
-            raise PolicyVersionNotFoundError(
-                f"Version '{target_version}' not found in group '{policy_group}'."
-            )
-
-        # Re-validate the target Rego before reinstating it (safety net)
-        result = await self._validator.validate(policy_group, target.rego_body)
-        if not result.is_valid:
-            raise RegoValidationError(result.errors)
-
-        activated_at = datetime.now(tz=UTC)
-        previous_label = current_active.version
-
-        await self._push_to_opa(policy_group, target.rego_body)
-
-        await self._repo.set_rolled_back(
-            current_active_id=current_active.id,
-            target_version_id=target.id,
-            activated_at=activated_at,
+        record = await self._repo.get_by_id(policy_id)
+        if record is None:
+            raise PolicyNotFoundError(str(policy_id))
+        
+        updated = await self._repo.update(
+            policy_id=policy_id,
+            description=description,
+            rego_body=rego_body,
         )
         logger.info(
-            "policy.rolled_back group=%s from=%s to=%s",
-            policy_group,
-            previous_label,
-            target_version,
+            "policy.updated group=%s version=%s author=%s",
+            updated.policy_group,
+            updated.version,
+            author,
         )
-        return RollbackResponse(
-            restored_version=target_version,
-            previous_active=previous_label,
-            activated_at=activated_at,
+        
+        # Log audit event
+        if self._audit:
+            changes = []
+            if description is not None:
+                changes.append("description")
+            if rego_body is not None:
+                changes.append("rego_body")
+            await self._audit.log(
+                policy_id=policy_id,
+                event_type="policy.updated",
+                actor_user_id=author,
+                detail=f"Updated {', '.join(changes)} for version {updated.version} in group {updated.policy_group}",
+            )
+        
+        return _to_version(updated)
+
+    # ------------------------------------------------------------------ #
+    # Deactivate a policy version                                         #
+    # ------------------------------------------------------------------ #
+
+    async def deactivate(
+        self,
+        *,
+        policy_id: uuid.UUID,
+        author: str,
+    ) -> PolicyVersion:
+        """Deactivate an active policy version.
+        
+        Marks the policy as SUPERSEDED and removes it from OPA.
+        """
+        record = await self._repo.get_by_id(policy_id)
+        if record is None:
+            raise PolicyNotFoundError(str(policy_id))
+        
+        if record.status != PolicyStatus.ACTIVE:
+            raise ValueError(f"Policy {policy_id} is not active (status: {record.status}).")
+        
+        # Remove from OPA
+        await self._remove_from_opa(record.policy_group)
+        
+        # Mark as superseded
+        updated = await self._repo.mark_superseded(policy_id)
+        logger.info(
+            "policy.deactivated group=%s version=%s author=%s",
+            updated.policy_group,
+            updated.version,
+            author,
+        )
+        
+        # Log audit event
+        if self._audit:
+            await self._audit.log(
+                policy_id=policy_id,
+                event_type="policy.deactivated",
+                actor_user_id=author,
+                detail=f"Deactivated version {updated.version} in group {updated.policy_group}",
+            )
+        
+        return _to_version(updated)
+
+    # ------------------------------------------------------------------ #
+    # Delete a policy version                                             #
+    # ------------------------------------------------------------------ #
+
+    async def delete(
+        self,
+        *,
+        policy_id: uuid.UUID,
+        author: str,
+    ) -> None:
+        """Delete a policy version.
+        
+        Only DRAFT or SUPERSEDED policies can be deleted.
+        """
+        record = await self._repo.get_by_id(policy_id)
+        if record is None:
+            raise PolicyNotFoundError(str(policy_id))
+        
+        policy_group = record.policy_group
+        version = record.version
+        
+        # Log audit event before deletion
+        if self._audit:
+            await self._audit.log(
+                policy_id=policy_id,
+                event_type="policy.deleted",
+                actor_user_id=author,
+                detail=f"Deleted version {version} in group {policy_group}",
+            )
+        
+        await self._repo.delete(policy_id)
+        logger.info(
+            "policy.deleted group=%s version=%s author=%s",
+            policy_group,
+            version,
+            author,
         )
 
     # ------------------------------------------------------------------ #
@@ -227,6 +323,27 @@ class PolicyService:
             return False
         except httpx.RequestError as exc:
             logger.error("opa_push error for group=%s: %s", policy_group, exc)
+            return False
+
+    async def _remove_from_opa(self, policy_group: str) -> bool:
+        """DELETE policy from OPA.
+
+        Returns True on HTTP 200; logs and returns False on other status codes.
+        """
+        url = f"{self._opa_base}/v1/policies/{policy_group}"
+        try:
+            resp = await self._opa.delete(url, timeout=5.0)
+            if resp.status_code == 200:
+                return True
+            logger.error(
+                "opa_delete failed for group=%s status=%d body=%s",
+                policy_group,
+                resp.status_code,
+                resp.text[:256],
+            )
+            return False
+        except httpx.RequestError as exc:
+            logger.error("opa_delete error for group=%s: %s", policy_group, exc)
             return False
 
 

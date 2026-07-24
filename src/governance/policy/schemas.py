@@ -37,6 +37,19 @@ class PolicyCreate(BaseModel):
     )
 
 
+class PolicyUpdate(BaseModel):
+    """Payload for PUT /v1/policies/{id} to update an existing policy."""
+
+    model_config = ConfigDict(frozen=True)
+
+    description: str | None = Field(default=None, max_length=1024)
+    rego_body: str | None = Field(
+        default=None,
+        min_length=1,
+        description="Updated Rego source.",
+    )
+
+
 class PolicyVersion(BaseModel):
     """Read-only view of a single stored policy version (AC-2)."""
 
@@ -113,3 +126,40 @@ class RollbackResponse(BaseModel):
     restored_version: str
     previous_active: str
     activated_at: datetime
+
+
+class PolicyPreviewRequest(BaseModel):
+    """Payload for POST /v1/policies/{id}/preview."""
+
+    model_config = ConfigDict(frozen=True)
+
+    rego_body: str = Field(
+        min_length=1,
+        description="Draft Rego source to simulate against recent traces.",
+    )
+
+
+class PolicyPreviewResult(BaseModel):
+    """Response from policy preview showing impact on recent requests."""
+
+    model_config = ConfigDict(frozen=True)
+
+    evaluated_count: int
+    allow_count: int
+    deny_count: int
+    allow_pct: float
+    deny_pct: float
+    affected_request_ids: list[str]
+
+
+class PolicyAuditEntry(BaseModel):
+    """Single audit trail entry for a policy lifecycle event."""
+
+    model_config = ConfigDict(frozen=True)
+
+    id: UUID
+    policy_id: UUID
+    event_type: str
+    actor_user_id: str
+    detail: str | None = None
+    created_at: datetime

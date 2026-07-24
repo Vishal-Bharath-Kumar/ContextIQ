@@ -7,6 +7,7 @@ Satisfies AC-6 (422 on invalid Rego).
 """
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 
 import httpx
@@ -59,11 +60,16 @@ class RegoValidator:
         Does NOT raise — the call site decides whether to raise ``RegoValidationError``.
         """
         transient_name = f"{self._TRANSIENT_POLICY_PREFIX}{name}"
+        validation_package = f"validation.{transient_name}"
+        
+        # Rewrite package name to avoid conflicts with existing policies in OPA
+        rewritten_body = self._rewrite_package_name(rego_body, validation_package)
+        
         url = f"{self._opa_base}/v1/policies/{transient_name}"
 
         put_response = await self._client.put(
             url,
-            content=rego_body.encode(),
+            content=rewritten_body.encode(),
             headers={"Content-Type": "text/plain"},
             timeout=5.0,
         )
@@ -74,6 +80,26 @@ class RegoValidator:
 
         errors = _extract_opa_errors(put_response)
         return RegoValidationResult(is_valid=False, errors=errors)
+
+    def _rewrite_package_name(self, rego_body: str, new_package: str) -> str:
+        """
+        Rewrite the package declaration in a Rego policy to use a unique validation package.
+        
+        Handles patterns like:
+        - package contextiq.example
+        - package contextiq.example.subpolicy
+        """
+        # Match package declaration at the start of the file (possibly after comments)
+        pattern = r'^(\s*package\s+)[a-zA-Z_][a-zA-Z0-9_.]*(\s*)$'
+        replacement = rf'\1{new_package}\2'
+        
+        rewritten = re.sub(pattern, replacement, rego_body, count=1, flags=re.MULTILINE)
+        
+        if rewritten == rego_body:
+            # No package declaration found - add one
+            rewritten = f"package {new_package}\n\n{rego_body}"
+        
+        return rewritten
 
 
 def _extract_opa_errors(response: httpx.Response) -> list[str]:

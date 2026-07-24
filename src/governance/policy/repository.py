@@ -84,25 +84,54 @@ class PolicyRepository:
         await self._session.flush()
         return record
 
-    async def set_rolled_back(
+    async def mark_superseded(self, policy_id: uuid.UUID) -> PolicyRecord:
+        """Mark an ACTIVE policy as SUPERSEDED (deactivation).
+        
+        Called when manually deactivating a policy without replacing it.
+        """
+        record = await self._get_or_raise(policy_id)
+        if record.status != PolicyStatus.ACTIVE:
+            raise ValueError(f"Cannot supersede policy with status {record.status}. Only ACTIVE policies can be superseded.")
+        
+        record.status = PolicyStatus.SUPERSEDED
+        await self._session.flush()
+        return record
+
+    async def update(
         self,
         *,
-        current_active_id: uuid.UUID,
-        target_version_id: uuid.UUID,
-        activated_at: datetime,
+        policy_id: uuid.UUID,
+        description: str | None = None,
+        rego_body: str | None = None,
     ) -> PolicyRecord:
-        """Demote current_active_id to ROLLED_BACK; promote target_version_id to ACTIVE.
-
-        Returns the newly active record. AC-4.
+        """Update an existing policy version's description and/or rego_body.
+        
+        Only DRAFT policies can be updated. Returns the updated record.
         """
-        current = await self._get_or_raise(current_active_id)
-        current.status = PolicyStatus.ROLLED_BACK
-
-        target = await self._get_or_raise(target_version_id)
-        target.status = PolicyStatus.ACTIVE
-        target.activated_at = activated_at
+        record = await self._get_or_raise(policy_id)
+        if record.status != PolicyStatus.DRAFT:
+            raise ValueError(f"Cannot update policy with status {record.status}. Only DRAFT policies can be updated.")
+        
+        if description is not None:
+            record.description = description
+        if rego_body is not None:
+            record.rego_body = rego_body
+        
         await self._session.flush()
-        return target
+        return record
+
+    async def delete(self, policy_id: uuid.UUID) -> None:
+        """Delete a policy version by ID.
+        
+        Only DRAFT or SUPERSEDED policies can be deleted.
+        Active policies must be deactivated first.
+        """
+        record = await self._get_or_raise(policy_id)
+        if record.status == PolicyStatus.ACTIVE:
+            raise ValueError("Cannot delete an active policy. Deactivate it first.")
+        
+        await self._session.delete(record)
+        await self._session.flush()
 
     # ------------------------------------------------------------------ #
     # Reads                                                                #

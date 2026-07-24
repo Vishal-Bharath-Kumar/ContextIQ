@@ -6,6 +6,7 @@ evaluates the last 100 execution traces, then deletes the temporary policy.
 from __future__ import annotations
 
 import logging
+import re
 import uuid
 from typing import Any
 
@@ -46,10 +47,11 @@ class PolicyPreviewService:
     ) -> PolicyPreviewResult:
         traces = await self._load_recent_traces()
         temp_name = f"{_TEMP_POLICY_PREFIX}{policy_id.hex}"
+        preview_package = f"preview.{temp_name}"
 
-        await self._push_temp_policy(temp_name, request.rego_body)
+        await self._push_temp_policy(temp_name, preview_package, request.rego_body)
         try:
-            results = await self._evaluate_traces(temp_name, traces)
+            results = await self._evaluate_traces(preview_package, traces)
         finally:
             await self._delete_temp_policy(temp_name)
 
@@ -91,10 +93,21 @@ class PolicyPreviewService:
             for row in rows
         ]
 
-    async def _push_temp_policy(self, name: str, rego_body: str) -> None:
+    async def _push_temp_policy(self, name: str, preview_package: str, rego_body: str) -> None:
+        # Rewrite package name to avoid conflicts with existing policies
+        rewritten_body = self._rewrite_package_name(rego_body, preview_package)
+        
+        logger.info(
+            "Pushing preview policy %s with package %s (original: %s chars, rewritten: %s chars)",
+            name,
+            preview_package,
+            len(rego_body),
+            len(rewritten_body),
+        )
+        
         resp = await self._opa.put(
             f"{self._opa_base}/v1/policies/{name}",
-            content=rego_body.encode(),
+            content=rewritten_body.encode(),
             headers={"Content-Type": "text/plain"},
         )
         resp.raise_for_status()
@@ -109,15 +122,18 @@ class PolicyPreviewService:
 
     async def _evaluate_traces(
         self,
-        policy_name: str,
+        package_path: str,
         traces: list[dict[str, Any]],
     ) -> list[bool]:
         """Evaluate each trace against the temporary policy; returns allow booleans."""
         results: list[bool] = []
+        # Convert package path to OPA data path (e.g., preview.__preview__abc123 -> preview/__preview__abc123)
+        data_path = package_path.replace(".", "/")
+        
         for trace in traces:
             try:
                 resp = await self._opa.post(
-                    f"{self._opa_base}/v1/data/{policy_name}/allow",
+                    f"{self._opa_base}/v1/data/{data_path}/allow",
                     json={"input": trace},
                 )
                 allowed = resp.json().get("result", False) is True
@@ -125,3 +141,24 @@ class PolicyPreviewService:
                 allowed = False  # treat OPA call failure as deny
             results.append(allowed)
         return results
+
+    def _rewrite_package_name(self, rego_body: str, new_package: str) -> str:
+        """
+        Rewrite the package declaration in a Rego policy to use a unique preview package.
+        
+        Handles patterns like:
+        - package contextiq.example
+        - package contextiq.example.subpolicy
+        """
+        # Match package declaration at the start of the file (possibly after comments)
+        pattern = r'^(\s*package\s+)[a-zA-Z_][a-zA-Z0-9_.]*(\s*)$'
+        replacement = rf'\1{new_package}\2'
+        
+        rewritten = re.sub(pattern, replacement, rego_body, count=1, flags=re.MULTILINE)
+        
+        if rewritten == rego_body:
+            # No package declaration found - add one
+            logger.warning("No package declaration found in preview Rego body, prepending default")
+            rewritten = f"package {new_package}\n\n{rego_body}"
+        
+        return rewritten

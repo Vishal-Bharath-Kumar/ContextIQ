@@ -1,6 +1,7 @@
 import { formatDistanceToNow } from "date-fns";
 import { Link } from "react-router-dom";
 import type { PolicyVersion } from "../../services/policyService";
+import { DeletePolicyDialog } from "./DeletePolicyDialog";
 
 const STATUS_CLASS: Record<PolicyVersion["status"], string> = {
   active: "text-green-700 font-medium",
@@ -27,15 +28,22 @@ export function PolicyVersionRow({ version, policyId }: Props) {
       </td>
       <td className="px-4 py-2 text-gray-500">{version.author}</td>
       <td className="px-4 py-2 text-gray-500">{activatedAt}</td>
-      <td className="px-4 py-2">
-        <Link
-          to={`/policies/${policyId}?version=${version.version}`}
-          className="text-blue-600 hover:underline text-xs"
-          aria-label={`Edit policy ${version.version}`}
-        >
-          Edit
-        </Link>
-      </td>
+      {/* <td className="px-4 py-2">
+        <div className="flex items-center gap-3">
+          <Link
+            to={`/policies/${policyId}?version=${version.version}`}
+            className="text-blue-600 hover:underline text-xs"
+            aria-label={`Edit policy ${version.version}`}
+          >
+            Edit
+          </Link>
+          <DeletePolicyDialog
+            policyId={version.id}
+            policyVersion={version.version}
+            policyStatus={version.status}
+          />
+        </div>
+      </td> */}
     </tr>
   );
 }

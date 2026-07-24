@@ -75,6 +75,8 @@ x-app-env-vars: &app-env-vars
     # ── Vault (disabled — certs injected via volume mounts) ──────────────────
     CONTEXTIQ_VAULT_ADDR: ""
     CONTEXTIQ_VAULT_ROLE: ""
+    # ── OPA (Open Policy Agent) ──────────────────────────────────────────────
+    OPA_BASE_URL: "http://opa:8181"
     # ── Langfuse (disable for local dev unless you have a Langfuse instance) ─
     SUMMARIZATION_LANGFUSE_ENABLED: "false"
     # ── Logging ──────────────────────────────────────────────────────────────
@@ -363,6 +365,25 @@ services:
         echo 'Vault bootstrap complete.'
       "
 
+  # ── OPA (Open Policy Agent) ──────────────────────────────────────────────
+  opa:
+    image: openpolicyagent/opa:latest
+    command:
+      - "run"
+      - "--server"
+      - "--addr=0.0.0.0:8181"
+      - "--log-level=debug"
+      - "--log-format=json"
+    ports:
+      - "8181:8181"
+    healthcheck:
+      test: ["CMD", "/opa", "version"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+
   # ── Keycloak (Identity Provider) ─────────────────────────────────────────
   keycloak:
     image: quay.io/keycloak/keycloak:latest
@@ -460,6 +481,8 @@ services:
       dockerfile: Dockerfile
     depends_on:
       <<: *app-depends
+      opa:
+        condition: service_healthy
       vault-init:
         condition: service_completed_successfully
     env_file: *app-env-file
