@@ -59,7 +59,9 @@ class RegoValidator:
         Returns ``RegoValidationResult(is_valid=False, errors=[...])`` on failure.
         Does NOT raise — the call site decides whether to raise ``RegoValidationError``.
         """
-        transient_name = f"{self._TRANSIENT_POLICY_PREFIX}{name}"
+        # Sanitize name: OPA package names can only contain letters, digits, underscores, and dots
+        sanitized_name = re.sub(r'[^a-zA-Z0-9_.]', '_', name)
+        transient_name = f"{self._TRANSIENT_POLICY_PREFIX}{sanitized_name}"
         validation_package = f"validation.{transient_name}"
         
         # Rewrite package name to avoid conflicts with existing policies in OPA

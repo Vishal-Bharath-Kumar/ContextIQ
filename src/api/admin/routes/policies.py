@@ -310,17 +310,20 @@ async def activate_policy(
         return result
     except PolicyNotFoundError as exc:
         await session.rollback()
+        logger.error(f"Policy not found during activation: {exc}")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Policy {policy_id} not found.",
         ) from exc
     except PolicyAlreadyActiveError as exc:
         await session.rollback()
+        logger.error(f"Policy already active: {exc}")
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT, detail=str(exc)
         ) from exc
     except RegoValidationError as exc:
         await session.rollback()
+        logger.error(f"Rego validation failed: {exc.errors}")
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail={

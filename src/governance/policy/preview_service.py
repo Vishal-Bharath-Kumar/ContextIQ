@@ -46,7 +46,9 @@ class PolicyPreviewService:
         request: PolicyPreviewRequest,
     ) -> PolicyPreviewResult:
         traces = await self._load_recent_traces()
-        temp_name = f"{_TEMP_POLICY_PREFIX}{policy_id.hex}"
+        # Sanitize policy ID for OPA: only letters, digits, underscores allowed
+        sanitized_id = re.sub(r'[^a-zA-Z0-9_]', '_', policy_id.hex)
+        temp_name = f"{_TEMP_POLICY_PREFIX}{sanitized_id}"
         preview_package = f"preview.{temp_name}"
 
         await self._push_temp_policy(temp_name, preview_package, request.rego_body)
