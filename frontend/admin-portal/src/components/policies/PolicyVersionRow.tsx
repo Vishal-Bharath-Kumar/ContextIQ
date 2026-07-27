@@ -1,7 +1,5 @@
 import { formatDistanceToNow } from "date-fns";
-import { Link } from "react-router-dom";
 import type { PolicyVersion } from "../../services/policyService";
-import { DeletePolicyDialog } from "./DeletePolicyDialog";
 
 const STATUS_CLASS: Record<PolicyVersion["status"], string> = {
   active: "text-green-700 font-medium",
@@ -12,10 +10,9 @@ const STATUS_CLASS: Record<PolicyVersion["status"], string> = {
 
 interface Props {
   version: PolicyVersion;
-  policyId: string;
 }
 
-export function PolicyVersionRow({ version, policyId }: Props) {
+export function PolicyVersionRow({ version }: Props) {
   const activatedAt = version.activated_at
     ? formatDistanceToNow(new Date(version.activated_at), { addSuffix: true })
     : "—";

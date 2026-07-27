@@ -1,6 +1,7 @@
 import * as Switch from "@radix-ui/react-switch";
 import { CapabilityTagList } from "./CapabilityTagList";
 import { LatencyBadge } from "./LatencyBadge";
+import { DeleteModelButton } from "./DeleteModelButton";
 import { useToggleModelStatus } from "../../services/modelService";
 import type { ModelDefinition } from "../../services/modelService";
 
@@ -42,6 +43,13 @@ export function ModelRow({ model }: Props) {
         >
           <Switch.Thumb className="block h-4 w-4 rounded-full bg-white shadow transition-transform data-[state=checked]:translate-x-4 data-[state=unchecked]:translate-x-0.5" />
         </Switch.Root>
+      </td>
+      <td className="px-4 py-2 text-right">
+        <DeleteModelButton
+          modelId={model.id}
+          modelName={model.model_id}
+          provider={model.provider}
+        />
       </td>
     </tr>
   );

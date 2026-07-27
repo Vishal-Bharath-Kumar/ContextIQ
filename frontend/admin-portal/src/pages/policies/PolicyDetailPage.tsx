@@ -158,7 +158,6 @@ function PolicyDetailPage() {
                   policyId={selectedVersion.id} 
                   policyVersion={selectedVersion.version}
                   policyStatus={selectedVersion.status}
-                  redirectAfterDelete={true}
                 />
               )}
             </div>

@@ -13,6 +13,7 @@ import { ConnectorListPage } from "../pages/connectors/ConnectorListPage";
 import { ForbiddenPage } from "../pages/errors/ForbiddenPage";
 import { LoginPage } from "../pages/errors/LoginPage";
 import { AddModelPage } from "../pages/models/AddModelPage";
+import { InstallModelPage } from "../pages/models/InstallModelPage";
 import { ModelListPage } from "../pages/models/ModelListPage";
 import { RoutingWeightsPage } from "../pages/models/RoutingWeightsPage";
 import { PolicyDetailPage } from "../pages/policies/PolicyDetailPage";
@@ -23,6 +24,7 @@ import { ToolFormPage } from "../pages/tools/ToolFormPage";
 import { ToolRegistryListPage } from "../pages/tools/ToolRegistryListPage";
 import { AuditLogPage } from "../pages/AuditLogPage";
 import { DashboardPage } from "../pages/DashboardPage";
+import { CostAnalyticsPage } from "../pages/analytics/CostAnalyticsPage";
 
 export const ADMIN_ROUTES: RouteObject[] = [
   // Public routes — must NOT sit under the guarded "/" parent below, otherwise
@@ -114,12 +116,26 @@ export const ADMIN_ROUTES: RouteObject[] = [
         ),
       },
       {
+        path: "models/install",
+        element: (
+          <RequirePlatformEngineer>
+            <InstallModelPage />
+          </RequirePlatformEngineer>
+        ),
+      },
+      {
         path: "models/weights",
         element: (
           <RequirePlatformEngineer>
             <RoutingWeightsPage />
           </RequirePlatformEngineer>
         ),
+      },
+
+      // Cost Analytics — available to all authenticated users
+      {
+        path: "cost-analytics",
+        element: <CostAnalyticsPage />,
       },
 
       // Tool Registry — PLATFORM_ENGINEER or ADMIN

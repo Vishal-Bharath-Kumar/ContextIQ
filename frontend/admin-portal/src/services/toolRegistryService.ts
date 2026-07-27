@@ -95,7 +95,7 @@ export function useDeleteTool() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (name: string) =>
-      api.delete<ToolDefinition>(`/v1/tools/${name}`).then((r) => r.data),
+      api.delete<ToolDefinition>(`/v1/tools/${name}`, { params: { hard_delete: true } }).then((r) => r.data),
     onSuccess: () => qc.invalidateQueries({ queryKey: TOOL_KEYS.all }),
   });
 }

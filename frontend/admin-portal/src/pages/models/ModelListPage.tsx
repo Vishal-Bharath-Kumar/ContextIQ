@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { MixerHorizontalIcon, PlusIcon } from "@radix-ui/react-icons";
+import { MixerHorizontalIcon, PlusIcon, DownloadIcon } from "@radix-ui/react-icons";
 
 import { useModels } from "../../services/modelService";
 import { ModelRow } from "../../components/models/ModelRow";
@@ -47,7 +47,11 @@ export function ModelListPage() {
               <MixerHorizontalIcon aria-hidden="true" />
               Routing Weights
             </Link>
-            <Link to="/models/add" className="btn-primary">
+            <Link to="/models/install" className="btn-primary">
+              <DownloadIcon aria-hidden="true" />
+              Install Model
+            </Link>
+            <Link to="/models/add" className="btn-secondary">
               <PlusIcon aria-hidden="true" />
               Register Model
             </Link>
@@ -79,6 +83,7 @@ export function ModelListPage() {
               <th scope="col" className="px-4 py-3">Latency</th>
               <th scope="col" className="px-4 py-3">Capabilities</th>
               <th scope="col" className="px-4 py-3">Active</th>
+              <th scope="col" className="px-4 py-3 text-right">Actions</th>
             </tr>
           </thead>
           <tbody>

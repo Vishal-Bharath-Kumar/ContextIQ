@@ -52,6 +52,14 @@ class ModelRepository:
             .order_by(ModelRecord.cost_per_1k_tokens.asc())
         )
         return list(result.scalars().all())
+    
+    async def list_all(self) -> list[ModelRecord]:
+        """Return all models regardless of active status, sorted by cost."""
+        result = await self._session.execute(
+            select(ModelRecord)
+            .order_by(ModelRecord.cost_per_1k_tokens.asc())
+        )
+        return list(result.scalars().all())
 
     async def set_active(self, model_id: UUID, is_active: bool) -> ModelRecord | None:
         record = await self.get_by_id(model_id)

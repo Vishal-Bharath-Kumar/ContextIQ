@@ -11,6 +11,7 @@ import {
   LockClosedIcon,
   MixerHorizontalIcon,
   Share2Icon,
+  TokensIcon,
   WidthIcon,
 } from "@radix-ui/react-icons";
 
@@ -59,6 +60,19 @@ const NAV_ITEMS: NavItem[] = [
     label: "Routing Weights",
     icon: <MixerHorizontalIcon aria-hidden="true" />,
     roles: [PlatformRole.PLATFORM_ENGINEER, PlatformRole.ADMIN],
+  },
+  {
+    to: "/cost-analytics",
+    label: "Cost Analytics",
+    icon: <TokensIcon aria-hidden="true" />,
+    roles: [
+      PlatformRole.DEVELOPER,
+      PlatformRole.PLATFORM_ENGINEER,
+      PlatformRole.DEVOPS_SRE,
+      PlatformRole.ADMIN,
+      PlatformRole.MANAGER,
+      PlatformRole.AUDITOR,
+    ],
   },
   {
     to: "/tools",

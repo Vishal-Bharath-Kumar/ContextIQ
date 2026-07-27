@@ -35,6 +35,7 @@ import { StatCard } from "../components/ui/StatCard";
 import { PageHeader } from "../components/ui/PageHeader";
 import { GlassCard } from "../components/ui/GlassCard";
 import { EmptyState } from "../components/ui/EmptyState";
+import { CostAnalyticsPanel } from "../components/models/CostAnalyticsPanel";
 
 const CONNECTOR_STATUS_COLORS: Record<string, string> = {
   active: "#10b981",
@@ -312,6 +313,9 @@ export function DashboardPage() {
               </ul>
             </GlassCard>
           </div>
+
+          {/* Per-model cost breakdown with sparklines */}
+          <CostAnalyticsPanel />
 
           {connectors && connectors.length === 0 && models?.length === 0 && (
             <EmptyState

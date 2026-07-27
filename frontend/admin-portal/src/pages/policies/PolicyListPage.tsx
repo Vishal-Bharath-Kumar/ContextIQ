@@ -107,7 +107,7 @@ export function PolicyListPage() {
                   </thead>
                   <tbody>
                     {policy.versions.map((version) => (
-                      <PolicyVersionRow key={version.id} version={version} policyId={policy.id} />
+                      <PolicyVersionRow key={version.id} version={version} />
                     ))}
                   </tbody>
                 </table>

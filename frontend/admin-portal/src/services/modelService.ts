@@ -56,7 +56,10 @@ export function useToggleModelStatus() {
       api
         .patch(`/v1/models/${id}/status`, { is_active: isActive })
         .then((r) => r.data as ModelDefinition),
-    onSuccess: () => qc.invalidateQueries({ queryKey: MODEL_KEYS.all }),
+    onSuccess: async () => {
+      // Force immediate refetch by using refetchQueries instead of invalidateQueries
+      await qc.refetchQueries({ queryKey: MODEL_KEYS.all, type: 'active' });
+    },
   });
 }
 
@@ -89,5 +92,79 @@ export function useCostAnalytics(days = 30) {
         .get<ModelCostSummary[]>(`/v1/models/cost-analytics?days=${days}`)
         .then((r) => r.data),
     staleTime: 5 * 60 * 1000,
+  });
+}
+
+export interface OllamaModel {
+  name: string;
+  size: number;
+  digest: string;
+  modified_at: string;
+}
+
+export interface ModelInstallationResponse {
+  model_id: string;
+  provider_type: string;
+  status: string;
+  message: string;
+  credentials_stored: boolean;
+}
+
+export function useOllamaModels() {
+  return useQuery({
+    queryKey: ["ollama-models"],
+    queryFn: () =>
+      api.get<OllamaModel[]>("/v1/models/ollama").then((r) => r.data),
+    staleTime: 30 * 1000, // 30 seconds
+  });
+}
+
+export function useInstallModel() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: import("../schemas/installModelSchema").InstallModelFields) =>
+      api.post<ModelInstallationResponse>("/v1/models/install", payload).then((r) => r.data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: MODEL_KEYS.all });
+      qc.invalidateQueries({ queryKey: ["ollama-models"] });
+    },
+  });
+}
+
+export function usePullOllamaModel() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: { model_name: string }) =>
+      api.post("/v1/models/ollama/pull", payload).then((r) => r.data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["ollama-models"] });
+    },
+  });
+}
+
+export function useDeleteModel() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, deleteFromOllama }: { id: string; deleteFromOllama?: boolean }) => {
+      console.log('[DELETE] Attempting to delete model:', id, 'deleteFromOllama:', deleteFromOllama);
+      console.log('[DELETE] Auth token exists:', !!sessionStorage.getItem("admin_user"));
+      try {
+        const response = await api.delete(`/v1/models/${id}`, { params: { delete_from_ollama: deleteFromOllama ?? false } });
+        console.log('[DELETE] Success:', response.data);
+        return response.data;
+      } catch (error: any) {
+        console.error('[DELETE] Error:', error.response?.status, error.response?.data);
+        throw error;
+      }
+    },
+    onSuccess: async () => {
+      console.log('[DELETE] onSuccess - refetching queries');
+      // Force immediate refetch
+      await qc.refetchQueries({ queryKey: MODEL_KEYS.all, type: 'active' });
+      await qc.refetchQueries({ queryKey: ["ollama-models"], type: 'active' });
+    },
+    onError: (error: any) => {
+      console.error('[DELETE] onError:', error.response?.status, error.response?.data);
+    },
   });
 }

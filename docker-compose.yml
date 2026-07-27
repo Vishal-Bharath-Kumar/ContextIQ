@@ -79,6 +79,19 @@ x-app-env-vars: &app-env-vars
     OPA_BASE_URL: "http://opa:8181"
     # ── Langfuse (disable for local dev unless you have a Langfuse instance) ─
     SUMMARIZATION_LANGFUSE_ENABLED: "false"
+    # ── LLM Provider API Keys (from .env file) ───────────────────────────────
+    # These are used by LiteLLM to invoke the actual model APIs.
+    # Optional: only set the keys for providers you want to use.
+    OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+    ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+    DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+    MISTRAL_API_KEY: ${MISTRAL_API_KEY:-}
+    AZURE_OPENAI_API_KEY: ${AZURE_OPENAI_API_KEY:-}
+    AZURE_OPENAI_ENDPOINT: ${AZURE_OPENAI_ENDPOINT:-}
+    AZURE_OPENAI_API_VERSION: ${AZURE_OPENAI_API_VERSION:-}
+    # ── Ollama (Local Models) ────────────────────────────────────────────────
+    # Use host.docker.internal to reach Ollama running on the host machine
+    OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
     # ── Logging ──────────────────────────────────────────────────────────────
     CONTEXTIQ_LOG_LEVEL: "DEBUG"
     CONTEXTIQ_SERVER_VERSION: "0.1.0-local"

@@ -1,5 +1,14 @@
 {
   "servers": {
+    "contextiq": {
+      "type": "http",
+      "url": "http://localhost:8080/mcp/sse",
+      "headers": {
+        "Authorization": "Bearer ${env:CONTEXTIQ_TOKEN}",
+        "Content-Type": "application/json"
+      },
+      "description": "ContextIQ Enterprise MCP Server - Access enterprise knowledge sources and tools"
+    },
     "propel-sdlc": {
       "type": "http",
       "url": "<propel-mcp-url>/mcp"

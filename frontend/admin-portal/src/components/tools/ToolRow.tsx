@@ -76,12 +76,12 @@ export function ToolRow({ tool }: Props) {
                 aria-describedby="delete-tool-desc"
               >
                 <AlertDialog.Title className="mb-2 text-lg font-semibold text-slate-900">
-                  Deactivate Tool
+                  Delete Tool
                 </AlertDialog.Title>
                 <AlertDialog.Description id="delete-tool-desc" className="mb-6 text-sm text-secondary">
-                  This will soft-delete <strong>{tool.name}</strong> by marking it inactive. Agents
-                  will no longer be able to invoke this tool. This action is recorded in the audit
-                  trail.
+                  This will permanently delete <strong>{tool.name}</strong> from the database. This
+                  action cannot be undone. Agents will no longer be able to invoke this tool. This
+                  action is recorded in the audit trail.
                 </AlertDialog.Description>
 
                 <div className="flex justify-end gap-3">
@@ -98,7 +98,7 @@ export function ToolRow({ tool }: Props) {
                       disabled={isDeleting}
                       aria-busy={isDeleting}
                     >
-                      {isDeleting ? "Removing…" : "Deactivate"}
+                      {isDeleting ? "Deleting…" : "Delete"}
                     </button>
                   </AlertDialog.Action>
                 </div>

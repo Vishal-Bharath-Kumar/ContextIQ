@@ -69,3 +69,8 @@ class ToolRepository:
         await self._session.flush()
         await self._session.refresh(tool)
         return tool
+
+    async def delete(self, tool: Tool) -> None:
+        """Hard delete: permanently remove the tool from the database."""
+        await self._session.delete(tool)
+        await self._session.flush()

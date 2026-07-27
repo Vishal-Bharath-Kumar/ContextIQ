@@ -1,0 +1,4 @@
+# Ignore any local MCP configuration files with secrets
+*.local.json
+*-local.json
+.env.mcp

@@ -103,6 +103,18 @@ class ToolRegistryService:
         """Soft-delete: sets status = 'inactive'."""
         return await self.update_tool(name, status=ToolStatus.INACTIVE.value)
 
+    async def hard_delete_tool(self, name: str) -> Tool:
+        """Hard-delete: permanently removes the tool from the database."""
+        tool = await self._repo.get_by_name(name)
+        if tool is None:
+            raise ToolNotFoundError(f"Tool '{name}' not found")
+
+        # Delete from database
+        await self._repo.delete(tool)
+        await self._session.commit()
+        await self._publish_changed(tool.name, "deleted")
+        return tool
+
     async def _publish_changed(self, tool_name: str, action: str) -> None:
         payload = json.dumps({"tool": tool_name, "action": action})
         try:

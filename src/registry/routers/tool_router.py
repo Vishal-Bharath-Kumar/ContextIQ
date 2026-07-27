@@ -6,7 +6,7 @@ TASK-US002-02:
   GET    /v1/tools          — list tools, optional ?status=active|inactive
   GET    /v1/tools/{name}   — fetch single tool by name
   PATCH  /v1/tools/{name}   — update description, schema, status, or version
-  DELETE /v1/tools/{name}   — soft-delete (sets status = 'inactive')
+  DELETE /v1/tools/{name}   — soft-delete (sets status = 'inactive'), or hard-delete with ?hard_delete=true
 
 RBAC: POST / PATCH / DELETE require ADMIN or PLATFORM_ENGINEER role.
 GET endpoints require the same guard (read is also privileged for tool definitions).
@@ -168,9 +168,13 @@ async def update_tool(
 async def delete_tool(
     name: str,
     svc: Annotated[ToolRegistryService, Depends(_get_service)],
+    hard_delete: bool = Query(default=False, description="If true, permanently delete the tool from database"),
 ) -> ToolResponse:
     try:
-        tool = await svc.delete_tool(name)
+        if hard_delete:
+            tool = await svc.hard_delete_tool(name)
+        else:
+            tool = await svc.delete_tool(name)
     except ToolNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     return ToolResponse.from_orm_tool(tool)

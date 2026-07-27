@@ -29,7 +29,7 @@ class ModelCapability(StrEnum):
     FUNCTION_CALL = "function_call"  # tool/function calling support
 
 
-_MODEL_ID_RE = re.compile(r"[a-zA-Z0-9._\-/]+")
+_MODEL_ID_RE = re.compile(r"[a-zA-Z0-9._\-/:]+")
 
 
 class ModelRegistration(BaseModel):
@@ -53,9 +53,9 @@ class ModelRegistration(BaseModel):
     @field_validator("model_id")
     @classmethod
     def model_id_url_safe(cls, v: str) -> str:
-        if not re.fullmatch(r"[a-zA-Z0-9._\-/]+", v):
+        if not re.fullmatch(r"[a-zA-Z0-9._\-/:]+", v):
             raise ValueError(
-                "model_id must contain only alphanumeric, '.', '_', '-', '/' characters"
+                "model_id must contain only alphanumeric, '.', '_', '-', '/', ':' characters"
             )
         return v
 
