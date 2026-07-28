@@ -146,9 +146,9 @@ export function InstallModelPage() {
       const result = await mutateAsync(data as any);
       
       // Check if response contains job_id (background job)
-      if (result.job_id) {
-        setInstallationJobId(result.job_id);
-        setInstallingModelId(result.model_id);
+      if ("job_id" in result && result.job_id) {
+        setInstallationJobId(result.job_id as string);
+        setInstallingModelId(result.model_id as string);
       } else {
         // Old synchronous response
         setSuccessMessage(result.message);

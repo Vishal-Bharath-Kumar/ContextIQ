@@ -77,17 +77,36 @@ class OllamaService:
                 # Ollama streams progress, we'll read the final status
                 lines = response.text.strip().split("\n")
                 final_status = {}
+                error_message = None
+                
                 for line in lines:
                     if line:
                         import json
-                        final_status = json.loads(line)
+                        line_data = json.loads(line)
+                        # Check for error in any line
+                        if "error" in line_data:
+                            error_message = line_data["error"]
+                            break
+                        # Keep updating with each line (final line is the status)
+                        final_status = line_data
                 
-                status = final_status.get("status", "unknown")
+                # If there was an error, raise it
+                if error_message:
+                    raise ValueError(f"Ollama pull failed: {error_message}")
+                
+                # If we have no final status, something went wrong
+                if not final_status:
+                    raise ValueError(f"No response from Ollama while pulling '{request.model_name}'")
+                
+                status = final_status.get("status", "")
+                
+                # Check for success
+                is_success = status.lower() == "success" or "success" in status.lower()
                 
                 return OllamaPullResponse(
-                    status="success" if "success" in status.lower() or status == "success" else status,
+                    status="success" if is_success else "failed",
                     model_name=request.model_name,
-                    message=f"Model '{request.model_name}' pulled successfully" if "success" in status.lower() else status,
+                    message=f"Model '{request.model_name}' pulled successfully" if is_success else f"Pull ended with status: {status or 'unknown'}",
                     digest=final_status.get("digest"),
                 )
             except httpx.ReadTimeout:

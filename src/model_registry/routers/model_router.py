@@ -88,6 +88,7 @@ async def register_model(
     audit: Annotated[AuditContext, Depends(get_audit_context)],
     service: Annotated[ModelRegistryService, Depends(get_model_registry_service)],
     session: Annotated[AsyncSession, Depends(get_db)],
+    redis: Annotated[Redis, Depends(get_redis_client)],
 ) -> ModelDefinition:
     """AC-1 / AC-2: register a model; logs MODEL_REGISTERED audit entry (AC-6)."""
     result = await service.register(body)
@@ -106,6 +107,18 @@ async def register_model(
         after_state=result.model_dump(mode="json"),
     )
     await session.commit()
+    
+    # Invalidate model list cache
+    import logging
+    logger = logging.getLogger(__name__)
+    try:
+        deleted_count = 0
+        deleted_count += await redis.delete(_CACHE_KEY)
+        deleted_count += await redis.delete(f"{_CACHE_KEY}:all")
+        logger.info(f"Cache invalidation: deleted {deleted_count} cache keys after model registration")
+    except Exception as e:
+        logger.error(f"Failed to invalidate cache after model registration: {e}")
+    
     return result
 
 

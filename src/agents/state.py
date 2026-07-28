@@ -74,6 +74,7 @@ class AgentState(TypedDict):
     context_redacted: NotRequired[bool]
     governance_scan_ms: NotRequired[float]
     governance_blocked: NotRequired[bool]  # True when fail-safe timeout blocked the scan
+    governance_summary: NotRequired[dict | None]  # Comprehensive governance summary with risk scoring
 
     # ── OPA filter output (TASK-US032-04) ─────────────────────────────
     jwt_claims: NotRequired[dict]  # decoded JWT claims; read by opa_filter_node

@@ -3,6 +3,7 @@ import { NavLink, Outlet, useLocation } from "react-router-dom";
 import {
   BarChartIcon,
   CardStackIcon,
+  CheckCircledIcon,
   ClipboardIcon,
   Cross1Icon,
   DashboardIcon,
@@ -70,6 +71,12 @@ const NAV_ITEMS: NavItem[] = [
     to: "/policies",
     label: "Policies",
     icon: <LockClosedIcon aria-hidden="true" />,
+    roles: [PlatformRole.SECURITY_OFFICER, PlatformRole.ADMIN],
+  },
+  {
+    to: "/governance",
+    label: "Governance",
+    icon: <CheckCircledIcon aria-hidden="true" />,
     roles: [PlatformRole.SECURITY_OFFICER, PlatformRole.ADMIN],
   },
   {

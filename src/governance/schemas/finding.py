@@ -21,12 +21,36 @@ class PatternType(StrEnum):
     AZURE_CONNECTION_STRING = "AZURE_CONNECTION_STRING"
     # SCM tokens
     GITHUB_PAT = "GITHUB_PAT"
+    GITLAB_PAT = "GITLAB_PAT"
+    BITBUCKET_TOKEN = "BITBUCKET_TOKEN"
+    # AI/LLM API keys
+    OPENAI_API_KEY = "OPENAI_API_KEY"
+    ANTHROPIC_API_KEY = "ANTHROPIC_API_KEY"
+    GOOGLE_AI_API_KEY = "GOOGLE_AI_API_KEY"
+    HUGGINGFACE_TOKEN = "HUGGINGFACE_TOKEN"
+    # Generic secrets
+    GENERIC_API_KEY = "GENERIC_API_KEY"
+    GENERIC_SECRET = "GENERIC_SECRET"
+    BEARER_TOKEN = "BEARER_TOKEN"
+    JWT_TOKEN = "JWT_TOKEN"
+    PASSWORD_IN_URL = "PASSWORD_IN_URL"
+    PRIVATE_KEY = "PRIVATE_KEY"
+    # Database credentials
+    DATABASE_URL = "DATABASE_URL"
+    POSTGRES_CONNECTION = "POSTGRES_CONNECTION"
+    MONGODB_CONNECTION = "MONGODB_CONNECTION"
     # PII
     EMAIL_ADDRESS = "EMAIL_ADDRESS"
     CREDIT_CARD_NUMBER = "CREDIT_CARD_NUMBER"
     PHONE_NUMBER = "PHONE_NUMBER"
     US_SSN = "US_SSN"
     UK_NI_NUMBER = "UK_NI_NUMBER"
+    IP_ADDRESS = "IP_ADDRESS"
+    # Vault/HashiCorp secrets
+    VAULT_TOKEN = "VAULT_TOKEN"
+    # Slack tokens
+    SLACK_TOKEN = "SLACK_TOKEN"
+    SLACK_WEBHOOK = "SLACK_WEBHOOK"
 
 
 class Severity(StrEnum):
@@ -35,6 +59,8 @@ class Severity(StrEnum):
     CRITICAL = "critical"  # credentials that enable direct cloud/SCM access
     HIGH = "high"  # PII that constitutes personal data under GDPR/CCPA
     MEDIUM = "medium"  # lower-risk PII (phone numbers, generic emails)
+    LOW = "low"  # informational findings, IP addresses
+    INFO = "info"  # non-sensitive informational patterns
 
 
 class DetectionFinding(BaseModel):

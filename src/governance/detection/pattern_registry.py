@@ -65,6 +65,131 @@ _PATTERNS: list[_PatternEntry] = [
         # Legacy 40-hex tokens excluded (too many false positives with SHA hashes).
         re.compile(r"\bgh[pousr]_[0-9A-Za-z]{36,255}\b"),
     ),
+    _PatternEntry(
+        PatternType.GITLAB_PAT,
+        Severity.CRITICAL,
+        # GitLab Personal Access Tokens: glpat- + 20 chars
+        re.compile(r"\bglpat-[0-9A-Za-z_\-]{20,}\b"),
+    ),
+    _PatternEntry(
+        PatternType.BITBUCKET_TOKEN,
+        Severity.CRITICAL,
+        # Bitbucket app passwords and tokens
+        re.compile(r"\b(?:ATBB|ATCTT)[0-9A-Za-z]{32,}\b"),
+    ),
+    # ---- AI/LLM API keys ----
+    _PatternEntry(
+        PatternType.OPENAI_API_KEY,
+        Severity.CRITICAL,
+        # OpenAI API keys: sk-proj- or sk- + alphanumeric
+        re.compile(r"\bsk-(?:proj-)?[0-9A-Za-z]{20,}\b"),
+    ),
+    _PatternEntry(
+        PatternType.ANTHROPIC_API_KEY,
+        Severity.CRITICAL,
+        # Anthropic API keys: sk-ant- + alphanumeric
+        re.compile(r"\bsk-ant-[0-9A-Za-z\-_]{95,}\b"),
+    ),
+    _PatternEntry(
+        PatternType.GOOGLE_AI_API_KEY,
+        Severity.CRITICAL,
+        # Google AI API keys (different from GCP general)
+        re.compile(r"\bAI[0-9A-Za-z\-_]{35,}\b"),
+    ),
+    _PatternEntry(
+        PatternType.HUGGINGFACE_TOKEN,
+        Severity.CRITICAL,
+        # Hugging Face tokens: hf_ + alphanumeric
+        re.compile(r"\bhf_[0-9A-Za-z]{32,}\b"),
+    ),
+    # ---- Generic secrets ----
+    _PatternEntry(
+        PatternType.GENERIC_API_KEY,
+        Severity.HIGH,
+        # Generic API key patterns in assignments
+        re.compile(
+            r"(?i)(?:api[_\-]?key|apikey|api[_\-]token)\s*[=:\"' ]+\s*"
+            r"['\"]([A-Za-z0-9_\-]{16,64})['\"]"
+        ),
+    ),
+    _PatternEntry(
+        PatternType.GENERIC_SECRET,
+        Severity.HIGH,
+        # Generic secret patterns
+        re.compile(
+            r"(?i)(?:secret|password|passwd|pwd)\s*[=:\"' ]+\s*"
+            r"['\"]([A-Za-z0-9!@#$%^&*()_+\-=\[\]{};':\"\\|,.<>\/?]{8,})['\"]"
+        ),
+    ),
+    _PatternEntry(
+        PatternType.BEARER_TOKEN,
+        Severity.HIGH,
+        # Bearer tokens in Authorization headers
+        re.compile(r"(?i)Bearer\s+([A-Za-z0-9_\-\.]{20,})"),
+    ),
+    _PatternEntry(
+        PatternType.JWT_TOKEN,
+        Severity.HIGH,
+        # JWT tokens: three base64 segments separated by dots
+        re.compile(r"\beyJ[A-Za-z0-9_\-]+\.eyJ[A-Za-z0-9_\-]+\.[A-Za-z0-9_\-]+\b"),
+    ),
+    _PatternEntry(
+        PatternType.PASSWORD_IN_URL,
+        Severity.CRITICAL,
+        # Passwords in URLs: protocol://user:password@host
+        re.compile(
+            r"(?i)(?:https?|ftp|mongodb|postgres|mysql)://[^:]+:([^@]{4,})@"
+        ),
+    ),
+    _PatternEntry(
+        PatternType.PRIVATE_KEY,
+        Severity.CRITICAL,
+        # Private keys (RSA, SSH, PGP)
+        re.compile(r"-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----"),
+    ),
+    # ---- Database credentials ----
+    _PatternEntry(
+        PatternType.DATABASE_URL,
+        Severity.CRITICAL,
+        # Database connection strings
+        re.compile(
+            r"(?i)(?:postgres|postgresql|mysql|mongodb|redis)://[^:]+:[^@]{4,}@[\w\.\-]+:\d+"
+        ),
+    ),
+    _PatternEntry(
+        PatternType.POSTGRES_CONNECTION,
+        Severity.CRITICAL,
+        # PostgreSQL connection strings
+        re.compile(
+            r"(?i)(?:host|server)\s*=\s*[\w\.\-]+.+(?:password|pwd)\s*=\s*[^\s;]+"
+        ),
+    ),
+    _PatternEntry(
+        PatternType.MONGODB_CONNECTION,
+        Severity.CRITICAL,
+        # MongoDB connection strings
+        re.compile(r"mongodb(?:\+srv)?://[^:]+:[^@]{4,}@[\w\.\-]+"),
+    ),
+    # ---- Vault/HashiCorp ----
+    _PatternEntry(
+        PatternType.VAULT_TOKEN,
+        Severity.CRITICAL,
+        # Vault tokens: hvs. or s. prefix
+        re.compile(r"\b(?:hvs|s)\.[0-9A-Za-z]{24,}\b"),
+    ),
+    # ---- Slack ----
+    _PatternEntry(
+        PatternType.SLACK_TOKEN,
+        Severity.CRITICAL,
+        # Slack tokens: xoxb-, xoxp-, xoxa-, xoxr-
+        re.compile(r"\bxox[bpra]-[0-9]{10,13}-[0-9]{10,13}-[0-9A-Za-z]{24,}\b"),
+    ),
+    _PatternEntry(
+        PatternType.SLACK_WEBHOOK,
+        Severity.HIGH,
+        # Slack webhook URLs
+        re.compile(r"https://hooks\.slack\.com/services/T[A-Z0-9]{8,}/B[A-Z0-9]{8,}/[A-Za-z0-9]{24,}"),
+    ),
     # ---- PII ----
     _PatternEntry(
         PatternType.EMAIL_ADDRESS,
@@ -99,6 +224,15 @@ _PATTERNS: list[_PatternEntry] = [
             r"\b(?!BG|GB|KN|NK|NT|TN|ZZ)[A-CEGHJ-PR-TW-Z][A-CEGHJ-NPR-TW-Z]"
             r"\d{6}[A-D]\b",
             re.IGNORECASE,
+        ),
+    ),
+    _PatternEntry(
+        PatternType.IP_ADDRESS,
+        Severity.LOW,
+        # IPv4 addresses
+        re.compile(
+            r"\b(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}"
+            r"(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\b"
         ),
     ),
 ]

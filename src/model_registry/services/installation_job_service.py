@@ -268,6 +268,14 @@ class ModelInstallationJobService:
             )
             await registry_service.register(registration)
             await reg_session.commit()
+            
+            # Invalidate model list cache so new model appears immediately
+            try:
+                await redis.delete("model_registry:active_models")
+                await redis.delete("model_registry:active_models:all")
+            except Exception as e:
+                import logging
+                logging.getLogger(__name__).warning(f"Failed to invalidate model cache: {e}")
 
     async def _install_api_model(
         self,

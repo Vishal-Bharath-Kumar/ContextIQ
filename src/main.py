@@ -19,6 +19,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from src.api.admin.routes.audit_log import router as audit_log_router
+from src.api.admin.routes.governance import router as governance_router
 from src.api.admin.routes.policies import router as policies_router
 from src.api.admin.routes.replay import router as replay_router
 from src.auth.dev_login import router as dev_login_router
@@ -124,6 +125,7 @@ def create_app(jwks_client: JWKSClient | None = None) -> FastAPI:
     new_app.include_router(model_router)
     new_app.include_router(routing_weight_router)
     new_app.include_router(policies_router)
+    new_app.include_router(governance_router)
     new_app.include_router(replay_router)
     new_app.include_router(metrics_router)
     new_app.include_router(audit_log_router)

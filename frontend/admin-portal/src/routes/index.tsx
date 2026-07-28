@@ -18,6 +18,7 @@ import { ModelListPage } from "../pages/models/ModelListPage";
 import { RoutingWeightsPage } from "../pages/models/RoutingWeightsPage";
 import { PolicyDetailPage } from "../pages/policies/PolicyDetailPage";
 import { PolicyListPage } from "../pages/policies/PolicyListPage";
+import { GovernanceSettingsPage } from "../pages/governance/GovernanceSettingsPage";
 import { ReplayExplorerPage } from "../pages/traces/ReplayExplorerPage";
 import { TraceDetailPage } from "../pages/traces/TraceDetailPage";
 import { ToolFormPage } from "../pages/tools/ToolFormPage";
@@ -93,6 +94,16 @@ export const ADMIN_ROUTES: RouteObject[] = [
         element: (
           <RequireSecurityOfficer>
             <PolicyDetailPage />
+          </RequireSecurityOfficer>
+        ),
+      },
+
+      // Governance Settings — SECURITY_OFFICER or ADMIN
+      {
+        path: "governance",
+        element: (
+          <RequireSecurityOfficer>
+            <GovernanceSettingsPage />
           </RequireSecurityOfficer>
         ),
       },
