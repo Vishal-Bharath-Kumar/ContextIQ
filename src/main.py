@@ -32,8 +32,8 @@ from src.knowledge_sources.routers.knowledge_source_router import router as know
 from src.knowledge_sources.sync.scheduler import CronSyncScheduler
 from src.model_registry.routers.model_router import router as model_router
 from src.model_router.routers.routing_weight_router import router as routing_weight_router
-from src.observability.cost.settings import LangfuseProjectSettings
 from src.observability.langfuse_integration import setup_langfuse, teardown_langfuse
+from src.observability.langfuse_integration.settings import LangfuseSettings
 from src.observability.metrics.middleware import MetricsMiddleware
 from src.observability.metrics.router import metrics_router
 from src.observability.metrics.settings import MetricsSettings
@@ -72,12 +72,13 @@ def create_app(jwks_client: JWKSClient | None = None) -> FastAPI:
         if manage_lifecycle:
             await client.startup()
         app.state.jwks_client = client
-        _langfuse_settings = LangfuseProjectSettings()
-        logger.info(
-            "Langfuse cost recording enabled. "
-            "Ensure project data retention >= %d months (AC-5).",
-            _langfuse_settings.required_retention_months,
-        )
+        _langfuse_settings = LangfuseSettings()
+        if _langfuse_settings.is_configured:
+            logger.info(
+                "Langfuse observability enabled (environment: %s, base_url: %s)",
+                _langfuse_settings.environment,
+                _langfuse_settings.base_url,
+            )
 
         # Initialise ConnectorRegistry (TASK-US021-02) so the real GitHub/
         # Confluence/Jira/Grafana connectors are discovered and available to

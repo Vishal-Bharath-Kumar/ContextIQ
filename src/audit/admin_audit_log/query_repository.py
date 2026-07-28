@@ -72,7 +72,7 @@ class AuditLogQueryRepository:
         Cursor pagination: pass the ``next_cursor`` value from the previous
         response as ``cursor`` to fetch the next page.  The cursor encodes
         both the last row's timestamp and id so that the keyset WHERE clause
-        works correctly with ORDER BY timestamp ASC, id ASC.
+        works correctly with ORDER BY timestamp DESC, id DESC (newest first).
         """
         conditions = []
 
@@ -91,13 +91,13 @@ class AuditLogQueryRepository:
 
         if cursor is not None:
             cursor_ts, cursor_id = decode_cursor(cursor)
-            # Correct keyset: (ts > cursor_ts) OR (ts == cursor_ts AND id > cursor_id)
+            # Correct keyset for DESC: (ts < cursor_ts) OR (ts == cursor_ts AND id < cursor_id)
             conditions.append(
                 or_(
-                    AdminAuditLog.timestamp > cursor_ts,
+                    AdminAuditLog.timestamp < cursor_ts,
                     and_(
                         AdminAuditLog.timestamp == cursor_ts,
-                        AdminAuditLog.id > cursor_id,
+                        AdminAuditLog.id < cursor_id,
                     ),
                 )
             )
@@ -106,7 +106,7 @@ class AuditLogQueryRepository:
         stmt = (
             select(AdminAuditLog)
             .where(and_(*conditions) if conditions else True)
-            .order_by(AdminAuditLog.timestamp.asc(), AdminAuditLog.id.asc())
+            .order_by(AdminAuditLog.timestamp.desc(), AdminAuditLog.id.desc())
             .limit(effective_limit)
         )
         result = await self._session.execute(stmt)
