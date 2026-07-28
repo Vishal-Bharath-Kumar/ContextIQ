@@ -45,9 +45,6 @@ class Permission(StrEnum):
     # Platform metrics and observability
     READ_METRICS        = "read_metrics"
 
-    # LLM cost analytics — EP-012 US-037, EP-013 US-041
-    READ_COST_ANALYTICS = "read_cost_analytics"
-
     # Full administrative access (Admin Portal shell, user management)
     ADMIN_ALL           = "admin_all"
 
@@ -94,12 +91,6 @@ ROLE_PERMISSION_MATRIX: dict[Permission, frozenset[PlatformRole]] = {
 
     Permission.READ_METRICS: frozenset({
         PlatformRole.DEVOPS_SRE,
-        PlatformRole.PLATFORM_ENGINEER,
-        PlatformRole.ADMIN,
-    }),
-
-    Permission.READ_COST_ANALYTICS: frozenset({
-        PlatformRole.MANAGER,
         PlatformRole.PLATFORM_ENGINEER,
         PlatformRole.ADMIN,
     }),

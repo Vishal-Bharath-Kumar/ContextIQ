@@ -55,13 +55,22 @@ class OllamaService:
     
     async def pull_model(self, request: OllamaPullRequest) -> OllamaPullResponse:
         """Pull/download an Ollama model."""
-        async with httpx.AsyncClient(timeout=300.0) as client:  # 5 min timeout for large models
+        pull_timeout_seconds = float(os.getenv("OLLAMA_PULL_TIMEOUT_SECONDS", "300"))
+
+        # Use explicit timeout controls so we can distinguish long downloads from connectivity issues.
+        timeout = httpx.Timeout(
+            connect=10.0,
+            read=pull_timeout_seconds,
+            write=30.0,
+            pool=10.0,
+        )
+
+        async with httpx.AsyncClient(timeout=timeout) as client:
             try:
                 # Start the pull
                 response = await client.post(
                     f"{self.base_url}/api/pull",
                     json={"name": request.model_name},
-                    timeout=300.0,
                 )
                 response.raise_for_status()
                 
@@ -80,6 +89,15 @@ class OllamaService:
                     model_name=request.model_name,
                     message=f"Model '{request.model_name}' pulled successfully" if "success" in status.lower() else status,
                     digest=final_status.get("digest"),
+                )
+            except httpx.ReadTimeout:
+                raise HTTPException(
+                    status_code=504,
+                    detail=(
+                        f"Timed out while pulling Ollama model '{request.model_name}'. "
+                        "The download is taking longer than the API timeout window. "
+                        "Try pulling it directly with `ollama pull <model>` and then install again."
+                    ),
                 )
             except httpx.HTTPError as e:
                 raise HTTPException(

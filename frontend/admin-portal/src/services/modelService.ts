@@ -72,29 +72,6 @@ export function useCreateModel() {
   });
 }
 
-export interface DailyCostPoint {
-  date: string;
-  cost_usd: number;
-}
-
-export interface ModelCostSummary {
-  model_id: string;
-  total_cost_usd: number;
-  daily_series: DailyCostPoint[];
-  total_tokens: number;
-}
-
-export function useCostAnalytics(days = 30) {
-  return useQuery({
-    queryKey: ["model-cost-analytics", days],
-    queryFn: () =>
-      api
-        .get<ModelCostSummary[]>(`/v1/models/cost-analytics?days=${days}`)
-        .then((r) => r.data),
-    staleTime: 5 * 60 * 1000,
-  });
-}
-
 export interface OllamaModel {
   name: string;
   size: number;

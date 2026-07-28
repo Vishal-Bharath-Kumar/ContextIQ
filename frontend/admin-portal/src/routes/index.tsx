@@ -24,7 +24,6 @@ import { ToolFormPage } from "../pages/tools/ToolFormPage";
 import { ToolRegistryListPage } from "../pages/tools/ToolRegistryListPage";
 import { AuditLogPage } from "../pages/AuditLogPage";
 import { DashboardPage } from "../pages/DashboardPage";
-import { CostAnalyticsPage } from "../pages/analytics/CostAnalyticsPage";
 
 export const ADMIN_ROUTES: RouteObject[] = [
   // Public routes — must NOT sit under the guarded "/" parent below, otherwise
@@ -130,12 +129,6 @@ export const ADMIN_ROUTES: RouteObject[] = [
             <RoutingWeightsPage />
           </RequirePlatformEngineer>
         ),
-      },
-
-      // Cost Analytics — available to all authenticated users
-      {
-        path: "cost-analytics",
-        element: <CostAnalyticsPage />,
       },
 
       // Tool Registry — PLATFORM_ENGINEER or ADMIN

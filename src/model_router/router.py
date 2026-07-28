@@ -22,6 +22,7 @@ from src.model_router.schemas.routing_weights import (
     RoutingWeights,
 )
 from src.model_router.scoring import compute_model_score
+from src.observability.langfuse_integration import observe_llm, update_current_observation
 
 # ---------------------------------------------------------------------------
 # Intent → required capability mapping
@@ -59,6 +60,7 @@ class ModelRouter:
         self._model_list_cache = model_list_cache
         self._scored_model_cache = scored_model_cache
 
+    @observe_llm(as_type="span", name="model-router-select")
     async def select(
         self,
         intent_type: str,
@@ -73,18 +75,51 @@ class ModelRouter:
         )
         required_capability = INTENT_CAPABILITY_MAP.get(intent_type, ModelCapability.CHAT)
 
+        # Add metadata for observability
+        update_current_observation(
+            input={
+                "intent_type": intent_type,
+                "required_capability": required_capability.value,
+            },
+            metadata={
+                "weights": {
+                    "cost": effective_weights.cost_weight,
+                    "latency": effective_weights.latency_weight,
+                    "coding": effective_weights.coding_weight,
+                    "reasoning": effective_weights.reasoning_weight,
+                }
+            }
+        )
+
         # Hot path — serve from pre-scored cache
         cached = await self._scored_model_cache.get(intent_type)
         if cached:
-            return cached[0]  # list is sorted desc by composite_score
+            selected = cached[0]
+            update_current_observation(
+                output={
+                    "model_id": selected.model_id,
+                    "composite_score": selected.composite_score,
+                    "source": "cache",
+                },
+                metadata={"cache_hit": True}
+            )
+            return selected  # list is sorted desc by composite_score
 
         # Cold path — score + populate cache
         candidates = await self._model_list_cache.get()
         if candidates is None:
+            update_current_observation(
+                output=None,
+                metadata={"error": "model_list_cache_empty"}
+            )
             return None  # model list cache is empty; ModelRouter cannot proceed
 
         eligible = [m for m in candidates if required_capability in m.capabilities]
         if not eligible:
+            update_current_observation(
+                output=None,
+                metadata={"error": "no_eligible_models", "cache_hit": False}
+            )
             return None
 
         scores = sorted(
@@ -93,7 +128,21 @@ class ModelRouter:
             reverse=True,
         )
         await self._scored_model_cache.set(intent_type, scores)
-        return scores[0]
+        
+        selected = scores[0]
+        update_current_observation(
+            output={
+                "model_id": selected.model_id,
+                "composite_score": selected.composite_score,
+                "source": "computed",
+            },
+            metadata={
+                "cache_hit": False,
+                "eligible_models_count": len(eligible),
+                "scored_models_count": len(scores),
+            }
+        )
+        return selected
 
     async def build_fallback_chain(
         self,

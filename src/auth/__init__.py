@@ -9,7 +9,6 @@ from src.auth.rbac import (
     require_admin,
     require_auditor,
     require_context_tools,
-    require_cost_analytics,
     require_developer,
     require_devops,
     require_manage_connectors,
@@ -52,5 +51,4 @@ __all__ = [
     "require_manage_policies",
     "require_read_traces",
     "require_read_metrics",
-    "require_cost_analytics",
 ]

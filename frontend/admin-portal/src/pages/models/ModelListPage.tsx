@@ -3,7 +3,6 @@ import { MixerHorizontalIcon, PlusIcon, DownloadIcon } from "@radix-ui/react-ico
 
 import { useModels } from "../../services/modelService";
 import { ModelRow } from "../../components/models/ModelRow";
-import { CostAnalyticsPanel } from "../../components/models/CostAnalyticsPanel";
 import { PageHeader } from "../../components/ui/PageHeader";
 import { GlassCard } from "../../components/ui/GlassCard";
 import { StatCard } from "../../components/ui/StatCard";
@@ -93,12 +92,6 @@ export function ModelListPage() {
           </tbody>
         </table>
       </GlassCard>
-
-      <div className="mt-6">
-        <GlassCard className="p-5" delay={160}>
-          <CostAnalyticsPanel />
-        </GlassCard>
-      </div>
     </main>
   );
 }

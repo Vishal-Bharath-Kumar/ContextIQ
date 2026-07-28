@@ -9,6 +9,10 @@ export default defineConfig({
       "/api": {
         target: "http://localhost:8000",
         changeOrigin: true,
+        // Ollama pulls can take several minutes for larger models.
+        // Keep the dev proxy connection open long enough to avoid 504s.
+        timeout: 10 * 60 * 1000,
+        proxyTimeout: 10 * 60 * 1000,
         rewrite: (path) => path.replace(/^\/api/, ""),
       },
     },

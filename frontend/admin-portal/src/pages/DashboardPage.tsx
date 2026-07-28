@@ -2,8 +2,6 @@ import { useMemo } from "react";
 import { Link } from "react-router-dom";
 import { formatDistanceToNow } from "date-fns";
 import {
-  Area,
-  AreaChart,
   Bar,
   BarChart,
   CartesianGrid,
@@ -21,13 +19,12 @@ import {
   CardStackIcon,
   LockClosedIcon,
   Share2Icon,
-  TokensIcon,
   WidthIcon,
 } from "@radix-ui/react-icons";
 
 import { useAuth } from "../context/AuthContext";
 import { useConnectors } from "../services/connectorService";
-import { useCostAnalytics, useModels } from "../services/modelService";
+import { useModels } from "../services/modelService";
 import { usePolicies } from "../services/policyService";
 import { useAuditLog } from "../services/auditLogService";
 import { useTools } from "../services/toolRegistryService";
@@ -35,7 +32,6 @@ import { StatCard } from "../components/ui/StatCard";
 import { PageHeader } from "../components/ui/PageHeader";
 import { GlassCard } from "../components/ui/GlassCard";
 import { EmptyState } from "../components/ui/EmptyState";
-import { CostAnalyticsPanel } from "../components/models/CostAnalyticsPanel";
 
 const CONNECTOR_STATUS_COLORS: Record<string, string> = {
   active: "#10b981",
@@ -63,32 +59,16 @@ export function DashboardPage() {
   const { data: connectors, isLoading: connectorsLoading } = useConnectors();
   const { data: models, isLoading: modelsLoading } = useModels();
   const { data: policies, isLoading: policiesLoading } = usePolicies();
-  const { data: costSummaries, isLoading: costLoading } = useCostAnalytics(30);
   const { data: auditPages } = useAuditLog({});
   const { data: tools, isLoading: toolsLoading } = useTools();
 
-  const isLoading = connectorsLoading || modelsLoading || policiesLoading || costLoading || toolsLoading;
+  const isLoading = connectorsLoading || modelsLoading || policiesLoading || toolsLoading;
 
   const activeConnectors = connectors?.filter((c) => c.status === "active").length ?? 0;
   const totalDocuments = connectors?.reduce((sum, c) => sum + c.document_count, 0) ?? 0;
   const activeModels = models?.filter((m) => m.is_active).length ?? 0;
   const enforcedPolicies = policies?.filter((p) => p.active_version).length ?? 0;
   const activeTools = tools?.filter((t) => t.status === "active").length ?? 0;
-  const totalSpend = costSummaries?.reduce((sum, s) => sum + s.total_cost_usd, 0) ?? 0;
-  const totalTokens = costSummaries?.reduce((sum, s) => sum + s.total_tokens, 0) ?? 0;
-
-  const spendTrend = useMemo(() => {
-    if (!costSummaries || costSummaries.length === 0) return [];
-    const byDate = new Map<string, number>();
-    for (const summary of costSummaries) {
-      for (const point of summary.daily_series) {
-        byDate.set(point.date, (byDate.get(point.date) ?? 0) + point.cost_usd);
-      }
-    }
-    return Array.from(byDate.entries())
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([date, cost_usd]) => ({ date, cost_usd: Math.round(cost_usd * 10000) / 10000 }));
-  }, [costSummaries]);
 
   const connectorStatusData = useMemo(() => {
     if (!connectors) return [];
@@ -123,7 +103,7 @@ export function DashboardPage() {
       {!isLoading && (
         <div className="space-y-6">
           {/* KPI row */}
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-7">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
             <StatCard
               label="Active Connectors"
               value={activeConnectors}
@@ -163,56 +143,11 @@ export function DashboardPage() {
               accent="primary"
               delay={160}
             />
-            <StatCard
-              label="30-Day LLM Spend"
-              value={totalSpend}
-              decimals={2}
-              prefix="$"
-              icon={<TokensIcon />}
-              accent="danger"
-              delay={200}
-            />
-            <StatCard
-              label="Tokens Processed"
-              value={totalTokens}
-              icon={<TokensIcon />}
-              accent="info"
-              delay={240}
-            />
           </div>
 
           {/* Charts row */}
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-            <GlassCard className="p-5 lg:col-span-2" delay={80}>
-              <h2 className="mb-4 text-sm font-semibold text-slate-800">30-Day LLM Spend Trend</h2>
-              {spendTrend.length === 0 ? (
-                <p className="py-10 text-center text-sm text-secondary">No cost data recorded yet.</p>
-              ) : (
-                <ResponsiveContainer width="100%" height={260}>
-                  <AreaChart data={spendTrend}>
-                    <defs>
-                      <linearGradient id="spendFill" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#6366f1" stopOpacity={0.45} />
-                        <stop offset="100%" stopColor="#6366f1" stopOpacity={0.02} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.25)" />
-                    <XAxis dataKey="date" tick={{ fontSize: 11 }} minTickGap={24} />
-                    <YAxis tick={{ fontSize: 11 }} width={50} tickFormatter={(v) => `$${v}`} />
-                    <Tooltip formatter={(v: number) => [`$${v.toFixed(4)}`, "Spend"]} />
-                    <Area
-                      type="monotone"
-                      dataKey="cost_usd"
-                      stroke="#4f46e5"
-                      strokeWidth={2}
-                      fill="url(#spendFill)"
-                    />
-                  </AreaChart>
-                </ResponsiveContainer>
-              )}
-            </GlassCard>
-
-            <GlassCard className="p-5" delay={120}>
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <GlassCard className="p-5" delay={80}>
               <h2 className="mb-4 text-sm font-semibold text-slate-800">Connector Health</h2>
               {connectorStatusData.length === 0 ? (
                 <p className="py-10 text-center text-sm text-secondary">No connectors configured.</p>
@@ -241,8 +176,8 @@ export function DashboardPage() {
             </GlassCard>
           </div>
 
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-            <GlassCard className="p-5" delay={160}>
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <GlassCard className="p-5" delay={120}>
               <h2 className="mb-4 text-sm font-semibold text-slate-800">Model Latency Mix</h2>
               {latencyTierData.length === 0 ? (
                 <p className="py-10 text-center text-sm text-secondary">No models registered yet.</p>
@@ -268,7 +203,7 @@ export function DashboardPage() {
               </div>
             </GlassCard>
 
-            <GlassCard className="p-5" delay={200}>
+            <GlassCard className="p-5" delay={160}>
               <h2 className="mb-4 text-sm font-semibold text-slate-800">Recent Activity</h2>
               {recentActivity.length === 0 ? (
                 <p className="py-10 text-center text-sm text-secondary">No audit events recorded yet.</p>
@@ -292,8 +227,10 @@ export function DashboardPage() {
                 </Link>
               </div>
             </GlassCard>
+          </div>
 
-            <GlassCard className="p-5" delay={240}>
+          <div className="grid grid-cols-1">
+            <GlassCard className="p-5" delay={200}>
               <h2 className="mb-4 text-sm font-semibold text-slate-800">BRD Success Metric Targets</h2>
               <ul className="space-y-3">
                 {SUCCESS_METRICS.map((metric) => (
@@ -313,9 +250,6 @@ export function DashboardPage() {
               </ul>
             </GlassCard>
           </div>
-
-          {/* Per-model cost breakdown with sparklines */}
-          <CostAnalyticsPanel />
 
           {connectors && connectors.length === 0 && models?.length === 0 && (
             <EmptyState
