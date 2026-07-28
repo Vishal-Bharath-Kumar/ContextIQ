@@ -19,7 +19,6 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from src.api.admin.routes.audit_log import router as audit_log_router
-from src.api.admin.routes.model_analytics import router as model_analytics_router
 from src.api.admin.routes.policies import router as policies_router
 from src.api.admin.routes.replay import router as replay_router
 from src.auth.dev_login import router as dev_login_router
@@ -34,6 +33,7 @@ from src.knowledge_sources.sync.scheduler import CronSyncScheduler
 from src.model_registry.routers.model_router import router as model_router
 from src.model_router.routers.routing_weight_router import router as routing_weight_router
 from src.observability.cost.settings import LangfuseProjectSettings
+from src.observability.langfuse_integration import setup_langfuse, teardown_langfuse
 from src.observability.metrics.middleware import MetricsMiddleware
 from src.observability.metrics.router import metrics_router
 from src.observability.metrics.settings import MetricsSettings
@@ -65,7 +65,10 @@ def create_app(jwks_client: JWKSClient | None = None) -> FastAPI:
 
     @asynccontextmanager
     async def _lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
-        setup_tracing()  # AC-7: called once at startup
+        # Initialize observability stack
+        setup_tracing()  # AC-7: OpenTelemetry tracing
+        setup_langfuse()  # Langfuse LLM tracing
+        
         if manage_lifecycle:
             await client.startup()
         app.state.jwks_client = client
@@ -94,10 +97,12 @@ def create_app(jwks_client: JWKSClient | None = None) -> FastAPI:
 
         yield
 
+        # Cleanup observability stack
         scheduler.stop()
         if manage_lifecycle:
             await client.shutdown()
-        teardown_tracing()  # flush spans before shutdown
+        teardown_langfuse()  # Flush Langfuse traces
+        teardown_tracing()  # Flush OpenTelemetry spans
 
     new_app = FastAPI(title="ContextIQ", version="0.1.0", lifespan=_lifespan)
 
@@ -119,7 +124,6 @@ def create_app(jwks_client: JWKSClient | None = None) -> FastAPI:
     new_app.include_router(routing_weight_router)
     new_app.include_router(policies_router)
     new_app.include_router(replay_router)
-    new_app.include_router(model_analytics_router)
     new_app.include_router(metrics_router)
     new_app.include_router(audit_log_router)
     new_app.include_router(tool_registry_router)

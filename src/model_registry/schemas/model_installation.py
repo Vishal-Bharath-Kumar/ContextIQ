@@ -5,8 +5,10 @@ and local providers (Ollama) requiring model pull/download.
 """
 from __future__ import annotations
 
+from datetime import datetime
 from enum import StrEnum
 from typing import Optional
+from uuid import UUID
 
 from pydantic import BaseModel, Field
 
@@ -114,3 +116,38 @@ class ModelInstallationResponse(BaseModel):
     status: str  # "installed", "pulled", "registered"
     message: str
     credentials_stored: bool = False
+
+
+class InstallationJobStatus(StrEnum):
+    """Status of a background model installation job."""
+    
+    PENDING = "pending"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
+
+
+class InstallationJobResponse(BaseModel):
+    """Response when creating a new installation job."""
+    
+    job_id: UUID
+    model_id: str
+    provider_type: str
+    status: InstallationJobStatus
+    message: str
+
+
+class InstallationJobProgress(BaseModel):
+    """Current progress of an installation job."""
+    
+    job_id: UUID
+    model_id: str
+    provider_type: str
+    status: InstallationJobStatus
+    progress_pct: float = Field(ge=0.0, le=100.0)
+    current_step: Optional[str] = None
+    error_message: Optional[str] = None
+    started_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+    created_at: datetime
+    updated_at: datetime

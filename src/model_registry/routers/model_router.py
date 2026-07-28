@@ -32,12 +32,15 @@ from src.model_registry.dependencies import get_model_registry_service
 from src.model_registry.repositories.model_audit_repository import ModelAuditRepository
 from src.model_registry.schemas.model_definition import ModelDefinition, ModelRegistration
 from src.model_registry.schemas.model_installation import (
+    InstallationJobProgress,
+    InstallationJobResponse,
     ModelInstallationRequest,
     ModelInstallationResponse,
     OllamaModelInfo,
     OllamaPullRequest,
     OllamaPullResponse,
 )
+from src.model_registry.services.installation_job_service import ModelInstallationJobService
 from src.model_registry.services.model_registry_service import ModelRegistryService
 from src.model_registry.services.ollama_service import OllamaService
 
@@ -146,26 +149,52 @@ async def update_model_status(
     return result
 
 
-@router.post("/install", status_code=201, response_model=ModelInstallationResponse)
+@router.post("/install", status_code=202, response_model=InstallationJobResponse)
 async def install_model(
     body: ModelInstallationRequest,
     claims: JWTClaimsDep,
     audit: Annotated[AuditContext, Depends(get_audit_context)],
-    service: Annotated[ModelRegistryService, Depends(get_model_registry_service)],
     session: Annotated[AsyncSession, Depends(get_db)],
-) -> ModelInstallationResponse:
-    """Install a new model with credentials (API-based or Ollama)."""
-    result = await service.install_model(body)
+) -> InstallationJobResponse:
+    """Install a new model with credentials (starts background job)."""
+    job_service = ModelInstallationJobService()
+    result = await job_service.create_job(body, created_by=claims.sub)
     
     await audit.log(
         action=AdminActionType.MODEL_REGISTERED,
-        resource_type="model",
-        resource_id=result.model_id,
+        resource_type="model_installation_job",
+        resource_id=str(result.job_id),
         before_state=None,
-        after_state={"provider_type": result.provider_type, "status": result.status},
+        after_state={"model_id": result.model_id, "status": result.status.value},
     )
     await session.commit()
     return result
+
+
+@router.get("/install/jobs/{job_id}", response_model=InstallationJobProgress)
+async def get_installation_job_status(
+    job_id: UUID,
+    claims: JWTClaimsDep,
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> InstallationJobProgress:
+    """Get the status of an installation job."""
+    job_service = ModelInstallationJobService()
+    result = await job_service.get_job_status(job_id, session)
+    if not result:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail=f"Job {job_id} not found")
+    return result
+
+
+@router.get("/install/jobs", response_model=list[InstallationJobProgress])
+async def list_installation_jobs(
+    claims: JWTClaimsDep,
+    session: Annotated[AsyncSession, Depends(get_db)],
+    limit: int = 50,
+) -> list[InstallationJobProgress]:
+    """List recent installation jobs."""
+    job_service = ModelInstallationJobService()
+    return await job_service.list_jobs(session, limit=limit)
 
 
 @router.get("/ollama", response_model=list[OllamaModelInfo])

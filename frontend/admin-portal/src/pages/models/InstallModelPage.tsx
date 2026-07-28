@@ -13,6 +13,7 @@ import {
 import { useInstallModel, useOllamaModels } from "../../services/modelService";
 import { GlassCard } from "../../components/ui/GlassCard";
 import { PageHeader } from "../../components/ui/PageHeader";
+import ModelInstallationProgressModal from "../../components/models/ModelInstallationProgressModal";
 
 const PROVIDER_INFO: Record<
   ProviderType,
@@ -83,6 +84,8 @@ export function InstallModelPage() {
   const { data: ollamaModels } = useOllamaModels();
   const [serverError, setServerError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [installationJobId, setInstallationJobId] = useState<string | null>(null);
+  const [installingModelId, setInstallingModelId] = useState<string | null>(null);
 
   const {
     register,
@@ -141,8 +144,16 @@ export function InstallModelPage() {
     try {
       const data = installModelSchema.parse(raw);
       const result = await mutateAsync(data as any);
-      setSuccessMessage(result.message);
-      setTimeout(() => navigate("/models"), 2000);
+      
+      // Check if response contains job_id (background job)
+      if (result.job_id) {
+        setInstallationJobId(result.job_id);
+        setInstallingModelId(result.model_id);
+      } else {
+        // Old synchronous response
+        setSuccessMessage(result.message);
+        setTimeout(() => navigate("/models"), 2000);
+      }
     } catch (err: unknown) {
       if (axios.isAxiosError(err)) {
         setServerError(
@@ -477,6 +488,18 @@ export function InstallModelPage() {
           </div>
         </form>
       </GlassCard>
+
+      {installationJobId && installingModelId && (
+        <ModelInstallationProgressModal
+          jobId={installationJobId}
+          modelId={installingModelId}
+          onClose={() => {
+            setInstallationJobId(null);
+            setInstallingModelId(null);
+            navigate("/models");
+          }}
+        />
+      )}
     </main>
   );
 }

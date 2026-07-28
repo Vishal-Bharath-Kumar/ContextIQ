@@ -92,6 +92,8 @@ x-app-env-vars: &app-env-vars
     # ── Ollama (Local Models) ────────────────────────────────────────────────
     # Use host.docker.internal to reach Ollama running on the host machine
     OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+    # Extended timeout for pulling large models (e.g., 70B models)
+    OLLAMA_PULL_TIMEOUT_SECONDS: "540"
     # ── Logging ──────────────────────────────────────────────────────────────
     CONTEXTIQ_LOG_LEVEL: "DEBUG"
     CONTEXTIQ_SERVER_VERSION: "0.1.0-local"
