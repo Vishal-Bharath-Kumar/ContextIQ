@@ -10,6 +10,7 @@ from src.data.models.policy import Policy, PolicyType
 from src.data.models.audit_log import AuditLog
 from src.data.models.execution_trace_index import ExecutionTraceIndex
 from src.data.models.sync_job import SyncJob, SyncStatus
+from src.data.models.governance_settings import GovernanceSettingsRecord
 
 __all__ = [
     "Base",
@@ -21,4 +22,5 @@ __all__ = [
     "AuditLog",
     "ExecutionTraceIndex",
     "SyncJob", "SyncStatus",
+    "GovernanceSettingsRecord",
 ]

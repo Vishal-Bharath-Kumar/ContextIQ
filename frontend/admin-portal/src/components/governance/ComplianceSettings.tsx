@@ -1,13 +1,17 @@
 import { useState, useEffect } from "react";
 import { CheckIcon, Cross2Icon } from "@radix-ui/react-icons";
+import { useQueryClient } from "@tanstack/react-query";
 
 import {
+  GOVERNANCE_KEYS,
+  type GovernanceSettings,
   useGovernanceSettings,
   useUpdateComplianceSettings,
   type ComplianceStandard,
 } from "../../services/governanceService";
 
 export function ComplianceSettings() {
+  const qc = useQueryClient();
   const { data: governanceSettings, isLoading } = useGovernanceSettings();
   const updateMutation = useUpdateComplianceSettings();
   
@@ -21,17 +25,43 @@ export function ComplianceSettings() {
     }
   }, [governanceSettings]);
 
-  const toggleStandard = (id: string) => {
-    setStandards((prev) =>
-      prev.map((std) => (std.id === id ? { ...std, enabled: !std.enabled } : std))
+  const setCompliancePreview = (nextStandards: ComplianceStandard[]) => {
+    qc.setQueryData<GovernanceSettings | undefined>(
+      GOVERNANCE_KEYS.settings(),
+      (current) =>
+        current
+          ? {
+              ...current,
+              compliance: {
+                ...current.compliance,
+                standards: nextStandards,
+              },
+            }
+          : current
     );
+  };
+
+  const toggleStandard = (id: string) => {
+    setStandards((prev) => {
+      const nextStandards = prev.map((std) =>
+        std.id === id ? { ...std, enabled: !std.enabled } : std
+      );
+      // Optimistic preview: keep Governance metrics in sync with unsaved toggles.
+      setCompliancePreview(nextStandards);
+      return nextStandards;
+    });
     setSaved(false);
   };
 
   const handleSave = async () => {
-    await updateMutation.mutateAsync({ standards });
-    setSaved(true);
-    setTimeout(() => setSaved(false), 3000);
+    try {
+      await updateMutation.mutateAsync({ standards });
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+    } catch {
+      // Roll back optimistic preview to server truth.
+      await qc.invalidateQueries({ queryKey: GOVERNANCE_KEYS.settings() });
+    }
   };
 
   if (isLoading) {

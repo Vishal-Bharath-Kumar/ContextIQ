@@ -1,4 +1,6 @@
 import { CheckCircledIcon, ExclamationTriangleIcon, LockClosedIcon, FileTextIcon } from "@radix-ui/react-icons";
+import { usePolicies } from "../../services/policyService";
+import { useGovernanceSettings } from "../../services/governanceService";
 
 interface MetricCard {
   title: string;
@@ -10,36 +12,69 @@ interface MetricCard {
 }
 
 export function GovernanceMetrics() {
+  const { data: policies } = usePolicies();
+  const { data: governanceSettings } = useGovernanceSettings();
+
+  const totalPolicies = policies?.length ?? 0;
+  const activePolicies = policies?.filter((policy) => policy.active_version !== null).length ?? 0;
+
+  const standards = governanceSettings?.compliance.standards ?? [];
+  const totalStandards = standards.length;
+  const disabledStandards = standards.filter((standard) => !standard.enabled).length;
+  const enabledStandards = totalStandards - disabledStandards;
+
+  const categories = governanceSettings?.patterns.categories ?? [];
+  const piiCategory = categories.find((category) => category.id === "pii");
+  const secretCategories = categories.filter((category) => category.id !== "pii");
+
+  const secretsMasked = secretCategories.reduce(
+    (sum, category) =>
+      sum +
+      category.patterns.reduce(
+        (categorySum, pattern) => categorySum + (pattern.enabled ? (pattern.matchCount ?? 0) : 0),
+        0
+      ),
+    0
+  );
+
+  const piiProtected = (piiCategory?.patterns ?? []).reduce(
+    (sum, pattern) => sum + (pattern.enabled ? (pattern.matchCount ?? 0) : 0),
+    0
+  );
+
+  const policyCoveragePct =
+    totalPolicies === 0 ? 0 : Math.round((activePolicies / totalPolicies) * 100);
+
   const metrics: MetricCard[] = [
     {
       title: "Policies Applied",
-      value: "12/12",
-      change: "+100%",
-      changeType: "positive",
+      value: `${activePolicies}/${totalPolicies}`,
+      change: `${policyCoveragePct}% active`,
+      changeType: policyCoveragePct === 100 ? "positive" : "neutral",
       icon: <CheckCircledIcon className="w-6 h-6" />,
       color: "green",
     },
     {
       title: "Secrets Masked",
-      value: "847",
-      change: "-12%",
-      changeType: "positive",
+      value: secretsMasked.toLocaleString(),
+      change: `${secretCategories.length} categories`,
+      changeType: "neutral",
       icon: <LockClosedIcon className="w-6 h-6" />,
       color: "blue",
     },
     {
       title: "PII Protected",
-      value: "2,341",
-      change: "+8%",
+      value: piiProtected.toLocaleString(),
+      change: `${(piiCategory?.patterns ?? []).filter((pattern) => pattern.enabled).length} patterns enabled`,
       changeType: "neutral",
       icon: <FileTextIcon className="w-6 h-6" />,
       color: "purple",
     },
     {
       title: "Compliance Violations",
-      value: "23",
-      change: "-45%",
-      changeType: "positive",
+      value: disabledStandards,
+      change: `${enabledStandards}/${totalStandards} standards enabled`,
+      changeType: disabledStandards === 0 ? "positive" : "negative",
       icon: <ExclamationTriangleIcon className="w-6 h-6" />,
       color: "orange",
     },

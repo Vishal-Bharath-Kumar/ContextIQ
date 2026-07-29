@@ -119,7 +119,11 @@ export function useUpdateComplianceSettings() {
   return useMutation({
     mutationFn: (settings: ComplianceSettings) =>
       api.put<ComplianceSettings>("/v1/governance/compliance", settings).then((r) => r.data),
-    onSuccess: () => {
+    onSuccess: (data) => {
+      qc.setQueryData<GovernanceSettings | undefined>(
+        GOVERNANCE_KEYS.settings(),
+        (current) => current ? { ...current, compliance: data } : current
+      );
       qc.invalidateQueries({ queryKey: GOVERNANCE_KEYS.settings() });
       qc.invalidateQueries({ queryKey: GOVERNANCE_KEYS.compliance() });
     },
@@ -134,7 +138,11 @@ export function useUpdateRBACSettings() {
   return useMutation({
     mutationFn: (settings: RBACSettings) =>
       api.put<RBACSettings>("/v1/governance/rbac", settings).then((r) => r.data),
-    onSuccess: () => {
+    onSuccess: (data) => {
+      qc.setQueryData<GovernanceSettings | undefined>(
+        GOVERNANCE_KEYS.settings(),
+        (current) => current ? { ...current, rbac: data } : current
+      );
       qc.invalidateQueries({ queryKey: GOVERNANCE_KEYS.settings() });
       qc.invalidateQueries({ queryKey: GOVERNANCE_KEYS.rbac() });
     },
@@ -149,7 +157,11 @@ export function useUpdatePatternSettings() {
   return useMutation({
     mutationFn: (settings: PatternDetectionSettings) =>
       api.put<PatternDetectionSettings>("/v1/governance/patterns", settings).then((r) => r.data),
-    onSuccess: () => {
+    onSuccess: (data) => {
+      qc.setQueryData<GovernanceSettings | undefined>(
+        GOVERNANCE_KEYS.settings(),
+        (current) => current ? { ...current, patterns: data } : current
+      );
       qc.invalidateQueries({ queryKey: GOVERNANCE_KEYS.settings() });
       qc.invalidateQueries({ queryKey: GOVERNANCE_KEYS.patterns() });
     },
@@ -164,7 +176,11 @@ export function useUpdateRiskScoringSettings() {
   return useMutation({
     mutationFn: (settings: RiskScoringSettings) =>
       api.put<RiskScoringSettings>("/v1/governance/risk-scoring", settings).then((r) => r.data),
-    onSuccess: () => {
+    onSuccess: (data) => {
+      qc.setQueryData<GovernanceSettings | undefined>(
+        GOVERNANCE_KEYS.settings(),
+        (current) => current ? { ...current, riskScoring: data } : current
+      );
       qc.invalidateQueries({ queryKey: GOVERNANCE_KEYS.settings() });
       qc.invalidateQueries({ queryKey: GOVERNANCE_KEYS.riskScoring() });
     },

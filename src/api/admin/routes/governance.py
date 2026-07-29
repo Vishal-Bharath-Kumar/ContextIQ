@@ -13,10 +13,13 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
+from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.api.admin.dependencies import require_admin_role
 from src.data.dependencies import get_db
+from src.data.models.governance_settings import GovernanceSettingsRecord
 from src.gateway.schemas.auth_types import JWTClaims
 
 logger = logging.getLogger(__name__)
@@ -24,6 +27,11 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/v1/governance", tags=["Admin — Governance"])
 
 AdminClaims = Annotated[JWTClaims, Depends(require_admin_role)]
+_DEFAULT_SETTINGS_KEY = "default"
+
+
+def _actor_identity(claims: JWTClaims) -> str:
+    return claims.email or claims.preferred_username or claims.sub
 
 
 # ------------------------------------------------------------------ #
@@ -128,7 +136,7 @@ class GovernanceSettings(BaseModel):
 
 
 # ------------------------------------------------------------------ #
-# Default Settings (to be persisted in DB in future)                 #
+# Default Settings (seeded into DB on first access)                  #
 # ------------------------------------------------------------------ #
 
 
@@ -488,6 +496,63 @@ DEFAULT_RISK_SCORING_SETTINGS = RiskScoringSettings(
 )
 
 
+def _default_settings_payload() -> dict[str, dict]:
+    return {
+        "compliance": DEFAULT_COMPLIANCE_SETTINGS.model_dump(by_alias=True),
+        "rbac": DEFAULT_RBAC_SETTINGS.model_dump(by_alias=True),
+        "patterns": DEFAULT_PATTERN_SETTINGS.model_dump(by_alias=True),
+        "risk_scoring": DEFAULT_RISK_SCORING_SETTINGS.model_dump(by_alias=True),
+    }
+
+
+def _record_to_settings(record: GovernanceSettingsRecord) -> GovernanceSettings:
+    return GovernanceSettings(
+        compliance=record.compliance,
+        rbac=record.rbac,
+        patterns=record.patterns,
+        riskScoring=record.risk_scoring,
+    )
+
+
+async def _get_or_create_settings_record(session: AsyncSession) -> GovernanceSettingsRecord:
+    record = (
+        await session.execute(
+            select(GovernanceSettingsRecord).where(
+                GovernanceSettingsRecord.settings_key == _DEFAULT_SETTINGS_KEY
+            )
+        )
+    ).scalar_one_or_none()
+
+    if record is not None:
+        return record
+
+    payload = _default_settings_payload()
+    record = GovernanceSettingsRecord(
+        settings_key=_DEFAULT_SETTINGS_KEY,
+        compliance=payload["compliance"],
+        rbac=payload["rbac"],
+        patterns=payload["patterns"],
+        risk_scoring=payload["risk_scoring"],
+    )
+    session.add(record)
+    try:
+        await session.commit()
+        await session.refresh(record)
+        return record
+    except IntegrityError:
+        await session.rollback()
+        existing_record = (
+            await session.execute(
+                select(GovernanceSettingsRecord).where(
+                    GovernanceSettingsRecord.settings_key == _DEFAULT_SETTINGS_KEY
+                )
+            )
+        ).scalar_one_or_none()
+        if existing_record is None:
+            raise
+        return existing_record
+
+
 # ------------------------------------------------------------------ #
 # Route Handlers                                                      #
 # ------------------------------------------------------------------ #
@@ -503,14 +568,8 @@ async def get_governance_settings(
     Returns all governance configuration including compliance standards,
     RBAC permissions, pattern detection, and risk scoring settings.
     """
-    # TODO: Load from database instead of returning defaults
-    # For now, return default settings
-    return GovernanceSettings(
-        compliance=DEFAULT_COMPLIANCE_SETTINGS,
-        rbac=DEFAULT_RBAC_SETTINGS,
-        patterns=DEFAULT_PATTERN_SETTINGS,
-        riskScoring=DEFAULT_RISK_SCORING_SETTINGS,
-    )
+    record = await _get_or_create_settings_record(session)
+    return _record_to_settings(record)
 
 
 @router.put("/compliance", response_model=ComplianceSettings)
@@ -523,12 +582,23 @@ async def update_compliance_settings(
 
     Enable or disable compliance standards (GDPR, SOC2, HIPAA, PCI-DSS, CCPA).
     """
-    # TODO: Persist to database
-    logger.info(
-        f"Compliance settings updated by {claims.get('email')}: "
-        f"enabled={[s.id for s in settings.standards if s.enabled]}"
-    )
-    return settings
+    try:
+        actor = _actor_identity(claims)
+        record = await _get_or_create_settings_record(session)
+        record.compliance = settings.model_dump(by_alias=True)
+        await session.commit()
+        logger.info(
+            f"Compliance settings updated by {actor}: "
+            f"enabled={[s.id for s in settings.standards if s.enabled]}"
+        )
+        return settings
+    except Exception as exc:
+        await session.rollback()
+        logger.exception("Failed to update compliance settings")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to persist compliance settings.",
+        ) from exc
 
 
 @router.put("/rbac", response_model=RBACSettings)
@@ -541,12 +611,23 @@ async def update_rbac_settings(
 
     Configure permissions and data access levels for each user role.
     """
-    # TODO: Persist to database
-    logger.info(
-        f"RBAC settings updated by {claims.get('email')}: "
-        f"roles={[r.role for r in settings.roles]}"
-    )
-    return settings
+    try:
+        actor = _actor_identity(claims)
+        record = await _get_or_create_settings_record(session)
+        record.rbac = settings.model_dump(by_alias=True)
+        await session.commit()
+        logger.info(
+            f"RBAC settings updated by {actor}: "
+            f"roles={[r.role for r in settings.roles]}"
+        )
+        return settings
+    except Exception as exc:
+        await session.rollback()
+        logger.exception("Failed to update RBAC settings")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to persist RBAC settings.",
+        ) from exc
 
 
 @router.put("/patterns", response_model=PatternDetectionSettings)
@@ -559,16 +640,27 @@ async def update_pattern_settings(
 
     Enable or disable specific secret and PII detection patterns.
     """
-    # TODO: Persist to database
-    total_enabled = sum(
-        sum(1 for p in cat.patterns if p.enabled)
-        for cat in settings.categories
-    )
-    logger.info(
-        f"Pattern settings updated by {claims.get('email')}: "
-        f"enabled_patterns={total_enabled}"
-    )
-    return settings
+    try:
+        actor = _actor_identity(claims)
+        record = await _get_or_create_settings_record(session)
+        record.patterns = settings.model_dump(by_alias=True)
+        await session.commit()
+        total_enabled = sum(
+            sum(1 for p in cat.patterns if p.enabled)
+            for cat in settings.categories
+        )
+        logger.info(
+            f"Pattern settings updated by {actor}: "
+            f"enabled_patterns={total_enabled}"
+        )
+        return settings
+    except Exception as exc:
+        await session.rollback()
+        logger.exception("Failed to update pattern settings")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to persist pattern settings.",
+        ) from exc
 
 
 @router.put("/risk-scoring", response_model=RiskScoringSettings)
@@ -581,9 +673,20 @@ async def update_risk_scoring_settings(
 
     Configure severity weights and compliance violation penalties.
     """
-    # TODO: Persist to database
-    logger.info(
-        f"Risk scoring settings updated by {claims.get('email')}: "
-        f"violation_penalty={settings.violation_penalty}"
-    )
-    return settings
+    try:
+        actor = _actor_identity(claims)
+        record = await _get_or_create_settings_record(session)
+        record.risk_scoring = settings.model_dump(by_alias=True)
+        await session.commit()
+        logger.info(
+            f"Risk scoring settings updated by {actor}: "
+            f"violation_penalty={settings.violation_penalty}"
+        )
+        return settings
+    except Exception as exc:
+        await session.rollback()
+        logger.exception("Failed to update risk scoring settings")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to persist risk scoring settings.",
+        ) from exc
