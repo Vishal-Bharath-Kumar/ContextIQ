@@ -18,6 +18,7 @@ from collections.abc import Callable
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from mcp.types import TextContent
 
 from src.gateway.clients.agent_worker_client import AgentWorkerClient
 from src.gateway.handlers.tools_call import register_tools_call_handler, set_user_id_context
@@ -197,6 +198,48 @@ class TestHandleToolCallValid:
         # limit is optional — should not raise
         result = await handler("flexible", {"q": "hello"})
         assert len(result) == 1
+
+
+class TestHandleToolCallBuiltinFallback:
+    @pytest.mark.asyncio
+    async def test_builtin_tool_called_when_registry_misses(self) -> None:
+        registry = _make_registry([])
+        agent_client = _make_agent_client()
+        captured: list[object] = []
+
+        def _call_tool_decorator() -> Callable[[object], object]:
+            def _inner(fn: object) -> object:
+                captured.append(fn)
+                return fn
+            return _inner
+
+        builtin_tool = MagicMock()
+        builtin_tool.name = "builtin_search"
+        builtin_tool.description = "Built-in search"
+        builtin_tool.parameters = {
+            "type": "object",
+            "properties": {"query": {"type": "string"}},
+            "required": ["query"],
+        }
+        builtin_tool.run = AsyncMock(
+            return_value=MagicMock(
+                content=[TextContent(type="text", text='{"source":"builtin"}')],
+                structured_content={"source": "builtin"},
+            )
+        )
+
+        mock_mcp = MagicMock()
+        mock_mcp.call_tool = _call_tool_decorator
+        mock_mcp.get_tool = AsyncMock(return_value=builtin_tool)
+
+        register_tools_call_handler(mock_mcp, registry=registry, agent_client=agent_client)
+        handler = captured[0]
+
+        result = await handler("builtin_search", {"query": "hello"})
+
+        builtin_tool.run.assert_awaited_once_with({"query": "hello"})
+        agent_client.execute.assert_not_called()
+        assert result[0].text == '{"source":"builtin"}'
 
 
 # ---------------------------------------------------------------------------

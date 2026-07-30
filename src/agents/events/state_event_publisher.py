@@ -133,6 +133,15 @@ def with_state_events(
                 if plan is not None:
                     plan_snapshot = plan.model_dump()
 
+            removed_chunks_snapshot: list[dict] | None = None
+            if node_name == "compression_agent" and isinstance(result, dict):
+                removed_chunks = result.get("removed_chunks")
+                if removed_chunks:
+                    removed_chunks_snapshot = [
+                        chunk.model_dump() if hasattr(chunk, "model_dump") else dict(chunk)
+                        for chunk in removed_chunks
+                    ]
+
             await publisher.publish(
                 StateTransitionEvent(
                     event_id=str(uuid4()),
@@ -144,6 +153,7 @@ def with_state_events(
                     timestamp=_utcnow_iso(),
                     duration_ms=_elapsed_ms(t_start),
                     execution_plan_snapshot=plan_snapshot,
+                    removed_chunks_snapshot=removed_chunks_snapshot,
                 )
             )
             return result

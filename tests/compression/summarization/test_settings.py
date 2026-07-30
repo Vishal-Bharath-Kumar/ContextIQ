@@ -28,7 +28,7 @@ class TestSummarizationSettingsDefaults:
 
     def test_default_model_name(self) -> None:
         settings = SummarizationSettings()
-        assert settings.model_name == "gpt-4o-mini"
+        assert settings.model_name == "ollama/llama3.2"
 
     def test_default_target_ratio(self) -> None:
         settings = SummarizationSettings()
@@ -65,9 +65,9 @@ class TestSummarizationSettingsEnvOverride:
         assert settings.token_threshold == 300
 
     def test_model_name_override(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.setenv("SUMMARIZATION_MODEL_NAME", "gpt-4o")
+        monkeypatch.setenv("SUMMARIZATION_MODEL_NAME", "ollama/mistral")
         settings = SummarizationSettings()
-        assert settings.model_name == "gpt-4o"
+        assert settings.model_name == "ollama/mistral"
 
     def test_target_ratio_override(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("SUMMARIZATION_TARGET_RATIO", "0.50")

@@ -6,7 +6,7 @@ types via a structured LLM chain.  The chain is a lazy module-level singleton
 call and no API key is required at import time.
 
 Performance contract: completes within 500 ms for prompts up to 2 000 tokens
-(``max_tokens=128`` keeps the response minimal; ``gpt-4o-mini`` p95 ≈ 250 ms).
+(``max_tokens=128`` keeps the response minimal; local Ollama is expected).
 
 OTel instrumentation (TASK-US009-05): every execution emits an
 ``intent_agent.classify`` span with attributes ``intent.type``,
@@ -26,6 +26,7 @@ from src.agents.planning.plan_generator import generate_execution_plan
 from src.agents.schemas.intent import IntentResult
 from src.agents.source_selector import select_sources
 from src.agents.state import AgentState, ExecutionStatus
+from src.llm.local_ollama_chain import LiteLLMChain
 from src.observability.tracing.node_span import otel_node_span
 
 _tracer = trace.get_tracer("contextiq.intent_agent")
@@ -53,12 +54,15 @@ def _get_chain() -> object:
     """Return the module-level chain singleton, building it on first call."""
     global _chain
     if _chain is None:
-        from langchain_openai import ChatOpenAI  # noqa: PLC0415
-
         _chain = (
-            _prompt
-            | ChatOpenAI(model="gpt-4o-mini", temperature=0, max_tokens=128)
-            | JsonOutputParser()
+            LiteLLMChain(
+                _prompt,
+                JsonOutputParser(),
+                model_id=settings.llm_model_id,
+                temperature=0.0,
+                max_tokens=128,
+                timeout_s=settings.llm_timeout_s,
+            )
         )
     return _chain
 

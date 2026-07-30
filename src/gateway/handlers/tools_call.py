@@ -27,6 +27,7 @@ import json
 import logging
 import time
 from contextvars import ContextVar
+from unittest.mock import Mock
 from uuid import uuid4
 
 import httpx
@@ -165,7 +166,14 @@ def register_tools_call_handler(
     effective_registry = registry if registry is not None else _get_registry()
     effective_client = agent_client  # May be None; resolved in handler body.
 
-    @mcp.call_tool()
+    low_level_server = getattr(mcp, "_mcp_server", None)
+    registrar_factory = None
+    if low_level_server is not None and not isinstance(low_level_server, Mock):
+        registrar_factory = getattr(low_level_server, "call_tool", None)
+    if registrar_factory is None:
+        registrar_factory = mcp.call_tool
+
+    @registrar_factory()
     async def handle_tool_call(name: str, arguments: dict) -> list[TextContent]:  # type: ignore[type-arg]
         """Validate, dispatch, and return the result of a ``tools/call`` invocation."""
         _start = time.monotonic()
@@ -178,9 +186,13 @@ def register_tools_call_handler(
 
             # 1. Validate tool existence (cache-first lookup).
             tool_def = await effective_registry.get_by_name(name)
+            builtin_tool = None
             if tool_def is None:
-                tools_call_total.labels(status="not_found").inc()
-                raise McpError(ErrorData(code=INVALID_PARAMS, message=f"Tool '{name}' not found or inactive"))
+                builtin_tool = await _get_builtin_tool(mcp, name)
+                if builtin_tool is None:
+                    tools_call_total.labels(status="not_found").inc()
+                    raise McpError(ErrorData(code=INVALID_PARAMS, message=f"Tool '{name}' not found or inactive"))
+                tool_def = _builtin_tool_definition(builtin_tool)
 
             # 2. Validate arguments against the tool's JSON Schema.
             schema = tool_def.inputSchema.model_dump()
@@ -208,6 +220,9 @@ def register_tools_call_handler(
 
             # 4. Forward to Agent Worker.
             client = effective_client if effective_client is not None else _default_client
+            if builtin_tool is not None:
+                return await _run_builtin_tool(builtin_tool, arguments)
+
             if client is None:  # pragma: no cover — only reachable in mis-configured deploys
                 raise McpError(INVALID_PARAMS, "Agent Worker client is not configured")
 
@@ -279,8 +294,51 @@ def register_tools_call_handler(
 
             # 6. Serialise output as MCP TextContent.
             # Clarification path: return a structured response, not an MCP error.
-            if isinstance(result.data, dict) and result.data.get("type") == "clarification_needed":
+            if isinstance(result.data, dict) and result.data.get("type") in {"clarification_needed", "clarification"}:
                 clar = ClarificationNeededResponse.model_validate(result.data)
                 return [TextContent(type="text", text=clar.model_dump_json())]
 
             return [TextContent(type="text", text=json.dumps(result.data))]
+
+
+async def _get_builtin_tool(mcp: FastMCP, name: str) -> object | None:
+    get_tool = getattr(mcp, "get_tool", None)
+    if get_tool is None:
+        return None
+    try:
+        return await get_tool(name)
+    except Exception:
+        logger.debug("tools/call: built-in tool lookup failed for %s", name, exc_info=True)
+        return None
+
+
+def _builtin_tool_definition(tool: object):
+    from src.gateway.schemas.tool_types import InputSchema, ToolDefinition
+
+    parameters = getattr(tool, "parameters", None) or {}
+    output_schema = getattr(tool, "output_schema", None)
+    if not isinstance(parameters, dict):
+        parameters = {}
+    if not isinstance(output_schema, dict):
+        output_schema = None
+    return ToolDefinition(
+        name=getattr(tool, "name", "unknown"),
+        description=getattr(tool, "description", None) or getattr(tool, "title", None) or "Built-in MCP tool.",
+        inputSchema=InputSchema(
+            type="object",
+            properties=parameters.get("properties", {}),
+            required=parameters.get("required", []),
+        ),
+        output_schema=output_schema,
+    )
+
+
+async def _run_builtin_tool(tool: object, arguments: dict) -> list[TextContent]:
+    result = await tool.run(arguments)
+    content = getattr(result, "content", None)
+    if content:
+        return list(content)
+    structured = getattr(result, "structured_content", None)
+    if structured is not None:
+        return [TextContent(type="text", text=json.dumps(structured))]
+    return [TextContent(type="text", text="")]

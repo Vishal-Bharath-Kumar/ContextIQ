@@ -255,6 +255,8 @@ def test_healthz_returns_ok_when_graph_compiled(test_client_with_graph):
     body = resp.json()
     assert body["status"] == "ok"
     assert body["graph_compiled"] is True
+    assert body["ollama"]["status"] == "unknown"
+    assert body["opa"]["status"] == "unknown"
 
 
 def test_execute_raises_500_when_graph_not_initialised():
@@ -288,3 +290,5 @@ def test_healthz_returns_graph_compiled_false_when_no_graph():
 
     assert resp.status_code == 200
     assert resp.json()["graph_compiled"] is False
+    assert resp.json()["ollama"]["status"] == "unknown"
+    assert resp.json()["opa"]["status"] == "unknown"

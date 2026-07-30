@@ -49,6 +49,11 @@ def _get_graph() -> CompiledStateGraph:
     return _graph
 
 
+def get_graph() -> CompiledStateGraph:
+    """Public accessor for the gateway-compiled graph."""
+    return _get_graph()
+
+
 # ---------------------------------------------------------------------------
 # Tool registration
 # ---------------------------------------------------------------------------

@@ -4,10 +4,10 @@ from __future__ import annotations
 
 from langchain_core.output_parsers import JsonOutputParser
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_openai import ChatOpenAI
 from pydantic import BaseModel, Field
 
 from src.compression.summarization.settings import get_summarization_settings
+from src.llm.local_ollama_chain import LiteLLMChain
 
 SUMMARIZATION_SYSTEM_PROMPT = """\
 You are a technical documentation compressor for a software engineering AI assistant.
@@ -45,16 +45,18 @@ class SummarizationChain:
     def __init__(self) -> None:
         settings = get_summarization_settings()
         self._settings = settings
-        self._llm = ChatOpenAI(
-            model=settings.model_name,
-            temperature=0.0,
-            max_tokens=settings.max_output_tokens,
-        )
         self._prompt = ChatPromptTemplate.from_messages([
             ("system", SUMMARIZATION_SYSTEM_PROMPT),
             ("human", "Source chunk (approx. {input_tokens} tokens):\n\n{content}"),
         ])
-        self._chain = self._prompt | self._llm | JsonOutputParser()
+        self._chain = LiteLLMChain(
+            self._prompt,
+            JsonOutputParser(),
+            model_id=settings.model_name,
+            temperature=0.0,
+            max_tokens=settings.max_output_tokens,
+            timeout_s=settings.timeout_s,
+        )
 
     async def summarise(
         self,

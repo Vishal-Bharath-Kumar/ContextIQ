@@ -11,6 +11,7 @@ import logging
 from typing import Any
 
 from fastmcp import FastMCP
+from src.gateway.tools.enterprise._local_tools import git_history, json_text_response, service_health_snapshot
 from mcp.types import TextContent
 
 logger = logging.getLogger(__name__)
@@ -59,21 +60,18 @@ def register_operations_tools(mcp: FastMCP, monitoring_service: Any = None) -> N
             Log search results with timestamps and context
         """
         try:
+            logs = []
+            if monitoring_service is not None and hasattr(monitoring_service, "search_logs"):
+                logs = await monitoring_service.search_logs(query=query, service=service, time_range=time_range, level=level, limit=limit)
             result = {
                 "query": query,
                 "service": service or "all services",
                 "time_range": time_range,
                 "level": level,
-                "logs": [
-                    {
-                        "timestamp": "2026-07-27T10:30:00Z",
-                        "level": "ERROR",
-                        "service": "payment-service",
-                        "message": "Placeholder log message",
-                    }
-                ],
-                "total": 1,
-                "status": "implementation_pending",
+                "logs": logs,
+                "total": len(logs),
+                "status": "success" if logs else "unavailable",
+                "reason": None if logs else "No monitoring service configured for log aggregation.",
             }
             
             logger.info(
@@ -83,11 +81,11 @@ def register_operations_tools(mcp: FastMCP, monitoring_service: Any = None) -> N
                 time_range,
             )
             
-            return [TextContent(type="text", text=str(result))]
+            return json_text_response(result)
             
         except Exception as e:
             logger.error("search_logs failed: %s", e, exc_info=True)
-            return [TextContent(type="text", text=f"Error: {e}")]
+            return json_text_response({"error": str(e), "status": "error"})
 
     @mcp.tool()
     async def deployment_history(
@@ -111,28 +109,23 @@ def register_operations_tools(mcp: FastMCP, monitoring_service: Any = None) -> N
             Deployment history with metadata
         """
         try:
+            deployments = git_history(limit, grep=service)
+            if not deployments:
+                deployments = git_history(limit)
             result = {
                 "service": service,
-                "deployments": [
-                    {
-                        "version": "v2.5.0",
-                        "timestamp": "2026-07-26T15:00:00Z",
-                        "deployer": "john.doe@example.com",
-                        "status": "success",
-                        "environment": "production",
-                    }
-                ],
-                "total": 1,
-                "status": "implementation_pending",
+                "deployments": deployments,
+                "total": len(deployments),
+                "status": "success",
             }
             
             logger.info("deployment_history invoked: service=%s", service)
             
-            return [TextContent(type="text", text=str(result))]
+            return json_text_response(result)
             
         except Exception as e:
             logger.error("deployment_history failed: %s", e, exc_info=True)
-            return [TextContent(type="text", text=f"Error: {e}")]
+            return json_text_response({"error": str(e), "status": "error"})
 
     @mcp.tool()
     async def service_health(
@@ -154,26 +147,18 @@ def register_operations_tools(mcp: FastMCP, monitoring_service: Any = None) -> N
             Service health metrics and status
         """
         try:
+            health = service_health_snapshot(service)
             result = {
                 "service": service or "all services",
-                "health": [
-                    {
-                        "service": "payment-service",
-                        "status": "healthy",
-                        "uptime": "99.95%",
-                        "avg_response_time": "120ms",
-                        "error_rate": "0.01%",
-                        "last_incident": None,
-                    }
-                ],
-                "timestamp": "2026-07-27T10:30:00Z",
-                "status": "implementation_pending",
+                "health": health,
+                "timestamp": health[0]["timestamp"] if health else None,
+                "status": "success",
             }
             
             logger.info("service_health invoked: service=%s", service)
             
-            return [TextContent(type="text", text=str(result))]
+            return json_text_response(result)
             
         except Exception as e:
             logger.error("service_health failed: %s", e, exc_info=True)
-            return [TextContent(type="text", text=f"Error: {e}")]
+            return json_text_response({"error": str(e), "status": "error"})

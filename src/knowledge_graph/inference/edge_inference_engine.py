@@ -21,6 +21,7 @@ from uuid import UUID
 
 import litellm
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from src.llm.local_ollama_chain import get_ollama_base_url
 
 from src.knowledge_graph.inference.prompts import EDGE_INFERENCE_HUMAN, EDGE_INFERENCE_SYSTEM
 from src.knowledge_graph.schemas.edge import EdgeType
@@ -38,7 +39,7 @@ class EdgeInferenceSettings(BaseSettings):
     # If False, only the heuristic pass runs (REFERENCES edges). Fast path only.
     # Set True to enable LLM-based directional edge typing.
     use_llm: bool = True
-    model_id: str = "gpt-4o-mini"
+    model_id: str = "ollama/llama3.2"
     temperature: float = 0.0
     max_tokens: int = 512
     # Per-chunk LLM timeout. Must be short to meet the 5 s / 500-chunk budget.
@@ -139,6 +140,7 @@ class EdgeInferenceEngine:
         response = await asyncio.wait_for(
             litellm.acompletion(
                 model=self._settings.model_id,
+                api_base=get_ollama_base_url(),
                 messages=messages,
                 temperature=self._settings.temperature,
                 max_tokens=self._settings.max_tokens,

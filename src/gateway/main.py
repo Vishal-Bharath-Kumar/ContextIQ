@@ -34,6 +34,7 @@ from pydantic import TypeAdapter
 
 from src.connector_sdk.health_poller import ConnectorHealthPoller
 from src.connector_sdk.registry import ConnectorRegistry
+from src.data.database import primary_session_factory
 from src.gateway.config import settings
 from src.gateway.lifespan import start_cache_invalidation_subscriber, start_entity_consumer, start_indexing_consumer
 from src.gateway.mcp_server import mcp, sse_app
@@ -46,7 +47,20 @@ from src.gateway.state import circuit_state_gauge, gateway_breaker
 from src.gateway.telemetry import setup_telemetry
 from src.governance.opa.bundle_loader import BundleNotReadyError, PolicyBundleLoader
 from src.governance.opa.client import OPAClient
+from src.governance.opa.health import default_opa_health_status, opa_health_status
+from src.governance.nodes.opa_filter_node import set_opa_client
+from src.knowledge_graph.extraction.extractor import ExtractionSettings
+from src.knowledge_graph.inference.edge_inference_engine import EdgeInferenceSettings
+from src.knowledge_graph.traversal.entity_linker import EntityLinkerSettings
+from src.llm.ollama_verify import default_ollama_verification_status, verify_ollama_models_available
 from src.registry.cache.tool_cache import ToolListCache
+from src.agents.checkpointer import get_redis_checkpointer
+from src.agents.config import settings as agent_settings
+from src.agents.graph import build_graph
+from src.agents.nodes.retrieval import set_connector_registry
+from src.audit.trace.object_store import TraceObjectStore
+from src.audit.trace.writer_node import set_trace_object_store, set_trace_session_factory
+from src.gateway.tools.clarification_reply import set_graph as set_clarification_graph
 
 if TYPE_CHECKING:
     from src.indexing.consumer import IndexingConsumer
@@ -149,15 +163,44 @@ def create_gateway_app(jwks_client: Any = None) -> FastAPI:
                 )
 
         async with sse_app.lifespan(app):
+            app.state.ollama_verification = await verify_ollama_models_available(
+                [
+                    agent_settings.llm_model_id,
+                    EntityLinkerSettings().model_id,
+                    ExtractionSettings().model_id,
+                    EdgeInferenceSettings().model_id,
+                ]
+            )
+            app.state.opa_health = default_opa_health_status()
+
             # Initialise ConnectorRegistry (TASK-US021-02).
             # Connectors that fail authenticate() are registered as disabled
             # so the gateway continues serving other connectors.
             _connector_registry = ConnectorRegistry()
             await _connector_registry.load()
             app.state.connector_registry = _connector_registry
+            set_connector_registry(_connector_registry)
             _health_poller = ConnectorHealthPoller(registry=_connector_registry)
             _health_poller.start()
             app.state.connector_health_poller = _health_poller
+
+            try:
+                trace_store = TraceObjectStore()
+                set_trace_object_store(trace_store)
+                set_trace_session_factory(primary_session_factory())
+                app.state.trace_object_store = trace_store
+            except Exception:
+                logger.warning("Could not configure trace writer dependencies", exc_info=True)
+
+            _graph_checkpointer = None
+            try:
+                _graph_checkpointer = await get_redis_checkpointer()
+                graph = build_graph(checkpointer=_graph_checkpointer)
+                set_clarification_graph(graph)
+                app.state.agent_graph = graph
+                app.state.agent_graph_checkpointer = _graph_checkpointer
+            except Exception:
+                logger.warning("Could not initialise gateway agent graph", exc_info=True)
 
             # Start indexing consumer (TASK-US027-04).
             # Guarded by DATABASE_URL so the gateway can start in dev/test
@@ -182,16 +225,30 @@ def create_gateway_app(jwks_client: Any = None) -> FastAPI:
             # Initialise OPA client and verify bundle (TASK-US032-02).
             # Guarded by OPA_BASE_URL so the gateway can start without an OPA
             # sidecar in dev/test environments.
-            if os.environ.get("OPA_BASE_URL", "http://localhost:8181"):
+            opa_base_url = os.environ.get("OPA_BASE_URL")
+            if opa_base_url:
                 _bundle_loader = PolicyBundleLoader()
                 try:
                     app.state.bundle_info = await _bundle_loader.verify()
                     app.state.opa_client = OPAClient()
+                    set_opa_client(app.state.opa_client)
+                    app.state.opa_health = opa_health_status(
+                        configured=True,
+                        bundle_ready=True,
+                        degraded=False,
+                        bundle_version=app.state.bundle_info.version,
+                    )
                     logger.info(
                         "OPA client ready — bundle version=%s",
                         app.state.bundle_info.version,
                     )
                 except BundleNotReadyError:
+                    app.state.opa_health = opa_health_status(
+                        configured=True,
+                        bundle_ready=False,
+                        degraded=False,
+                        error="OPA bundle not ready",
+                    )
                     logger.critical("OPA bundle not ready — refusing to start")
                     raise
 
@@ -222,6 +279,9 @@ def create_gateway_app(jwks_client: Any = None) -> FastAPI:
                     )
 
             yield
+
+            if _graph_checkpointer is not None:
+                await _graph_checkpointer.aclose()
 
             if _indexing_consumer is not None:
                 await _indexing_consumer.stop()
@@ -375,7 +435,12 @@ def create_gateway_app(jwks_client: Any = None) -> FastAPI:
     @gateway.get("/healthz")
     async def healthz() -> dict[str, object]:
         """Liveness / readiness probe — no authentication required."""
-        return {"status": "ok", "transport": ["sse", "websocket"]}
+        return {
+            "status": "ok",
+            "transport": ["sse", "websocket"],
+            "ollama": getattr(gateway.state, "ollama_verification", default_ollama_verification_status()),
+            "opa": getattr(gateway.state, "opa_health", default_opa_health_status()),
+        }
 
     return gateway
 

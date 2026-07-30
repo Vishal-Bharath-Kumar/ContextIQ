@@ -10,6 +10,7 @@ from uuid import UUID
 
 import litellm
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from src.llm.local_ollama_chain import get_ollama_base_url
 
 from src.knowledge_graph.extraction.prompts import (
     ENTITY_EXTRACTION_HUMAN,
@@ -34,7 +35,7 @@ class ExtractionSettings(BaseSettings):
     )
 
     # AIR-020 specifies the extraction model; default is a fast, cheap model.
-    model_id: str = "gpt-4o-mini"
+    model_id: str = "ollama/llama3.2"
     # Hard timeout per LiteLLM call. Keeps p99 latency from blowing past the 500 ms SLA.
     timeout_s: float = 2.0
     # Temperature 0 for deterministic, reproducible entity extraction.
@@ -68,6 +69,7 @@ class EntityExtractor:
         response = await asyncio.wait_for(
             litellm.acompletion(
                 model=self._settings.model_id,
+                api_base=get_ollama_base_url(),
                 messages=messages,
                 temperature=self._settings.temperature,
                 max_tokens=self._settings.max_tokens,

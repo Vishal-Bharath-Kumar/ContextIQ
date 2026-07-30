@@ -2,20 +2,18 @@
 from __future__ import annotations
 
 import logging
-from typing import Optional
-
-from langfuse import Langfuse
+from typing import Any, Optional
 
 from src.observability.langfuse_integration.settings import LangfuseSettings
 
 logger = logging.getLogger(__name__)
 
 # Module-level Langfuse client instance
-_langfuse_client: Optional[Langfuse] = None
+_langfuse_client: Any | None = None
 _langfuse_settings: Optional[LangfuseSettings] = None
 
 
-def setup_langfuse(settings: Optional[LangfuseSettings] = None) -> Optional[Langfuse]:
+def setup_langfuse(settings: Optional[LangfuseSettings] = None) -> Any | None:
     """
     Initialize Langfuse SDK.
     
@@ -44,6 +42,8 @@ def setup_langfuse(settings: Optional[LangfuseSettings] = None) -> Optional[Lang
         return None
     
     try:
+        from langfuse import Langfuse  # noqa: PLC0415
+
         _langfuse_client = Langfuse(
             public_key=_langfuse_settings.public_key,
             secret_key=_langfuse_settings.secret_key,
@@ -67,7 +67,7 @@ def setup_langfuse(settings: Optional[LangfuseSettings] = None) -> Optional[Lang
         return None
 
 
-def get_langfuse() -> Optional[Langfuse]:
+def get_langfuse() -> Any | None:
     """
     Get the initialized Langfuse client.
     

@@ -15,7 +15,7 @@ class SummarizationSettings(BaseSettings):
 
     Environment variables (all prefixed SUMMARIZATION_):
         TOKEN_THRESHOLD     — int ≥ 1, default 500
-        MODEL_NAME          — string, default "gpt-4o-mini"
+        MODEL_NAME          — string, default "ollama/llama3.2"
                               Set to a model-router endpoint when EP-006 is available.
         TARGET_RATIO        — float in (0.0, 1.0), default 0.40
         MAX_OUTPUT_TOKENS   — int ≥ 50, default 400
@@ -24,11 +24,12 @@ class SummarizationSettings(BaseSettings):
     """
 
     token_threshold: int = Field(default=SUMMARIZATION_TOKEN_THRESHOLD, ge=1)
-    model_name: str = Field(default="gpt-4o-mini")
+    model_name: str = Field(default="ollama/llama3.2")
     target_ratio: float = Field(default=SUMMARIZATION_TARGET_RATIO, gt=0.0, lt=1.0)
     max_output_tokens: int = Field(default=SUMMARIZATION_MAX_OUTPUT_TOKENS, ge=50)
     max_concurrent: int = Field(default=10, ge=1)
     langfuse_enabled: bool = Field(default=True)
+    timeout_s: float = Field(default=30.0, gt=0.0)
 
     model_config = SettingsConfigDict(
         env_prefix="SUMMARIZATION_",

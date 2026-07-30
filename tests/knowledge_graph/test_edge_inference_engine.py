@@ -77,7 +77,7 @@ def _no_llm_settings(**kwargs: object) -> EdgeInferenceSettings:
 
 
 def _llm_settings(**kwargs: object) -> EdgeInferenceSettings:
-    return EdgeInferenceSettings(use_llm=True, model_id="gpt-4o-mini", **kwargs)
+    return EdgeInferenceSettings(use_llm=True, model_id="ollama/llama3.2", **kwargs)
 
 
 # ---------------------------------------------------------------------------

@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 
 import litellm
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from src.llm.local_ollama_chain import get_ollama_base_url
 
 if TYPE_CHECKING:
     from src.knowledge_graph.traversal.neo4j_traversal_client import GraphTraversalClient
@@ -29,7 +30,7 @@ class EntityLinkerSettings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="ENTITY_LINKER_", env_file=".env", extra="ignore")
 
     # Fallback LLM for entity name extraction when metadata.entity_ids is absent.
-    model_id: str = "gpt-4o-mini"
+    model_id: str = "ollama/llama3.2"
     temperature: float = 0.0
     max_tokens: int = 256
     timeout_s: float = 1.0
@@ -76,7 +77,8 @@ class EntityLinker:
 
         # --- Slow path: LLM name extraction → graph ID lookup ---
         combined_text = "\n".join(
-            str(item.get("text") or "") for item in ranked_context[:5]  # top-5 items only
+            str(item.get("content") or item.get("text") or item.get("path_summary") or "")
+            for item in ranked_context[:5]
         )
         names = await self._extract_entity_names(combined_text)
         if not names:
@@ -95,6 +97,7 @@ class EntityLinker:
             response = await asyncio.wait_for(
                 litellm.acompletion(
                     model=self._settings.model_id,
+                    api_base=get_ollama_base_url(),
                     messages=[
                         {"role": "system", "content": _ENTITY_NAME_EXTRACTION_SYSTEM},
                         {"role": "user", "content": text},

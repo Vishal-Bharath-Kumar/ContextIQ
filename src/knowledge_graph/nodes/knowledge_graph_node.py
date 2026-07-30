@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import logging
 
-from langfuse import Langfuse
 from opentelemetry import trace
 
 from src.agents.state import AgentState
@@ -16,10 +15,28 @@ from src.knowledge_graph.schemas.edge import EdgeType
 from src.knowledge_graph.traversal.entity_linker import EntityLinker
 from src.knowledge_graph.traversal.neo4j_traversal_client import GraphTraversalClient
 from src.knowledge_graph.traversal.schemas import TraversalConfig, TraversalSettings
+from src.retrieval.ranking.filters import count_tokens
 
 logger = logging.getLogger(__name__)
 tracer = trace.get_tracer(__name__)
-langfuse = Langfuse()
+langfuse = None
+
+
+def _get_langfuse() -> object | None:
+    global langfuse
+    if langfuse is not None:
+        return langfuse
+    try:
+        from langfuse import Langfuse  # noqa: PLC0415
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("knowledge_graph_node: Langfuse unavailable: %s", exc)
+        return None
+    try:
+        langfuse = Langfuse()
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("knowledge_graph_node: Langfuse init failed: %s", exc)
+        return None
+    return langfuse
 
 
 async def knowledge_graph_node(state: AgentState) -> AgentState:
@@ -37,9 +54,7 @@ async def knowledge_graph_node(state: AgentState) -> AgentState:
     settings = TraversalSettings()
 
     ranked_context: list[dict] = state.get("ranked_context") or []
-    execution_plan: dict = state.get("execution_plan") or {}
-
-    remaining_budget: int = execution_plan.get("remaining_tokens", 0)
+    remaining_budget = _remaining_budget(state, ranked_context)
     token_budget = int(remaining_budget * settings.budget_fraction)
 
     with tracer.start_as_current_span("knowledge_graph.traverse") as span:
@@ -50,10 +65,12 @@ async def knowledge_graph_node(state: AgentState) -> AgentState:
             logger.info("knowledge_graph_node: zero token budget — skipping traversal")
             span.set_attribute("kg.skipped", True)
             return {
-                **state,
+                "current_node": "knowledge_graph",
+                "status": state.get("status"),
                 "graph_traversal_skipped": True,
                 "graph_tokens_used": 0,
                 "graph_context_items": [],
+                "ranked_context": ranked_context,
             }
 
         # Resolve seeds
@@ -65,10 +82,12 @@ async def knowledge_graph_node(state: AgentState) -> AgentState:
             logger.info("knowledge_graph_node: no seed entities found — skipping traversal")
             span.set_attribute("kg.skipped", True)
             return {
-                **state,
+                "current_node": "knowledge_graph",
+                "status": state.get("status"),
                 "graph_traversal_skipped": True,
                 "graph_tokens_used": 0,
                 "graph_context_items": [],
+                "ranked_context": ranked_context,
             }
 
         span.set_attribute("kg.seed_count", len(seeds))
@@ -90,10 +109,12 @@ async def knowledge_graph_node(state: AgentState) -> AgentState:
             )
             span.set_attribute("kg.timeout", True)
             return {
-                **state,
+                "current_node": "knowledge_graph",
+                "status": state.get("status"),
                 "graph_traversal_skipped": True,
                 "graph_tokens_used": 0,
                 "graph_context_items": [],
+                "ranked_context": ranked_context,
             }
 
         span.set_attribute("kg.items_returned", len(result.items))
@@ -101,21 +122,47 @@ async def knowledge_graph_node(state: AgentState) -> AgentState:
         span.set_attribute("kg.truncated", result.truncated)
         span.set_attribute("kg.duration_ms", result.query_duration_ms)
 
-        langfuse.create_event(
-            name="knowledge_graph_traversal",
-            input={"seeds": seeds, "max_depth": config.max_depth},
-            output={"items": len(result.items), "tokens": result.total_tokens},
-            metadata={"duration_ms": result.query_duration_ms, "truncated": result.truncated},
-        )
+        lf = _get_langfuse()
+        if lf is not None:
+            lf.create_event(
+                name="knowledge_graph_traversal",
+                input={"seeds": seeds, "max_depth": config.max_depth},
+                output={"items": len(result.items), "tokens": result.total_tokens},
+                metadata={"duration_ms": result.query_duration_ms, "truncated": result.truncated},
+            )
 
         # Append graph results to ranked_context (AC-4)
         graph_context_dicts = [item.model_dump() for item in result.items]
         updated_ranked_context = ranked_context + graph_context_dicts
 
         return {
-            **state,
+            "current_node": "knowledge_graph",
+            "status": state.get("status"),
             "ranked_context": updated_ranked_context,
             "graph_context_items": result.items,
             "graph_traversal_skipped": False,
             "graph_tokens_used": result.total_tokens,
         }
+
+
+def _remaining_budget(state: AgentState, ranked_context: list[dict]) -> int:
+    execution_plan = state.get("execution_plan")
+    if isinstance(execution_plan, dict):
+        if execution_plan.get("remaining_tokens") is not None:
+            return int(execution_plan["remaining_tokens"])
+        plan_total = int(execution_plan.get("token_budget_total") or 0)
+    elif execution_plan is not None:
+        plan_total = int(execution_plan.token_budget_total)
+    else:
+        plan_total = 0
+
+    used = sum(_ranked_item_tokens(item) for item in ranked_context)
+    return max(plan_total - used, 0)
+
+
+def _ranked_item_tokens(item: dict[str, object]) -> int:
+    raw = item.get("token_count")
+    if raw is not None:
+        return int(raw)
+    text = str(item.get("content") or item.get("text") or item.get("path_summary") or "")
+    return count_tokens(text)

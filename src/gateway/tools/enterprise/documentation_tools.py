@@ -11,6 +11,7 @@ import logging
 from typing import Any
 
 from fastmcp import FastMCP
+from src.gateway.tools.enterprise._local_tools import DOC_ROOT, json_text_response, search_workspace, summarize_document_path
 from mcp.types import TextContent
 
 logger = logging.getLogger(__name__)
@@ -56,22 +57,17 @@ def register_documentation_tools(mcp: FastMCP, knowledge_service: Any = None) ->
             Documentation search results with summaries
         """
         try:
+            path_filter = None
+            if doc_type:
+                path_filter = f"**/*{doc_type}*.md"
+            matches = search_workspace(query, roots=[DOC_ROOT], suffixes={".md"}, limit=limit, path_filter=path_filter)
             result = {
                 "query": query,
-                "source": source or "all sources",
+                "source": source or "workspace-docs",
                 "doc_type": doc_type,
-                "results": [
-                    {
-                        "title": "Example Documentation",
-                        "source": "confluence",
-                        "url": "https://example.com/wiki/page",
-                        "summary": "Placeholder summary",
-                        "relevance": 0.92,
-                        "last_updated": "2026-07-27",
-                    }
-                ],
-                "total": 1,
-                "status": "implementation_pending",
+                "results": matches,
+                "total": len(matches),
+                "status": "success",
             }
             
             logger.info(
@@ -81,11 +77,11 @@ def register_documentation_tools(mcp: FastMCP, knowledge_service: Any = None) ->
                 doc_type,
             )
             
-            return [TextContent(type="text", text=str(result))]
+            return json_text_response(result)
             
         except Exception as e:
             logger.error("search_documentation failed: %s", e, exc_info=True)
-            return [TextContent(type="text", text=f"Error: {e}")]
+            return json_text_response({"error": str(e), "status": "error"})
 
     @mcp.tool()
     async def summarize_document(
@@ -112,15 +108,7 @@ def register_documentation_tools(mcp: FastMCP, knowledge_service: Any = None) ->
             Document summary with metadata
         """
         try:
-            result = {
-                "document_id": document_id,
-                "source": source,
-                "title": "Document Title",
-                "summary": "Placeholder AI-generated summary",
-                "key_points": [],
-                "word_count": max_length,
-                "status": "implementation_pending",
-            }
+            result = {**summarize_document_path(document_id, max_words=max_length), "source": source, "status": "success"}
             
             logger.info(
                 "summarize_document invoked: %s from %s",
@@ -128,11 +116,11 @@ def register_documentation_tools(mcp: FastMCP, knowledge_service: Any = None) ->
                 source,
             )
             
-            return [TextContent(type="text", text=str(result))]
+            return json_text_response(result)
             
         except Exception as e:
             logger.error("summarize_document failed: %s", e, exc_info=True)
-            return [TextContent(type="text", text=f"Error: {e}")]
+            return json_text_response({"error": str(e), "status": "error"})
 
     @mcp.tool()
     async def architecture_search(
@@ -157,18 +145,18 @@ def register_documentation_tools(mcp: FastMCP, knowledge_service: Any = None) ->
             Architecture documentation results
         """
         try:
+            results = search_workspace(
+                query,
+                roots=[DOC_ROOT],
+                suffixes={".md"},
+                limit=10,
+                path_filter="**/*architecture*.md",
+            )
             result = {
                 "query": query,
                 "component": component,
-                "results": [
-                    {
-                        "title": "System Architecture",
-                        "type": "architecture_diagram",
-                        "components": ["api", "database", "cache"],
-                        "last_updated": "2026-07-15",
-                    }
-                ],
-                "status": "implementation_pending",
+                "results": results,
+                "status": "success",
             }
             
             logger.info(
@@ -177,8 +165,8 @@ def register_documentation_tools(mcp: FastMCP, knowledge_service: Any = None) ->
                 component,
             )
             
-            return [TextContent(type="text", text=str(result))]
+            return json_text_response(result)
             
         except Exception as e:
             logger.error("architecture_search failed: %s", e, exc_info=True)
-            return [TextContent(type="text", text=f"Error: {e}")]
+            return json_text_response({"error": str(e), "status": "error"})

@@ -12,7 +12,6 @@ import uuid
 from datetime import UTC, datetime
 from typing import Any, cast
 
-from langfuse import Langfuse
 from opentelemetry import trace
 
 from src.agents.state import AgentState
@@ -29,7 +28,24 @@ from src.audit.trace.schemas import (
 
 logger = logging.getLogger(__name__)
 tracer = trace.get_tracer(__name__)
-langfuse = Langfuse()
+langfuse = None
+
+
+def _get_langfuse() -> object | None:
+    global langfuse
+    if langfuse is not None:
+        return langfuse
+    try:
+        from langfuse import Langfuse  # noqa: PLC0415
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("trace_writer_node: Langfuse unavailable: %s", exc)
+        return None
+    try:
+        langfuse = Langfuse()
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("trace_writer_node: Langfuse init failed: %s", exc)
+        return None
+    return langfuse
 
 
 # ------------------------------------------------------------------ #
@@ -61,11 +77,13 @@ async def trace_writer_node(state: AgentState) -> AgentState:
             name=f"persist_trace_{trace_obj.request_id}",
         )
 
-        langfuse.create_event(
-            name="trace_writer_dispatched",
-            input={"request_id": str(trace_obj.request_id)},
-            metadata={"intent": trace_obj.intent},
-        )
+        lf = _get_langfuse()
+        if lf is not None:
+            lf.create_event(
+                name="trace_writer_dispatched",
+                input={"request_id": str(trace_obj.request_id)},
+                metadata={"intent": trace_obj.intent},
+            )
 
         # Object key is computed locally without hitting MinIO
         estimated_key = _build_key(trace_obj)
@@ -221,7 +239,10 @@ def _get_request_id(state: AgentState) -> uuid.UUID:
     if isinstance(raw, uuid.UUID):
         return raw
     if isinstance(raw, str):
-        return uuid.UUID(raw)
+        try:
+            return uuid.UUID(raw)
+        except ValueError:
+            return uuid.uuid5(uuid.NAMESPACE_URL, raw)
     return uuid.uuid4()
 
 

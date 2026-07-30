@@ -7,6 +7,7 @@ from typing import NotRequired, TypedDict
 
 from src.agents.schemas.execution_plan import ExecutionPlan
 from src.agents.schemas.intent import IntentType
+from src.compression.schemas.removed_chunk import RemovedChunk
 from src.governance.opa.schemas import PolicyDecision
 from src.governance.schemas.finding import DetectionFinding
 from src.knowledge_graph.traversal.schemas import GraphContextItem
@@ -60,6 +61,8 @@ class AgentState(TypedDict):
     compressed_context: list[dict] | None
     tokens_before_compression: int | None
     tokens_after_compression: int | None
+    removed_chunks: NotRequired[list[RemovedChunk] | None]
+    consolidated_sources: NotRequired[dict[str, list[str]] | None]
 
     # ── Compression trace fields (TASK-US034-04) ───────────────────────
     ranked_context_pre_compression: NotRequired[list[dict] | None]  # pre-compression snapshot
@@ -113,3 +116,6 @@ class AgentState(TypedDict):
     # ── OTel tracing (TASK-US038-02) ───────────────────────────────────
     _otel_ctx: NotRequired[object | None]  # RootSpanContext — not serialised to JSON
     otel_trace_id: NotRequired[str | None]  # 32-char hex trace ID = request_id without hyphens
+
+    # ── Internal dependency injection (best-effort runtime helpers) ─────
+    _config: NotRequired[dict | None]

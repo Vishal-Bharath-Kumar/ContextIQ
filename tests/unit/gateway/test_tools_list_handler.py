@@ -219,6 +219,40 @@ class TestHandleToolsList:
         assert isinstance(t.inputSchema, InputSchema)
 
 
+class TestHandleToolsListBuiltinFallback:
+    @pytest.mark.asyncio
+    async def test_builtin_tools_merged_with_registry_tools(self) -> None:
+        registry = _make_registry([_make_tool("db_tool")])
+        captured: list[object] = []
+
+        def _list_tools_decorator() -> Callable[[object], object]:
+            def _inner(fn: object) -> object:
+                captured.append(fn)
+                return fn
+            return _inner
+
+        builtin_tool = MagicMock()
+        builtin_tool.name = "builtin_tool"
+        builtin_tool.description = "Built-in tool"
+        builtin_tool.title = None
+        builtin_tool.parameters = {
+            "type": "object",
+            "properties": {"query": {"type": "string"}},
+            "required": ["query"],
+        }
+        builtin_tool.output_schema = {"type": "object"}
+
+        mock_mcp = MagicMock()
+        mock_mcp.list_tools = _list_tools_decorator
+        mock_mcp._list_tools = AsyncMock(return_value=[builtin_tool])
+
+        register_tools_list_handler(mock_mcp, registry=registry)
+        handler = captured[0]
+
+        result = await handler()
+        assert [tool.name for tool in result] == ["builtin_tool", "db_tool"]
+
+
 # ---------------------------------------------------------------------------
 # ToolRegistryService stub — interface contract
 # ---------------------------------------------------------------------------

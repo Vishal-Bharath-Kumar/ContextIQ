@@ -40,6 +40,12 @@ from src.observability.metrics.router import metrics_router
 from src.observability.metrics.settings import MetricsSettings
 from src.observability.tracing.setup import setup_tracing, teardown_tracing
 from src.registry.routers.tool_router import router as tool_registry_router
+from src.agents.config import settings as agent_settings
+from src.governance.opa.health import default_opa_health_status, opa_health_status
+from src.knowledge_graph.extraction.extractor import ExtractionSettings
+from src.knowledge_graph.inference.edge_inference_engine import EdgeInferenceSettings
+from src.knowledge_graph.traversal.entity_linker import EntityLinkerSettings
+from src.llm.ollama_verify import default_ollama_verification_status, verify_ollama_models_available
 
 logger = logging.getLogger(__name__)
 
@@ -80,6 +86,20 @@ def create_app(jwks_client: JWKSClient | None = None) -> FastAPI:
                 _langfuse_settings.environment,
                 _langfuse_settings.base_url,
             )
+
+        app.state.ollama_verification = await verify_ollama_models_available(
+            [
+                agent_settings.llm_model_id,
+                EntityLinkerSettings().model_id,
+                ExtractionSettings().model_id,
+                EdgeInferenceSettings().model_id,
+            ]
+        )
+        app.state.opa_health = opa_health_status(
+            configured=False,
+            bundle_ready=False,
+            degraded=False,
+        )
 
         # Initialise ConnectorRegistry (TASK-US021-02) so the real GitHub/
         # Confluence/Jira/Grafana connectors are discovered and available to
@@ -132,9 +152,13 @@ def create_app(jwks_client: JWKSClient | None = None) -> FastAPI:
     new_app.include_router(tool_registry_router)
 
     @new_app.get("/healthz")
-    async def healthz() -> dict[str, str]:
+    async def healthz() -> dict[str, object]:
         """Liveness/readiness probe — no authentication required (_SKIP_PATHS)."""
-        return {"status": "ok"}
+        return {
+            "status": "ok",
+            "ollama": getattr(new_app.state, "ollama_verification", default_ollama_verification_status()),
+            "opa": getattr(new_app.state, "opa_health", default_opa_health_status()),
+        }
 
     return new_app
 

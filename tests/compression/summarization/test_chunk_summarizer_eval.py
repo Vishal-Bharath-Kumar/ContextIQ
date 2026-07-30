@@ -138,9 +138,9 @@ def _make_chunk(content: str, chunk_id: str = "eval0000000000001") -> RetrievedC
 
 
 def _patch_for_eval(mock_fn: AsyncMock) -> tuple:
-    """Return a context manager that patches ChatOpenAI and SummarizationChain.summarise."""
+    """Return a context manager that patches the Ollama chain wrapper and SummarizationChain.summarise."""
     return (
-        patch("src.compression.summarization.chain.ChatOpenAI"),
+        patch("src.compression.summarization.chain.LiteLLMChain"),
         patch.object(SummarizationChain, "summarise", new=AsyncMock(side_effect=mock_fn)),
     )
 

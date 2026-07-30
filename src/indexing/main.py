@@ -27,6 +27,7 @@ from fastapi import FastAPI
 
 from src.connector_sdk.registry import ConnectorRegistry
 from src.data.database import primary_session_factory
+from src.governance.opa.health import opa_health_status
 from src.indexing.consumer import IndexingConsumer
 from src.indexing.embedding.service import EmbeddingService
 from src.indexing.pipeline import IndexingPipeline
@@ -104,8 +105,15 @@ def create_app() -> FastAPI:
     )
 
     @application.get("/healthz")
-    async def healthz() -> dict[str, str]:
-        return {"status": "ok"}
+    async def healthz() -> dict[str, object]:
+        return {
+            "status": "ok",
+            "opa": opa_health_status(
+                configured=False,
+                bundle_ready=False,
+                degraded=False,
+            ),
+        }
 
     return application
 

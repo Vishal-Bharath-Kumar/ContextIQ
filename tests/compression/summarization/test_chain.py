@@ -46,36 +46,41 @@ class TestSummarizationOutput:
 
 
 class TestSummarizationChainInit:
-    @patch("src.compression.summarization.chain.ChatOpenAI")
+    @patch("src.compression.summarization.chain.LiteLLMChain")
     @patch("src.compression.summarization.chain.get_summarization_settings")
-    def test_chain_constructed_once(self, mock_get_settings: MagicMock, mock_openai: MagicMock) -> None:
+    def test_chain_constructed_once(self, mock_get_settings: MagicMock, mock_chain: MagicMock) -> None:
         mock_settings = MagicMock()
-        mock_settings.model_name = "gpt-4o-mini"
+        mock_settings.model_name = "ollama/llama3.2"
         mock_settings.max_output_tokens = 400
         mock_settings.target_ratio = 0.40
+        mock_settings.timeout_s = 30.0
         mock_get_settings.return_value = mock_settings
 
         chain = SummarizationChain()
 
-        mock_openai.assert_called_once_with(
-            model="gpt-4o-mini",
+        mock_chain.assert_called_once_with(
+            chain._prompt,
+            pytest.ANY,
+            model_id="ollama/llama3.2",
             temperature=0.0,
             max_tokens=400,
+            timeout_s=30.0,
         )
         assert chain._chain is not None
 
-    @patch("src.compression.summarization.chain.ChatOpenAI")
+    @patch("src.compression.summarization.chain.LiteLLMChain")
     @patch("src.compression.summarization.chain.get_summarization_settings")
-    def test_llm_temperature_is_zero(self, mock_get_settings: MagicMock, mock_openai: MagicMock) -> None:
+    def test_llm_temperature_is_zero(self, mock_get_settings: MagicMock, mock_chain: MagicMock) -> None:
         mock_settings = MagicMock()
-        mock_settings.model_name = "gpt-4o-mini"
+        mock_settings.model_name = "ollama/llama3.2"
         mock_settings.max_output_tokens = 400
         mock_settings.target_ratio = 0.40
+        mock_settings.timeout_s = 30.0
         mock_get_settings.return_value = mock_settings
 
         SummarizationChain()
 
-        _, kwargs = mock_openai.call_args
+        _, kwargs = mock_chain.call_args
         assert kwargs["temperature"] == 0.0
 
 
@@ -94,13 +99,14 @@ class TestSummarizationChainSummarise:
     @pytest.fixture()
     def chain_with_mock_llm(self) -> SummarizationChain:
         with (
-            patch("src.compression.summarization.chain.ChatOpenAI"),
+            patch("src.compression.summarization.chain.LiteLLMChain"),
             patch("src.compression.summarization.chain.get_summarization_settings") as mock_settings_fn,
         ):
             mock_settings = MagicMock()
-            mock_settings.model_name = "gpt-4o-mini"
+            mock_settings.model_name = "ollama/llama3.2"
             mock_settings.max_output_tokens = 400
             mock_settings.target_ratio = 0.40
+            mock_settings.timeout_s = 30.0
             mock_settings_fn.return_value = mock_settings
 
             chain = SummarizationChain()

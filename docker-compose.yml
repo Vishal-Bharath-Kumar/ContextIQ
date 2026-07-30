@@ -92,6 +92,11 @@ x-app-env-vars: &app-env-vars
     # ── Ollama (Local Models) ────────────────────────────────────────────────
     # Use host.docker.internal to reach Ollama running on the host machine
     OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+    CONTEXTIQ_LLM_MODEL_ID: ${CONTEXTIQ_LLM_MODEL_ID:-ollama/llama3.2}
+    ENTITY_LINKER_MODEL_ID: ${ENTITY_LINKER_MODEL_ID:-ollama/llama3.2}
+    ENTITY_EXTRACTION_MODEL_ID: ${ENTITY_EXTRACTION_MODEL_ID:-ollama/llama3.2}
+    EDGE_INFERENCE_MODEL_ID: ${EDGE_INFERENCE_MODEL_ID:-ollama/llama3.2}
+    SUMMARIZATION_MODEL_NAME: ${SUMMARIZATION_MODEL_NAME:-ollama/llama3.2}
     # Extended timeout for pulling large models (e.g., 70B models)
     OLLAMA_PULL_TIMEOUT_SECONDS: "540"
     # ── Logging ──────────────────────────────────────────────────────────────
@@ -543,12 +548,15 @@ services:
       dockerfile: Dockerfile.agent
     depends_on:
       <<: *app-depends
+      opa:
+        condition: service_healthy
       vault-init:
         condition: service_completed_successfully
     env_file: *app-env-file
     environment:
       <<: *app-env-vars
       OTEL_SERVICE_NAME: "contextiq-agent-worker"
+      CONTEXTIQ_ALLOW_DEGRADED_OPA_STARTUP: "true"
       REDIS_URL: "rediss://:contextiq_dev@redis:6379/0?ssl_cert_reqs=none"
       GITHUB_CONNECTOR_VAULT_ADDR: "http://vault:8200"
       GITHUB_CONNECTOR_VAULT_ROLE_ID: "contextiq-connectors-role"

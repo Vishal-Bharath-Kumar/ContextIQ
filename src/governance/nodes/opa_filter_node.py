@@ -12,7 +12,6 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
-from langfuse import Langfuse
 from opentelemetry import trace
 
 from src.agents.state import AgentState
@@ -27,7 +26,24 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 tracer = trace.get_tracer(__name__)
-_langfuse = Langfuse()
+_langfuse = None
+
+
+def _get_langfuse() -> object | None:
+    global _langfuse
+    if _langfuse is not None:
+        return _langfuse
+    try:
+        from langfuse import Langfuse  # noqa: PLC0415
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("opa_filter_node: Langfuse unavailable: %s", exc)
+        return None
+    try:
+        _langfuse = Langfuse()
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("opa_filter_node: Langfuse init failed: %s", exc)
+        return None
+    return _langfuse
 
 # Module-level singleton for production use (set at lifespan startup).
 _DEFAULT_OPA_CLIENT: OPAClient | None = None
@@ -124,16 +140,18 @@ async def opa_filter_node(state: AgentState) -> dict:
         # ── execution_trace entry (AC-4) ───────────────────────────────
         _record_trace(state, filter_result)
 
-        _langfuse.create_event(
-            name="opa_policy_evaluation",
-            input={"chunks": len(ranked_context), "tenant_id": tenant_id},
-            output={
-                "allowed": len(allowed_chunks),
-                "denied": filter_result.denial_count,
-                "eval_ms": filter_result.total_eval_ms,
-            },
-            metadata={"bundle_version": bundle_version},
-        )
+        langfuse = _get_langfuse()
+        if langfuse is not None:
+            langfuse.create_event(
+                name="opa_policy_evaluation",
+                input={"chunks": len(ranked_context), "tenant_id": tenant_id},
+                output={
+                    "allowed": len(allowed_chunks),
+                    "denied": filter_result.denial_count,
+                    "eval_ms": filter_result.total_eval_ms,
+                },
+                metadata={"bundle_version": bundle_version},
+            )
 
         if filter_result.denial_count:
             logger.warning(

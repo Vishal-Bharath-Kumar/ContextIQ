@@ -15,7 +15,6 @@ from __future__ import annotations
 
 import logging
 
-from langfuse import Langfuse
 from opentelemetry import trace
 
 from src.agents.state import AgentState, ExecutionStatus
@@ -38,7 +37,24 @@ _DETECTOR = SecretPIIDetector()
 _REDACTOR = ContextRedactor()
 _COMPLIANCE_VALIDATOR = ComplianceValidator()
 _RBAC_VALIDATOR = RBACValidator()
-_langfuse = Langfuse()
+_langfuse = None
+
+
+def _get_langfuse() -> object | None:
+    global _langfuse
+    if _langfuse is not None:
+        return _langfuse
+    try:
+        from langfuse import Langfuse  # noqa: PLC0415
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("governance_node: Langfuse unavailable: %s", exc)
+        return None
+    try:
+        _langfuse = Langfuse()
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("governance_node: Langfuse init failed: %s", exc)
+        return None
+    return _langfuse
 
 
 @otel_node_span("governance.comprehensive_scan")
@@ -181,7 +197,9 @@ async def governance_node(state: AgentState) -> dict:
 
         # ── 6. Langfuse event ──────────────────────────────────────────
         try:
-            _langfuse.create_event(
+            langfuse = _get_langfuse()
+            if langfuse is not None:
+                langfuse.create_event(
                 name="governance_comprehensive_scan",
                 input={"chunks_scanned": scan_result.chunks_scanned},
                 output={
@@ -199,7 +217,7 @@ async def governance_node(state: AgentState) -> dict:
                     "rbac_authorized": rbac_result.authorized,
                     "user_role": user_role.value,
                 },
-            )
+                )
         except Exception as lf_exc:  # pragma: no cover — Langfuse I/O failure is non-fatal
             logger.warning("governance_node: langfuse event failed: %s", lf_exc)
 

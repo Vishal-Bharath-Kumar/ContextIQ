@@ -11,6 +11,7 @@ import logging
 from typing import Any
 
 from fastmcp import FastMCP
+from src.gateway.tools.enterprise._local_tools import CODE_ROOTS, explain_code_file, json_text_response, search_workspace
 from mcp.types import TextContent
 
 logger = logging.getLogger(__name__)
@@ -56,22 +57,18 @@ def register_source_code_tools(mcp: FastMCP, connector_manager: Any = None) -> N
             Code search results with snippets and metadata
         """
         try:
-            # TODO: Integrate with retrieval service and connector framework
-            # For now, return structured placeholder
+            suffixes = None
+            if language:
+                from src.gateway.tools.enterprise._local_tools import _LANGUAGE_SUFFIXES  # noqa: PLC0415
+
+                suffixes = _LANGUAGE_SUFFIXES.get(language.lower())
             results = {
                 "query": query,
-                "repository": repository or "all repositories",
+                "repository": repository or "ContextIQ",
                 "language": language or "all languages",
-                "results": [
-                    {
-                        "file": "src/example.py",
-                        "line": 42,
-                        "snippet": "# Placeholder code snippet",
-                        "relevance": 0.95,
-                    }
-                ],
-                "total": 1,
-                "status": "implementation_pending",
+                "results": search_workspace(query, roots=CODE_ROOTS, suffixes=suffixes, limit=limit),
+                "total": len(search_workspace(query, roots=CODE_ROOTS, suffixes=suffixes, limit=limit)),
+                "status": "success",
             }
             
             logger.info(
@@ -81,11 +78,11 @@ def register_source_code_tools(mcp: FastMCP, connector_manager: Any = None) -> N
                 language,
             )
             
-            return [TextContent(type="text", text=str(results))]
+            return json_text_response(results)
             
         except Exception as e:
             logger.error("search_code failed: %s", e, exc_info=True)
-            return [TextContent(type="text", text=f"Error: {e}")]
+            return json_text_response({"error": str(e), "status": "error"})
 
     @mcp.tool()
     async def explain_code(
@@ -117,13 +114,9 @@ def register_source_code_tools(mcp: FastMCP, connector_manager: Any = None) -> N
         """
         try:
             result = {
-                "file": file_path,
+                **explain_code_file(file_path, start_line=start_line, end_line=end_line),
                 "repository": repository,
-                "lines": f"{start_line}-{end_line}" if start_line else "full file",
-                "explanation": "Placeholder: AI-generated code explanation",
-                "dependencies": [],
-                "related_services": [],
-                "status": "implementation_pending",
+                "status": "success",
             }
             
             logger.info(
@@ -134,11 +127,11 @@ def register_source_code_tools(mcp: FastMCP, connector_manager: Any = None) -> N
                 end_line,
             )
             
-            return [TextContent(type="text", text=str(result))]
+            return json_text_response(result)
             
         except Exception as e:
             logger.error("explain_code failed: %s", e, exc_info=True)
-            return [TextContent(type="text", text=f"Error: {e}")]
+            return json_text_response({"error": str(e), "status": "error"})
 
     @mcp.tool()
     async def search_repository(
@@ -165,12 +158,19 @@ def register_source_code_tools(mcp: FastMCP, connector_manager: Any = None) -> N
             Repository search results
         """
         try:
+            results = search_workspace(
+                query,
+                roots=CODE_ROOTS,
+                suffixes=None,
+                limit=20,
+                path_filter=path_filter,
+            )
             result = {
-                "repository": repository,
+                "repository": repository or "ContextIQ",
                 "query": query,
                 "path_filter": path_filter,
-                "results": [],
-                "status": "implementation_pending",
+                "results": results,
+                "status": "success",
             }
             
             logger.info(
@@ -180,8 +180,8 @@ def register_source_code_tools(mcp: FastMCP, connector_manager: Any = None) -> N
                 path_filter,
             )
             
-            return [TextContent(type="text", text=str(result))]
+            return json_text_response(result)
             
         except Exception as e:
             logger.error("search_repository failed: %s", e, exc_info=True)
-            return [TextContent(type="text", text=f"Error: {e}")]
+            return json_text_response({"error": str(e), "status": "error"})

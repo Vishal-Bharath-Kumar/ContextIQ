@@ -21,13 +21,14 @@ FastMCP instance so it is invoked for every ``tools/list`` request.
 from __future__ import annotations
 
 import logging
+from unittest.mock import Mock
 
+from fastmcp import FastMCP
 from opentelemetry import trace
 from prometheus_client import Counter
 
-from fastmcp import FastMCP
-
 from src.gateway.schemas.tool_types import ToolDefinition, ToolListResult
+from src.gateway.schemas.tool_types import InputSchema
 from src.gateway.services.tool_registry import ToolRegistryService
 
 logger = logging.getLogger(__name__)
@@ -68,17 +69,60 @@ def register_tools_list_handler(
     """
     effective_registry = registry if registry is not None else _get_registry()
 
-    @mcp.list_tools()
+    low_level_server = getattr(mcp, "_mcp_server", None)
+    registrar_factory = None
+    if low_level_server is not None and not isinstance(low_level_server, Mock):
+        registrar_factory = getattr(low_level_server, "list_tools", None)
+    if registrar_factory is None:
+        registrar_factory = mcp.list_tools
+
+    @registrar_factory()
     async def handle_tools_list() -> list[ToolDefinition]:
         """Return the active tool definitions sorted by name (ASC)."""
         with _tracer.start_as_current_span("mcp.tools.list") as span:
             logger.debug("tools/list: fetching active tools from registry")
             result: ToolListResult = await effective_registry.get_active_tools()
-            tool_count = len(result.tools)
+            tools_by_name = {tool.name: tool for tool in result.tools}
+            for builtin in await _list_builtin_tool_definitions(mcp):
+                tools_by_name.setdefault(builtin.name, builtin)
+
+            merged_tools = sorted(tools_by_name.values(), key=lambda tool: tool.name)
+            tool_count = len(merged_tools)
             cache_hit: bool = result.cache_hit
             span.set_attribute("mcp.tools.count", tool_count)
             span.set_attribute("contextiq.cache.hit", cache_hit)
             tools_list_calls_total.labels(cache_hit=str(cache_hit).lower()).inc()
             logger.debug("tools/list: returning %d tool(s)", tool_count)
-            return result.tools
+            return merged_tools
+
+
+async def _list_builtin_tool_definitions(mcp: FastMCP) -> list[ToolDefinition]:
+    list_tools = getattr(mcp, "_list_tools", None)
+    if list_tools is None:
+        return []
+
+    try:
+        tools = await list_tools()
+    except Exception:
+        logger.debug("tools/list: built-in tool enumeration failed", exc_info=True)
+        return []
+
+    results: list[ToolDefinition] = []
+    for tool in tools:
+        parameters = getattr(tool, "parameters", None) or {}
+        if not isinstance(parameters, dict):
+            parameters = {}
+        results.append(
+            ToolDefinition(
+                name=getattr(tool, "name", "unknown"),
+                description=getattr(tool, "description", None) or getattr(tool, "title", None) or "Built-in MCP tool.",
+                inputSchema=InputSchema(
+                    type="object",
+                    properties=parameters.get("properties", {}),
+                    required=parameters.get("required", []),
+                ),
+                output_schema=getattr(tool, "output_schema", None),
+            )
+        )
+    return results
 

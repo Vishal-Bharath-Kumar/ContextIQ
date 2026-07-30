@@ -39,10 +39,24 @@ from fastapi import FastAPI
 from src.agent_worker.routers.execute import router as execute_router
 from src.agent_worker.routers.execute import set_graph
 from src.agents.checkpointer import get_redis_checkpointer
+from src.agents.config import settings
 from src.agents.events.state_event_publisher import StateEventPublisher
 from src.agents.graph import build_graph
+from src.agents.nodes.retrieval import set_connector_registry
 from src.agents.source_selector import FALLBACK_SOURCES, _validate_source_map
+from src.audit.trace.object_store import TraceObjectStore
+from src.audit.trace.writer_node import set_trace_object_store, set_trace_session_factory
+from src.connector_sdk.registry import ConnectorRegistry
+from src.data.database import primary_session_factory
 from src.events.producer import _sasl_kwargs
+from src.governance.opa.health import default_opa_health_status, opa_health_status
+from src.governance.nodes.opa_filter_node import set_opa_client
+from src.governance.opa.bundle_loader import BundleNotReadyError, PolicyBundleLoader
+from src.governance.opa.client import OPAClient
+from src.knowledge_graph.extraction.extractor import ExtractionSettings
+from src.knowledge_graph.inference.edge_inference_engine import EdgeInferenceSettings
+from src.knowledge_graph.traversal.entity_linker import EntityLinkerSettings
+from src.llm.ollama_verify import verify_ollama_models_available
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +67,65 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     logger.info("agent_worker: initialising Redis checkpointer")
     checkpointer = await get_redis_checkpointer()
     app.state.checkpointer = checkpointer
+
+    app.state.ollama_verification = await verify_ollama_models_available(
+        [
+            settings.llm_model_id,
+            EntityLinkerSettings().model_id,
+            ExtractionSettings().model_id,
+            EdgeInferenceSettings().model_id,
+        ]
+    )
+    app.state.opa_health = default_opa_health_status()
+
+    logger.info("agent_worker: loading connector registry")
+    connector_registry = ConnectorRegistry()
+    await connector_registry.load()
+    set_connector_registry(connector_registry)
+    app.state.connector_registry = connector_registry
+
+    try:
+        trace_store = TraceObjectStore()
+        set_trace_object_store(trace_store)
+        set_trace_session_factory(primary_session_factory())
+        app.state.trace_object_store = trace_store
+    except Exception:
+        logger.warning("agent_worker: trace writer dependencies unavailable", exc_info=True)
+
+    if os.environ.get("OPA_BASE_URL"):
+        bundle_loader = PolicyBundleLoader()
+        try:
+            app.state.bundle_info = await bundle_loader.verify()
+            app.state.opa_client = OPAClient()
+            set_opa_client(app.state.opa_client)
+            app.state.opa_health = opa_health_status(
+                configured=True,
+                bundle_ready=True,
+                degraded=False,
+                bundle_version=app.state.bundle_info.version,
+            )
+        except BundleNotReadyError:
+            if settings.allow_degraded_opa_startup:
+                logger.warning(
+                    "agent_worker: OPA bundle not ready — continuing startup in degraded mode"
+                )
+                app.state.bundle_info = None
+                app.state.opa_client = None
+                app.state.opa_health = opa_health_status(
+                    configured=True,
+                    bundle_ready=False,
+                    degraded=True,
+                    error="OPA bundle not ready",
+                )
+            else:
+                app.state.opa_health = opa_health_status(
+                    configured=True,
+                    bundle_ready=False,
+                    degraded=False,
+                    error="OPA bundle not ready",
+                )
+                logger.critical("agent_worker: OPA bundle not ready — refusing to start")
+                raise
 
     # Validate SOURCE_MAP against the full set of known connector IDs (AIR-006).
     _validate_source_map(set(FALLBACK_SOURCES))

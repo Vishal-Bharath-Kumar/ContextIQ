@@ -8,6 +8,7 @@ Coverage targets:
 """
 from __future__ import annotations
 
+import asyncio
 import json
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch, PropertyMock
@@ -107,6 +108,12 @@ class TestMcpServerModule:
 
         assert isinstance(sse_app, StarletteWithLifespan)
 
+    def test_enterprise_tools_registered(self) -> None:
+        from src.gateway.mcp_server import mcp
+
+        tool_names = {tool.name for tool in asyncio.run(mcp._list_tools())}
+        assert {"generate_context", "search_code", "search_documentation", "dependency_graph", "service_health"}.issubset(tool_names)
+
 
 # ---------------------------------------------------------------------------
 # create_gateway_app — health endpoint
@@ -135,6 +142,10 @@ class TestGatewayAppHealth:
         data = client.get("/healthz").json()
         assert data["status"] == "ok"
         assert set(data["transport"]) == {"sse", "websocket"}
+        assert "ollama" in data
+        assert data["ollama"]["status"] in {"unknown", "ok", "missing_models", "unreachable", "skipped"}
+        assert "opa" in data
+        assert data["opa"]["status"] in {"unknown", "disabled", "ready", "degraded", "unready"}
 
 
 # ---------------------------------------------------------------------------

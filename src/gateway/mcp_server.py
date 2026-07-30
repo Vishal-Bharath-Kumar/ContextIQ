@@ -17,6 +17,11 @@ from src.gateway.handlers.initialize import register_initialize_handler
 from src.gateway.handlers.tools_call import register_tools_call_handler
 from src.gateway.handlers.tools_list import register_tools_list_handler
 from src.gateway.tools.clarification_reply import register_clarification_reply_tool
+from src.gateway.tools.enterprise.context_tools import register_context_tools
+from src.gateway.tools.enterprise.documentation_tools import register_documentation_tools
+from src.gateway.tools.enterprise.knowledge_graph_tools import register_knowledge_graph_tools
+from src.gateway.tools.enterprise.operations_tools import register_operations_tools
+from src.gateway.tools.enterprise.source_code_tools import register_source_code_tools
 
 # ---------------------------------------------------------------------------
 # Server instance
@@ -37,6 +42,13 @@ register_tools_call_handler(mcp)
 
 # Register the clarification_reply tool (TASK-US011-04).
 register_clarification_reply_tool(mcp)
+
+# Register built-in enterprise tools for direct MCP exposure and handler fallback.
+register_context_tools(mcp)
+register_source_code_tools(mcp)
+register_documentation_tools(mcp)
+register_knowledge_graph_tools(mcp)
+register_operations_tools(mcp)
 
 # ---------------------------------------------------------------------------
 # SSE transport — ASGI app mounted at {mcp_path}/sse in gateway/main.py.

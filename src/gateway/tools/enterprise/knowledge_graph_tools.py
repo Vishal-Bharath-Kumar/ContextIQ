@@ -11,6 +11,7 @@ import logging
 from typing import Any
 
 from fastmcp import FastMCP
+from src.gateway.tools.enterprise._local_tools import json_text_response, latest_file_authors, service_graph
 from mcp.types import TextContent
 
 logger = logging.getLogger(__name__)
@@ -50,20 +51,18 @@ def register_knowledge_graph_tools(mcp: FastMCP, graph_service: Any = None) -> N
             Dependency graph with nodes and relationships
         """
         try:
+            graph = service_graph()
+            info = graph.get(service, {"depends_on": [], "ports": []})
+            downstream = sorted([name for name, data in graph.items() if service in data.get("depends_on", [])])
             result = {
                 "service": service,
                 "depth": depth,
                 "dependencies": {
-                    "upstream": [
-                        {"type": "database", "name": "postgres-main"},
-                        {"type": "api", "name": "auth-service"},
-                    ],
-                    "downstream": [
-                        {"type": "service", "name": "notification-service"},
-                    ],
+                    "upstream": [{"type": "service", "name": name} for name in info.get("depends_on", [])],
+                    "downstream": [{"type": "service", "name": name} for name in downstream],
                 },
-                "graph_nodes": 5,
-                "status": "implementation_pending",
+                "graph_nodes": 1 + len(info.get("depends_on", [])) + len(downstream),
+                "status": "success",
             }
             
             logger.info(
@@ -72,11 +71,11 @@ def register_knowledge_graph_tools(mcp: FastMCP, graph_service: Any = None) -> N
                 depth,
             )
             
-            return [TextContent(type="text", text=str(result))]
+            return json_text_response(result)
             
         except Exception as e:
             logger.error("dependency_graph failed: %s", e, exc_info=True)
-            return [TextContent(type="text", text=f"Error: {e}")]
+            return json_text_response({"error": str(e), "status": "error"})
 
     @mcp.tool()
     async def find_owner(
@@ -101,18 +100,12 @@ def register_knowledge_graph_tools(mcp: FastMCP, graph_service: Any = None) -> N
             Owner information with contact details
         """
         try:
+            owners = latest_file_authors(resource)
             result = {
                 "resource": resource,
                 "resource_type": resource_type,
-                "owners": [
-                    {
-                        "team": "Platform Engineering",
-                        "primary_contact": "jane.smith@example.com",
-                        "on_call": "john.doe@example.com",
-                        "slack_channel": "#platform-team",
-                    }
-                ],
-                "status": "implementation_pending",
+                "owners": owners,
+                "status": "success" if owners else "unresolved",
             }
             
             logger.info(
@@ -121,11 +114,11 @@ def register_knowledge_graph_tools(mcp: FastMCP, graph_service: Any = None) -> N
                 resource_type,
             )
             
-            return [TextContent(type="text", text=str(result))]
+            return json_text_response(result)
             
         except Exception as e:
             logger.error("find_owner failed: %s", e, exc_info=True)
-            return [TextContent(type="text", text=f"Error: {e}")]
+            return json_text_response({"error": str(e), "status": "error"})
 
     @mcp.tool()
     async def related_services(
@@ -150,22 +143,25 @@ def register_knowledge_graph_tools(mcp: FastMCP, graph_service: Any = None) -> N
             Related services with relationship descriptions
         """
         try:
+            graph = service_graph()
+            base = graph.get(service, {"depends_on": []})
+            base_deps = set(base.get("depends_on", []))
+            related = []
+            for candidate, data in graph.items():
+                if candidate == service:
+                    continue
+                shared = sorted(base_deps & set(data.get("depends_on", [])))
+                if service in data.get("depends_on", []):
+                    related.append({"service": candidate, "relationship": "downstream_dependency", "confidence": 0.9})
+                elif candidate in base_deps:
+                    related.append({"service": candidate, "relationship": "upstream_dependency", "confidence": 0.85})
+                elif shared:
+                    related.append({"service": candidate, "relationship": "shared_dependency", "confidence": min(0.5 + (0.1 * len(shared)), 0.8), "shared_dependencies": shared})
             result = {
                 "service": service,
                 "relationship_type": relationship_type,
-                "related": [
-                    {
-                        "service": "payment-processor",
-                        "relationship": "shared_database",
-                        "confidence": 0.88,
-                    },
-                    {
-                        "service": "billing-service",
-                        "relationship": "business_capability",
-                        "confidence": 0.75,
-                    },
-                ],
-                "status": "implementation_pending",
+                "related": related,
+                "status": "success",
             }
             
             logger.info(
@@ -174,8 +170,8 @@ def register_knowledge_graph_tools(mcp: FastMCP, graph_service: Any = None) -> N
                 relationship_type,
             )
             
-            return [TextContent(type="text", text=str(result))]
+            return json_text_response(result)
             
         except Exception as e:
             logger.error("related_services failed: %s", e, exc_info=True)
-            return [TextContent(type="text", text=f"Error: {e}")]
+            return json_text_response({"error": str(e), "status": "error"})

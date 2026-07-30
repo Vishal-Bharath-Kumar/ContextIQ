@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from src.agents.config import INTENT_CONFIDENCE_THRESHOLD, MAX_CLARIFICATION_ROUNDS
 from src.agents.state import AgentState, ExecutionStatus
+from src.retrieval.ranking.filters import count_tokens
 
 
 def route_after_intent(state: AgentState) -> str:
@@ -58,12 +59,29 @@ def route_after_governance(state: AgentState) -> str:
     if state.get("status") == ExecutionStatus.FAILED:
         return "failed"
     execution_plan = state.get("execution_plan")
-    budget: int = (
-        execution_plan.token_budget_total
-        if execution_plan is not None
-        else 8_000
-    )
+    if isinstance(execution_plan, dict):
+        budget = int(execution_plan.get("token_budget_total") or 8_000)
+    elif execution_plan is not None:
+        budget = int(execution_plan.token_budget_total)
+    else:
+        budget = 8_000
     ranked_tokens: int = sum(
-        c.get("token_count", 0) for c in (state.get("ranked_context") or [])
+        _chunk_token_count(c) for c in (state.get("ranked_context") or [])
     )
     return "compress" if ranked_tokens > budget else "skip"
+
+
+def _chunk_token_count(chunk: object) -> int:
+    if isinstance(chunk, dict):
+        raw_token_count = chunk.get("token_count")
+        if raw_token_count is not None:
+            return int(raw_token_count)
+        text = str(chunk.get("content") or chunk.get("text") or chunk.get("path_summary") or "")
+        return count_tokens(text)
+
+    raw_token_count = getattr(chunk, "token_count", None)
+    if raw_token_count is not None:
+        return int(raw_token_count)
+
+    text = str(getattr(chunk, "content", "") or getattr(chunk, "path_summary", "") or "")
+    return count_tokens(text)

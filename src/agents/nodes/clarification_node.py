@@ -15,9 +15,10 @@ from __future__ import annotations
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 
-from src.agents.config import INTENT_CONFIDENCE_THRESHOLD  # noqa: F401 — re-export for callers
+from src.agents.config import INTENT_CONFIDENCE_THRESHOLD, settings  # noqa: F401 — re-export for callers
 from src.agents.schemas.clarification import ClarificationQuestion
 from src.agents.state import AgentState, ExecutionStatus
+from src.llm.local_ollama_chain import LiteLLMChain
 
 # ---------------------------------------------------------------------------
 # Prompt template
@@ -52,12 +53,15 @@ def _get_clar_chain() -> object:
     """Return the module-level chain singleton, building it on first call."""
     global _clar_chain
     if _clar_chain is None:
-        from langchain_openai import ChatOpenAI  # noqa: PLC0415
-
         _clar_chain = (
-            _clar_prompt
-            | ChatOpenAI(model="gpt-4o-mini", temperature=0.3, max_tokens=80)
-            | StrOutputParser()
+            LiteLLMChain(
+                _clar_prompt,
+                StrOutputParser(),
+                model_id=settings.llm_model_id,
+                temperature=0.3,
+                max_tokens=80,
+                timeout_s=settings.llm_timeout_s,
+            )
         )
     return _clar_chain
 
@@ -97,25 +101,41 @@ async def clarification_node(state: AgentState) -> dict:
     confidence: float = state["intent_confidence"]  # type: ignore[assignment]
     intent = state.get("intent_type") or "unknown"
 
-    chain = _get_clar_chain()
-    raw_question = await chain.ainvoke({  # type: ignore[union-attr]
-        "intent_type": intent,
-        "confidence": confidence,
-        "user_prompt": state["prompt"],
-    })
+    try:
+        chain = _get_clar_chain()
+        raw_question = await chain.ainvoke({  # type: ignore[union-attr]
+            "intent_type": intent,
+            "confidence": confidence,
+            "user_prompt": state["prompt"],
+        })
+        response_type = "clarification_needed"
+    except Exception:
+        raw_question = _fallback_question(intent)
+        response_type = "clarification"
 
     guarded = _enforce_word_limit(raw_question.strip())
     question = ClarificationQuestion(question=guarded)
+    confidence_pct = f"{confidence:.0%}"
+    message = (
+        f"Intent '{intent}' is only classified with {confidence_pct} confidence. "
+        f"{question.question}"
+    )
 
     return {
         "requires_clarification": True,
         "clarification_question": question.question,
         "status": ExecutionStatus.COMPLETE,
         "final_response": {
-            "type": "clarification_needed",
+            "type": response_type,
             "question": question.question,
+            "message": message,
             "original_prompt": state["prompt"],
             "session_id": state["request_id"],
             "clarification_round": state.get("clarification_round", 0),
         },
     }
+
+
+def _fallback_question(intent: str) -> str:
+    intent_label = str(intent or "unknown")
+    return f"Which {intent_label} component or service do you want me to focus on?"

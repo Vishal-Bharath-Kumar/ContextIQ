@@ -17,7 +17,6 @@ from src.agents.state import AgentState
 from src.model_registry.cache.model_cache import ModelListCache
 from src.model_router.cache.scored_model_cache import ScoredModelCache
 from src.model_router.config import RoutingSettings
-from src.model_router.router import ModelRouter
 
 if TYPE_CHECKING:
     from langfuse import Langfuse
@@ -27,6 +26,33 @@ _settings = RoutingSettings()
 
 # Module-level singleton — initialised once at import time
 _FALLBACK_MODEL_ID: str = _settings.fallback_model_id
+
+
+class ModelRouter:
+    """Lazy adapter around the real model router.
+
+    Keeps this module importable in environments where optional Langfuse-backed
+    router dependencies fail during import, while still allowing tests to patch
+    ``ModelRouter.select`` directly.
+    """
+
+    def __init__(self, model_list_cache: ModelListCache, scored_model_cache: ScoredModelCache) -> None:
+        self._model_list_cache = model_list_cache
+        self._scored_model_cache = scored_model_cache
+
+    def _delegate(self):
+        from src.model_router.router import ModelRouter as RealModelRouter  # noqa: PLC0415
+
+        return RealModelRouter(
+            model_list_cache=self._model_list_cache,
+            scored_model_cache=self._scored_model_cache,
+        )
+
+    async def select(self, intent_type: str):
+        return await self._delegate().select(intent_type=intent_type)
+
+    async def build_fallback_chain(self, intent_type: str):
+        return await self._delegate().build_fallback_chain(intent_type=intent_type)
 
 
 async def routing_node(
@@ -72,7 +98,10 @@ async def routing_node(
                 f"normalised_cost={selection.normalised_cost:.4f})"
             )
 
-        fallback = await router.build_fallback_chain(intent_type=intent_type)
+        try:
+            fallback = await router.build_fallback_chain(intent_type=intent_type)
+        except Exception:
+            fallback = None
         fallback_chain_ids = fallback.model_ids if fallback is not None else [selected_model_id]
 
         latency_ms = (time.perf_counter() - t0) * 1000

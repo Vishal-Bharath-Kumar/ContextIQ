@@ -26,7 +26,7 @@ from src.knowledge_graph.traversal.entity_linker import EntityLinker, EntityLink
 
 def _settings(**overrides: object) -> EntityLinkerSettings:
     defaults: dict = {
-        "model_id": "gpt-4o-mini",
+        "model_id": "ollama/llama3.2",
         "temperature": 0.0,
         "max_tokens": 256,
         "timeout_s": 1.0,

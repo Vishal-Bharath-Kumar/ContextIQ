@@ -21,11 +21,13 @@ import logging
 import time
 from datetime import UTC, datetime
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from langgraph.graph.state import CompiledStateGraph
 
 from src.agent_worker.schemas.execute_types import ExecuteRequest, ExecuteResponse, ToolCallError
 from src.agents.state import AgentState, ExecutionStatus
+from src.governance.opa.health import default_opa_health_status
+from src.llm.ollama_verify import default_ollama_verification_status
 
 logger = logging.getLogger(__name__)
 
@@ -66,9 +68,14 @@ def get_graph() -> CompiledStateGraph:
 
 
 @router.get("/healthz", summary="Health check")
-async def healthz() -> dict:
+async def healthz(request: Request) -> dict:
     """Return service health including whether the graph is compiled."""
-    return {"status": "ok", "graph_compiled": _compiled_graph is not None}
+    return {
+        "status": "ok",
+        "graph_compiled": _compiled_graph is not None,
+        "ollama": getattr(request.app.state, "ollama_verification", default_ollama_verification_status()),
+        "opa": getattr(request.app.state, "opa_health", default_opa_health_status()),
+    }
 
 
 @router.post(

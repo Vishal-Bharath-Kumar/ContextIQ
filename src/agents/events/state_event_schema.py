@@ -19,5 +19,6 @@ class StateTransitionEvent(BaseModel):
     duration_ms: int    # time spent in the completed node
     error: str | None = None
     execution_plan_snapshot: dict | None = None  # serialised ExecutionPlan; set only by intent_agent
+    removed_chunks_snapshot: list[dict] | None = None
 
     model_config = {"frozen": True}

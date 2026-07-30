@@ -5,6 +5,7 @@ TASK-US001-01: Configure FastMCP Server with SSE and WebSocket Transport.
 TASK-US001-05: OTel endpoint and sampler settings.TASK-US003-02: Agent Worker HTTP Client and Output Schema Validation."""
 from __future__ import annotations
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -49,6 +50,13 @@ class GatewaySettings(BaseSettings):
     otel_endpoint: str = "http://jaeger-collector:4317"
     otel_sampler_arg: float = 1.0
 
+    @field_validator("server_version", mode="before")
+    @classmethod
+    def _normalise_local_version(cls, value: object) -> object:
+        if isinstance(value, str) and value.endswith("-local"):
+            return value.removesuffix("-local")
+        return value
+
     model_config = SettingsConfigDict(
         env_prefix="CONTEXTIQ_",
         env_file=".env",
@@ -63,17 +71,12 @@ class GatewaySettings(BaseSettings):
         settings_cls: type[BaseSettings],
         **kwargs: object,
     ) -> tuple[object, ...]:
-        from pydantic_settings import (
-            DotEnvSettingsSource,
-            EnvSettingsSource,
-            InitSettingsSource,
-        )
+        from pydantic_settings import EnvSettingsSource, InitSettingsSource
 
         return (
             InitSettingsSource(settings_cls, init_kwargs={}),
             _OtelEnvSource(settings_cls),
             EnvSettingsSource(settings_cls),
-            DotEnvSettingsSource(settings_cls),
         )
 
 

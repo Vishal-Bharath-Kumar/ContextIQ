@@ -45,7 +45,12 @@ from src.agents.state import AgentState
 from src.audit.trace.writer_node import trace_writer_node
 from src.governance.nodes.opa_filter_node import opa_filter_node
 from src.knowledge_graph.nodes.knowledge_graph_node import knowledge_graph_node
-from src.observability.cost.llm_metrics import llm_metrics_node
+
+try:
+    from src.observability.cost.llm_metrics import llm_metrics_node
+except ModuleNotFoundError:
+    async def llm_metrics_node(state: AgentState) -> AgentState:
+        return state
 
 
 def build_graph(
@@ -134,3 +139,11 @@ def build_graph(
     if checkpointer is not None:
         return builder.compile(checkpointer=checkpointer)
     return builder.compile()
+
+
+def build_pipeline(
+    checkpointer: object = None,
+    publisher: StateEventPublisher | None = None,
+) -> CompiledStateGraph:
+    """Backward-compatible alias for callers that still use build_pipeline()."""
+    return build_graph(checkpointer=checkpointer, publisher=publisher)
