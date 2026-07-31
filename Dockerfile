@@ -10,7 +10,8 @@ FROM python:${PYTHON_VERSION}-slim-bookworm AS builder
 # Install uv for fast dependency resolution
 COPY --from=ghcr.io/astral-sh/uv:0.4 /uv /usr/local/bin/uv
 ENV UV_COMPILE_BYTECODE=1 \
-    UV_LINK_MODE=copy
+    UV_LINK_MODE=copy \
+    UV_HTTP_TIMEOUT=180
 
 WORKDIR /app
 
@@ -26,6 +27,9 @@ COPY alembic.ini ./
 
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-dev
+
+# Pre-cache tiktoken encoding to avoid online download at startup
+RUN python -c "import tiktoken; tiktoken.get_encoding('cl100k_base')" 2>/dev/null || true
 
 # ---- Stage 2: runtime image ---------------------------------------------
 FROM python:${PYTHON_VERSION}-slim-bookworm AS runtime
