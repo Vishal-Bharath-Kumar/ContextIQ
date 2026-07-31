@@ -1,9 +1,0 @@
-{
-  "chat.tools.terminal.enableAutoApprove": true,
-  "chat.tools.terminal.autoApprove": {
-    "/^\\.\\/\\.propel\\/tools\\/ingest\\.sh(\\s.*)?$/": true,
-    "/^\\.propel\\/tools\\/ingest\\.sh(\\s.*)?$/": true,
-    "/^\\.propel\\\\tools\\\\ingest\\.cmd(\\s.*)?$/": true,
-    "/^\\.\\\\.propel\\\\tools\\\\ingest\\.cmd(\\s.*)?$/": true,
-  }
-}

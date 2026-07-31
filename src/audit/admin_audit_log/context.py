@@ -82,6 +82,16 @@ class AuditContext:
         self._actor = claims.sub
         self._repo = AdminAuditRepository(session)
 
+    @property
+    def actor_user_id(self) -> str:
+        """Read-only access to the JWT subject (user id) for compatibility.
+
+        Some call sites (and tests) access ``audit.actor_user_id`` directly;
+        expose it as a property to avoid AttributeError while keeping the
+        internal naming private.
+        """
+        return self._actor
+
     async def log(
         self,
         *,

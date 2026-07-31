@@ -1,9 +1,15 @@
+import { useEffect, useState } from "react";
 import { useRoutingWeights } from "../../services/routingWeightService";
 import { IntentWeightCard } from "../../components/models/IntentWeightCard";
 import { PageHeader } from "../../components/ui/PageHeader";
 
 export function RoutingWeightsPage() {
   const { data: entries, isLoading, isError } = useRoutingWeights();
+  const [initialLoad, setInitialLoad] = useState(true);
+
+  useEffect(() => {
+    if (!isLoading) setInitialLoad(false);
+  }, [isLoading]);
 
   return (
     <main aria-labelledby="routing-weights-heading" className="page-layout">
@@ -28,7 +34,11 @@ export function RoutingWeightsPage() {
       {!isLoading && !isError && (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {(entries ?? []).map((entry, i) => (
-            <div key={entry.intent_type} className="stagger-item" style={{ animationDelay: `${i * 50}ms` }}>
+            <div
+              key={entry.intent_type}
+              className={initialLoad ? "stagger-item" : ""}
+              style={initialLoad ? { animationDelay: `${i * 50}ms` } : undefined}
+            >
               <IntentWeightCard entry={entry} />
             </div>
           ))}

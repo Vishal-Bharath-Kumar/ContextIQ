@@ -83,10 +83,9 @@ class ModelRouter:
             },
             metadata={
                 "weights": {
+                    "quality": effective_weights.quality_weight,
                     "cost": effective_weights.cost_weight,
                     "latency": effective_weights.latency_weight,
-                    "coding": effective_weights.coding_weight,
-                    "reasoning": effective_weights.reasoning_weight,
                 }
             }
         )

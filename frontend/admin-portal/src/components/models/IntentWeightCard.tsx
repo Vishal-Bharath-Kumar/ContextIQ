@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import * as Slider from "@radix-ui/react-slider";
 
 import type { RoutingWeightEntry } from "../../services/routingWeightService";
@@ -17,11 +17,20 @@ const SLIDER_CONFIGS: { key: WeightKey; label: string; colour: string }[] = [
 ];
 
 export function IntentWeightCard({ entry }: Props) {
-  const [weights, setWeights] = useState({
+  type Weights = {
+    quality_weight: number;
+    cost_weight: number;
+    latency_weight: number;
+  };
+
+  const initial = {
     quality_weight: entry.quality_weight,
     cost_weight: entry.cost_weight,
     latency_weight: entry.latency_weight,
-  });
+  };
+
+  const [weights, setWeights] = useState<Weights>(initial);
+  const [savedWeights, setSavedWeights] = useState<Weights>(initial);
   const { mutate: save, isPending } = useUpdateRoutingWeights();
 
   /**
@@ -43,8 +52,36 @@ export function IntentWeightCard({ entry }: Props) {
     });
   };
 
+  // Simple comparator that tolerates minor FP differences by rounding to 3dp
+  const sameWeights = (a: Weights, b: Weights) =>
+    Math.round(a.quality_weight * 1000) === Math.round(b.quality_weight * 1000) &&
+    Math.round(a.cost_weight * 1000) === Math.round(b.cost_weight * 1000) &&
+    Math.round(a.latency_weight * 1000) === Math.round(b.latency_weight * 1000);
+
+  // dirty when current weights differ from saved baseline
+  const isDirty = !sameWeights(weights, savedWeights);
+
   const handleSave = () =>
-    save({ intentType: entry.intent_type, weights });
+    save(
+      { intentType: entry.intent_type, weights },
+      {
+        onSuccess: () => {
+          // update local saved baseline so UI shows "Saved" and disables button
+          setSavedWeights(weights);
+        },
+      }
+    );
+
+  // When the parent `entry` updates (query invalidation / refetch), sync local state
+  useEffect(() => {
+    const next: Weights = {
+      quality_weight: entry.quality_weight,
+      cost_weight: entry.cost_weight,
+      latency_weight: entry.latency_weight,
+    };
+    setWeights(next);
+    setSavedWeights(next);
+  }, [entry.intent_type, entry.quality_weight, entry.cost_weight, entry.latency_weight]);
 
   return (
     <div className="glass-card p-4">
@@ -55,11 +92,11 @@ export function IntentWeightCard({ entry }: Props) {
         <button
           type="button"
           onClick={handleSave}
-          disabled={isPending}
+          disabled={isPending || !isDirty}
           className="btn-primary text-xs"
           aria-label={`Save routing weights for ${entry.intent_type}`}
         >
-          {isPending ? "Saving…" : "Save"}
+          {isPending ? "Saving…" : !isDirty ? "Saved" : "Save"}
         </button>
       </div>
 
