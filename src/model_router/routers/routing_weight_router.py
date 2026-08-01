@@ -4,6 +4,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, ConfigDict, model_validator
+from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.agents.schemas.intent import IntentType
@@ -11,8 +12,9 @@ from src.audit.admin_audit_log.context import AuditContext, get_audit_context
 from src.audit.admin_audit_log.schemas import AdminActionType
 from src.auth import require_manage_models
 from src.auth.dependencies import JWTClaimsDep
-from src.data.dependencies import get_db
+from src.data.dependencies import get_db, get_redis_client
 from src.model_registry.repositories.model_audit_repository import ModelAuditRepository
+from src.model_router.cache.scored_model_cache import ScoredModelCache
 from src.model_router.repositories.routing_weight_repository import (
     RoutingWeightRepository,
 )
@@ -95,6 +97,7 @@ async def update_routing_weights(
     claims: JWTClaimsDep,
     audit: Annotated[AuditContext, Depends(get_audit_context)],
     session: Annotated[AsyncSession, Depends(get_db)],
+    redis: Annotated[Redis, Depends(get_redis_client)],
 ) -> RoutingWeightResponse:
     if intent_type not in _VALID_INTENT_TYPES:
         raise HTTPException(
@@ -135,6 +138,7 @@ async def update_routing_weights(
         ),
     )
     await session.commit()
+    await ScoredModelCache(redis).invalidate_all()
     return RoutingWeightResponse(
         intent_type=intent_type,
         quality_weight=body.quality_weight,

@@ -43,9 +43,17 @@ from src.model_registry.schemas.model_installation import (
 from src.model_registry.services.installation_job_service import ModelInstallationJobService
 from src.model_registry.services.model_registry_service import ModelRegistryService
 from src.model_registry.services.ollama_service import OllamaService
+from src.model_router.cache.scored_model_cache import ScoredModelCache
 
 _CACHE_KEY = "model_registry:active_models"
 _CACHE_TTL = 60  # seconds
+
+
+async def _invalidate_runtime_routing_cache(redis: Redis) -> None:
+    await redis.delete(_CACHE_KEY)
+    await redis.delete(f"{_CACHE_KEY}:all")
+    await redis.delete("contextiq:model_registry:active_models")
+    await ScoredModelCache(redis).invalidate_all()
 
 
 class ModelStatusUpdateRequest(BaseModel):
@@ -112,10 +120,8 @@ async def register_model(
     import logging
     logger = logging.getLogger(__name__)
     try:
-        deleted_count = 0
-        deleted_count += await redis.delete(_CACHE_KEY)
-        deleted_count += await redis.delete(f"{_CACHE_KEY}:all")
-        logger.info(f"Cache invalidation: deleted {deleted_count} cache keys after model registration")
+        await _invalidate_runtime_routing_cache(redis)
+        logger.info("Cache invalidation completed after model registration")
     except Exception as e:
         logger.error(f"Failed to invalidate cache after model registration: {e}")
     
@@ -153,10 +159,8 @@ async def update_model_status(
     import logging
     logger = logging.getLogger(__name__)
     try:
-        deleted_count = 0
-        deleted_count += await redis.delete(_CACHE_KEY)
-        deleted_count += await redis.delete(f"{_CACHE_KEY}:all")
-        logger.info(f"Cache invalidation: deleted {deleted_count} cache keys for status change")
+        await _invalidate_runtime_routing_cache(redis)
+        logger.info("Cache invalidation completed for status change")
     except Exception as e:
         logger.error(f"Failed to invalidate cache after status change: {e}")
     return result
@@ -287,11 +291,8 @@ async def delete_model(
     
     # Invalidate both cache keys after successful commit
     try:
-        # Delete both cache variants
-        deleted_count = 0
-        deleted_count += await redis.delete(_CACHE_KEY)
-        deleted_count += await redis.delete(f"{_CACHE_KEY}:all")
-        logger.info(f"[DELETE] Cache invalidation: deleted {deleted_count} cache keys")
+        await _invalidate_runtime_routing_cache(redis)
+        logger.info("[DELETE] Cache invalidation complete")
     except Exception as e:
         # Log the error but don't fail the request
         logger.error(f"[DELETE] Failed to invalidate cache: {e}")

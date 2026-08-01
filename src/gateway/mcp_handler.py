@@ -23,14 +23,16 @@ async def context_query(
         request_id=uuid.uuid4(),
         tool_input=_merge_request_identity(request, body),
         connector_registry=getattr(request.app.state, "connector_registry", None),
+        runtime_config=_runtime_config_from_request(request),
     )
-    return result.get("final_response") or result
+    return _serialise_context_query_result(result)
 
 
 async def handle_tool_call(
     request_id: uuid.UUID,
     tool_input: dict[str, Any],
     connector_registry: object | None = None,
+    runtime_config: dict[str, object] | None = None,
 ) -> dict[str, Any]:
     """Invoke the LangGraph pipeline under a root OTel span.
 
@@ -45,11 +47,12 @@ async def handle_tool_call(
         set_connector_registry(connector_registry)
 
     with start_root_span(request_id, operation="mcp.context_query") as rsc:
-        pipeline = build_pipeline()
+        pipeline = build_pipeline(runtime_config=runtime_config)
         state = _build_initial_state(request_id, tool_input)
         state["_otel_ctx"] = rsc
         state["otel_trace_id"] = rsc.trace_id_hex
-        return await pipeline.ainvoke(state)
+        config = {"configurable": {"thread_id": str(request_id)}}
+        return await pipeline.ainvoke(state, config=config)
 
 
 def _build_initial_state(request_id: uuid.UUID, tool_input: dict[str, Any]) -> dict[str, Any]:
@@ -105,3 +108,27 @@ def _merge_request_identity(request: Request, tool_input: dict[str, Any]) -> dic
     if tenant_id is not None:
         merged.setdefault("tenant_id", tenant_id)
     return merged
+
+
+def _runtime_config_from_request(request: Request) -> dict[str, object] | None:
+    routing_runtime = getattr(request.app.state, "routing_runtime", None)
+    if routing_runtime is None:
+        return None
+    return {"routing_runtime": routing_runtime}
+
+
+def _serialise_context_query_result(result: dict[str, Any]) -> dict[str, Any]:
+    final_response = result.get("final_response")
+    if isinstance(final_response, dict):
+        return final_response
+
+    return {
+        "type": "pipeline_error",
+        "status": str(result.get("status") or "failed"),
+        "request_id": str(result.get("request_id") or ""),
+        "current_node": str(result.get("current_node") or "unknown"),
+        "error": result.get("error"),
+        "selected_model": result.get("selected_model"),
+        "model_routing_score": result.get("model_routing_score"),
+        "degraded_sources": result.get("degraded_sources") or [],
+    }

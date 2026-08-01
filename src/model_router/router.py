@@ -65,6 +65,7 @@ class ModelRouter:
         self,
         intent_type: str,
         weights: RoutingWeights | None = None,
+        cache_key: str | None = None,
     ) -> ModelScore | None:
         """Return the highest-scoring ModelScore for the given intent.
 
@@ -74,6 +75,7 @@ class ModelRouter:
             intent_type, INTENT_ROUTING_WEIGHT_TABLE[IntentType.GENERAL]
         )
         required_capability = INTENT_CAPABILITY_MAP.get(intent_type, ModelCapability.CHAT)
+        routing_cache_key = cache_key or intent_type
 
         # Add metadata for observability
         update_current_observation(
@@ -83,16 +85,15 @@ class ModelRouter:
             },
             metadata={
                 "weights": {
+                    "quality": effective_weights.quality_weight,
                     "cost": effective_weights.cost_weight,
                     "latency": effective_weights.latency_weight,
-                    "coding": effective_weights.coding_weight,
-                    "reasoning": effective_weights.reasoning_weight,
                 }
             }
         )
 
         # Hot path — serve from pre-scored cache
-        cached = await self._scored_model_cache.get(intent_type)
+        cached = await self._scored_model_cache.get(routing_cache_key)
         if cached:
             selected = cached[0]
             update_current_observation(
@@ -127,7 +128,7 @@ class ModelRouter:
             key=lambda s: s.composite_score,
             reverse=True,
         )
-        await self._scored_model_cache.set(intent_type, scores)
+        await self._scored_model_cache.set(routing_cache_key, scores)
         
         selected = scores[0]
         update_current_observation(
@@ -148,19 +149,21 @@ class ModelRouter:
         self,
         intent_type: str,
         settings: InvokerSettings | None = None,
+        cache_key: str | None = None,
     ) -> FallbackChain | None:
         """Return an ordered FallbackChain of up to fallback_chain_size model IDs.
 
         Returns ``None`` if the scored candidate list is empty.
         """
         n = (settings or InvokerSettings()).fallback_chain_size
+        routing_cache_key = cache_key or intent_type
 
         # Reuse existing scoring/cache logic — read full scored list, not just [0]
-        cached = await self._scored_model_cache.get(intent_type)
+        cached = await self._scored_model_cache.get(routing_cache_key)
         if cached is None:
             # Cold path — populate cache via select(), then re-read
-            await self.select(intent_type=intent_type)
-            cached = await self._scored_model_cache.get(intent_type)
+            await self.select(intent_type=intent_type, cache_key=routing_cache_key)
+            cached = await self._scored_model_cache.get(routing_cache_key)
 
         if not cached:
             return None

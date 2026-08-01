@@ -82,6 +82,14 @@ NODE_OUTPUT_CONTRACTS: dict[str, set[str]] = {
     "routing_agent": {
         "selected_model",
         "model_routing_score",
+        "fallback_chain",
+        "final_response",
+        "status",
+        "current_node",
+        "error",
+    },
+    "llm_response_agent": {
+        "selected_model",
         "final_response",
         "status",
         "current_node",

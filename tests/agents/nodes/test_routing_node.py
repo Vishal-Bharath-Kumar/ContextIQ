@@ -25,6 +25,7 @@ from src.agents.schemas.execution_plan import ExecutionPlan, RankingStrategy
 from src.agents.schemas.intent import IntentType
 from src.agents.state import AgentState, ExecutionStatus
 from src.model_router.schemas.model_score import ModelScore
+from src.model_router.schemas.routing_weights import RoutingWeights
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -215,7 +216,14 @@ class TestRoutingNodeIntentExtraction:
             mock_select.return_value = score
             await routing_node(state, model_list_cache, scored_cache, langfuse=None)
 
-        mock_select.assert_awaited_once_with(intent_type="code-gen")
+        _, kwargs = mock_select.await_args
+        assert kwargs["intent_type"] == "code-gen"
+        assert kwargs["cache_key"] == "code-gen:q0.625:c0.235:l0.140"
+        assert kwargs["weights"] == RoutingWeights(
+            quality_weight=0.625,
+            cost_weight=0.235,
+            latency_weight=0.14,
+        )
 
     @pytest.mark.asyncio
     async def test_defaults_to_general_when_no_execution_plan(self) -> None:
@@ -229,7 +237,13 @@ class TestRoutingNodeIntentExtraction:
             mock_select.return_value = score
             await routing_node(state, model_list_cache, scored_cache, langfuse=None)
 
-        mock_select.assert_awaited_once_with(intent_type="general")
+        _, kwargs = mock_select.await_args
+        assert kwargs["intent_type"] == "general"
+        assert kwargs["weights"] == RoutingWeights(
+            quality_weight=0.4,
+            cost_weight=0.4,
+            latency_weight=0.2,
+        )
 
     @pytest.mark.asyncio
     async def test_defaults_to_general_when_no_intent_type_in_plan(self) -> None:
@@ -245,7 +259,27 @@ class TestRoutingNodeIntentExtraction:
             mock_select.return_value = score
             await routing_node(state, model_list_cache, scored_cache, langfuse=None)
 
-        mock_select.assert_awaited_once_with(intent_type="general")
+        _, kwargs = mock_select.await_args
+        assert kwargs["intent_type"] == "general"
+
+    @pytest.mark.asyncio
+    async def test_blends_toward_general_weights_at_low_confidence(self) -> None:
+        score = _make_model_score()
+        model_list_cache, scored_cache = _make_caches(score)
+        state = _make_state(intent_type=IntentType.CODE_GEN, intent_confidence=0.2)
+
+        with patch(
+            "src.agents.nodes.routing_node.ModelRouter.select", new_callable=AsyncMock
+        ) as mock_select:
+            mock_select.return_value = score
+            await routing_node(state, model_list_cache, scored_cache, langfuse=None)
+
+        _, kwargs = mock_select.await_args
+        assert kwargs["weights"] == RoutingWeights(
+            quality_weight=0.46,
+            cost_weight=0.36,
+            latency_weight=0.18,
+        )
 
 
 # ---------------------------------------------------------------------------

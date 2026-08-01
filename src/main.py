@@ -31,6 +31,7 @@ from src.auth.middleware import JWTAuthMiddleware
 from src.agents.checkpointer import get_redis_checkpointer
 from src.connector_sdk.registry import ConnectorRegistry
 from src.data.database import primary_session_factory
+from src.data.redis_client import create_redis_client
 from src.agents.graph import build_graph
 from src.agents.nodes.retrieval import set_connector_registry
 from src.audit.trace.object_store import TraceObjectStore
@@ -48,7 +49,8 @@ from src.knowledge_sources.runtime_connectors import apply_runtime_connector_ove
 from src.knowledge_sources.sync.scheduler import CronSyncScheduler
 from src.model_registry.routers.model_router import router as model_router
 from src.model_router.routers.routing_weight_router import router as routing_weight_router
-from src.observability.langfuse_integration import setup_langfuse, teardown_langfuse
+from src.model_router.runtime_services import RoutingRuntimeServices
+from src.observability.langfuse_integration import get_langfuse, setup_langfuse, teardown_langfuse
 from src.observability.langfuse_integration.settings import LangfuseSettings
 from src.observability.metrics.middleware import MetricsMiddleware
 from src.observability.metrics.router import metrics_router
@@ -142,6 +144,13 @@ def create_app(jwks_client: JWKSClient | None = None) -> FastAPI:
             except Exception:
                 logger.warning("Could not configure trace writer dependencies", exc_info=True)
 
+            routing_runtime = RoutingRuntimeServices(
+                redis=create_redis_client(),
+                session_factory=primary_session_factory(),
+                langfuse=get_langfuse(),
+            )
+            app.state.routing_runtime = routing_runtime
+
             graph_checkpointer = None
             try:
                 graph_checkpointer = await get_redis_checkpointer()
@@ -149,7 +158,10 @@ def create_app(jwks_client: JWKSClient | None = None) -> FastAPI:
                 logger.warning("Could not initialise MCP graph checkpointer", exc_info=True)
 
             try:
-                graph = build_graph(checkpointer=graph_checkpointer)
+                graph = build_graph(
+                    checkpointer=graph_checkpointer,
+                    runtime_config={"routing_runtime": routing_runtime},
+                )
                 set_clarification_graph(graph)
                 app.state.agent_graph = graph
                 app.state.agent_graph_checkpointer = graph_checkpointer
@@ -198,6 +210,7 @@ def create_app(jwks_client: JWKSClient | None = None) -> FastAPI:
 
             # Cleanup observability stack
             scheduler.stop()
+            await routing_runtime.close()
             if manage_lifecycle:
                 await client.shutdown()
             teardown_langfuse()  # Flush Langfuse traces
