@@ -24,6 +24,23 @@ from src.observability.tracing.node_span import otel_node_span
 
 _logger = logging.getLogger(__name__)
 
+_CODE_RELATED_INTENTS: set[str] = {"debugging", "code-gen", "code-review"}
+_CODE_FOCUSED_PHRASES: tuple[str, ...] = (
+    "source code",
+    "code file",
+    "code files",
+    "implementation",
+    "class ",
+    "function",
+    "middleware",
+    "router",
+    "endpoint",
+)
+_CODE_FILE_SUFFIXES: tuple[str, ...] = (
+    ".py", ".ts", ".tsx", ".js", ".jsx", ".java", ".go", ".rb",
+    ".kt", ".cs", ".cpp", ".c", ".h", ".hpp", ".rs", ".swift",
+)
+
 # ---------------------------------------------------------------------------
 # Registry singleton — set by lifespan / test fixtures
 # ---------------------------------------------------------------------------
@@ -91,13 +108,13 @@ async def retrieval_node(state: AgentState) -> dict:
 
     dispatcher = ParallelConnectorDispatcher(
         connector_registry=get_connector_registry(),
-        timeout_seconds=settings.connector_timeout_seconds,
     )
 
     results = await dispatcher.fetch_all(
         query=prompt,
         source_ids=plan.sources,
         token_budget_per_source=plan.token_budget_per_source,
+        intent_type=str(state.get("intent_type") or ""),
     )
 
     aggregator = ContextAggregator()
@@ -106,11 +123,46 @@ async def retrieval_node(state: AgentState) -> dict:
         token_budget_per_source=plan.token_budget_per_source,
         global_token_budget=plan.token_budget_total,
     )
+    ranked_chunks = _rank_chunks_for_intent(
+        aggregated.chunks,
+        str(state.get("intent_type") or ""),
+        prompt,
+    )
 
     return {
         "raw_context": [c.model_dump() for c in aggregated.chunks],
-        "ranked_context": [c.model_dump() for c in aggregated.chunks],  # ranking in EP-004
+        "ranked_context": [c.model_dump() for c in ranked_chunks],
         "degraded_sources": [d.model_dump() for d in aggregated.degraded_sources],
         "current_node": "retrieval_agent",
         "status": ExecutionStatus.RUNNING,
     }
+
+
+def _rank_chunks_for_intent(chunks: list, intent_type: str, prompt: str) -> list:
+    if intent_type not in _CODE_RELATED_INTENTS and not _looks_code_focused_prompt(prompt):
+        return chunks
+
+    def score(item: object) -> int:
+        metadata = getattr(item, "metadata", {}) or {}
+        file_path = str(metadata.get("file_path", "")).lower()
+        value = 0
+        if getattr(item, "source_id", "") == "github":
+            value += 2
+        if file_path.startswith("src/") or "/src/" in file_path:
+            value += 4
+        if file_path.endswith(_CODE_FILE_SUFFIXES):
+            value += 5
+        if file_path.endswith(".md") or file_path.endswith(".rst") or "/docs/" in file_path or file_path.startswith("docs/"):
+            value -= 5
+        if file_path.endswith("readme.md"):
+            value -= 4
+        return value
+
+    indexed = list(enumerate(chunks))
+    indexed.sort(key=lambda item: (-score(item[1]), item[0]))
+    return [chunk for _idx, chunk in indexed]
+
+
+def _looks_code_focused_prompt(prompt: str) -> bool:
+    lowered = prompt.lower()
+    return any(phrase in lowered for phrase in _CODE_FOCUSED_PHRASES)

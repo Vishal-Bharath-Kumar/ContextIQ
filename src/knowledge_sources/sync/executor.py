@@ -103,16 +103,52 @@ class SyncJobExecutor:
 
         Returns the sync job ID (for on-demand callers to poll status).
         """
+        return await self._run_internal(source_id=source_id, is_full_sync=is_full_sync)
+
+    async def run_existing_job(
+        self,
+        *,
+        source_id: UUID,
+        job_id: UUID,
+        is_full_sync: bool = False,
+    ) -> UUID:
+        """Execute a sync using an existing queued job record.
+
+        Used by the on-demand API route, which creates the job row up front so
+        it can return the job ID immediately to the caller.
+        """
+        return await self._run_internal(
+            source_id=source_id,
+            is_full_sync=is_full_sync,
+            job_id=job_id,
+        )
+
+    async def _run_internal(
+        self,
+        *,
+        source_id: UUID,
+        is_full_sync: bool,
+        job_id: UUID | None = None,
+    ) -> UUID:
+        """Shared sync execution path with optional pre-created job row."""
         from src.events.producer import close_kafka_producer
 
         source_repo = KnowledgeSourceRepository(self._session)
         job_repo = SyncJobRepository(self._session)
         settings = self._settings
+        job = None
+        source = None
+        started_at = time.perf_counter()
 
         try:
             source = await source_repo.get_by_id(source_id)
             if source is None:
                 raise ValueError(f"Knowledge source {source_id} not found")
+
+            if job_id is not None:
+                job = await job_repo.get(job_id)
+                if job is None:
+                    raise ValueError(f"Sync job {job_id} not found")
 
             connector = await self._build_connector_for_source(source)
 
@@ -120,9 +156,10 @@ class SyncJobExecutor:
             source.status = SourceStatus.SYNCING
             await self._session.flush()
 
-            job = await job_repo.create(
-                source_id=source_id, attempt_number=1, is_full_sync=is_full_sync
-            )
+            if job is None:
+                job = await job_repo.create(
+                    source_id=source_id, attempt_number=1, is_full_sync=is_full_sync
+                )
             await self._session.commit()
 
             last_exc: Exception | None = None
@@ -198,6 +235,17 @@ class SyncJobExecutor:
             source.status = SourceStatus.ERROR
             await self._session.commit()
             return job.id
+        except Exception as exc:
+            if job is not None:
+                await job_repo.mark_failed(
+                    job_id=job.id,
+                    error_message=str(exc),
+                    duration_s=time.perf_counter() - started_at,
+                )
+                if source is not None:
+                    source.status = SourceStatus.ERROR
+                await self._session.commit()
+            raise
         finally:
             await close_kafka_producer()
 

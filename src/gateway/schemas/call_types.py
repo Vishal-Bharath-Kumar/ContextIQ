@@ -20,6 +20,14 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field
 
 
+class DegradedSourceSummary(BaseModel):
+    """Summary of a connector degradation surfaced to the MCP caller."""
+
+    source_id: str = Field(..., description="Connector source identifier (e.g. 'jira:myproject').")
+    error_type: str = Field(..., description="Exception class name for the degraded connector.")
+    message: str = Field(..., description="Human-readable degradation summary.")
+
+
 class ToolCallRequest(BaseModel):
     """Represents the inbound ``tools/call`` request from an AI assistant."""
 
@@ -41,6 +49,10 @@ class ToolCallOutput(BaseModel):
     """Successful tool execution payload returned by the Agent Worker."""
 
     data: dict[str, Any] | list[Any] | str = Field(..., description="Tool-specific output payload.")
+    degraded_sources: list[DegradedSourceSummary] = Field(
+        default_factory=list,
+        description="Connectors that degraded during execution while the tool still completed.",
+    )
     output_schema_version: str = Field("1.0", description="Version of the output schema contract.")
 
 

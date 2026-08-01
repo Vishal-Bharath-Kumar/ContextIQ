@@ -17,7 +17,7 @@ They execute only when:
 
 Each benchmark uses 100 rounds + 10 warmup rounds to produce a statistically
 stable sample.  The p95 is derived from the raw timing data collected by
-pytest-benchmark (``benchmark.stats.data``).
+pytest-benchmark (``benchmark.stats["data"]`` in the installed plugin).
 
 Async handling
 --------------
@@ -107,7 +107,7 @@ def test_pipeline_p95_under_3s(benchmark) -> None:
     finally:
         loop.close()
 
-    p95 = _p95(benchmark.stats.data)
+    p95 = _p95(list(benchmark.stats["data"]))
     assert p95 < 3.0, f"p95 latency {p95:.3f} s exceeds 3 s SLA (full path)"
     assert result["status"] == ExecutionStatus.COMPLETE
     assert result["final_response"] is not None
@@ -145,7 +145,7 @@ def test_pipeline_skip_compression_p95_under_2s(benchmark) -> None:
     finally:
         loop.close()
 
-    p95 = _p95(benchmark.stats.data)
+    p95 = _p95(list(benchmark.stats["data"]))
     assert p95 < 2.0, f"p95 latency {p95:.3f} s exceeds 2 s SLA (skip-compression path)"
     assert result["status"] == ExecutionStatus.COMPLETE
     assert result["final_response"] is not None

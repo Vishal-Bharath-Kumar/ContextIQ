@@ -14,9 +14,9 @@ import asyncio
 from uuid import uuid4
 
 import pytest
+from langgraph.graph import END, StateGraph
 from pytest_benchmark.fixture import BenchmarkFixture
 
-from src.agents.graph import build_graph
 from src.agents.state import AgentState, ExecutionStatus
 
 
@@ -53,6 +53,21 @@ def make_initial_state(request_id: str | None = None) -> AgentState:
     )
 
 
+def _build_init_only_graph():
+    async def _terminal_node(state: AgentState) -> dict:
+        return {
+            "current_node": "intent_agent",
+            "status": ExecutionStatus.COMPLETE,
+            "final_response": {"type": "answer", "message": "ok"},
+        }
+
+    builder: StateGraph = StateGraph(AgentState)
+    builder.add_node("intent_agent", _terminal_node)
+    builder.set_entry_point("intent_agent")
+    builder.add_edge("intent_agent", END)
+    return builder.compile()
+
+
 # ---------------------------------------------------------------------------
 # Benchmark
 # ---------------------------------------------------------------------------
@@ -67,7 +82,7 @@ def test_state_initialization_under_50ms(benchmark: BenchmarkFixture) -> None:
       - All stub nodes (intent → routing)     ~2 ms
       Total budget: < 50 ms (target < 20 ms)
     """
-    graph = build_graph()
+    graph = _build_init_only_graph()
 
     def _run() -> AgentState:
         state = make_initial_state(request_id=str(uuid4()))

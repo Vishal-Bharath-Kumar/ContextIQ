@@ -11,15 +11,16 @@ from __future__ import annotations
 
 import re
 
-import tiktoken
 from pydantic import BaseModel, ConfigDict
+
+from src.llm.token_encoding import get_cl100k_encoding
 
 TOKEN_CHUNK_THRESHOLD = 10_000  # US-023 AC-6: pages above this are chunked
 
 # Heading patterns in plain text produced by strip_confluence_storage()
 _HEADING_RE = re.compile(r"\n(?=#{1,3} |\n[A-Z][^\n]{3,80}\n[=-]{3,})")
 
-_ENCODER = tiktoken.get_encoding("cl100k_base")  # module-level singleton
+_ENCODER = get_cl100k_encoding()
 
 
 class PageChunk(BaseModel):

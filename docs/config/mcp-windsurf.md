@@ -11,7 +11,7 @@
 {
   "mcpServers": {
     "contextiq": {
-      "url": "http://localhost:8080/mcp/sse",
+      "url": "http://localhost:8000/mcp/sse/",
       "transport": "http",
       "auth": {
         "type": "bearer",
@@ -29,7 +29,7 @@
   "mcpServers": {
     "contextiq": {
       "name": "ContextIQ Enterprise",
-      "url": "http://localhost:8080/mcp/sse",
+      "url": "http://localhost:8000/mcp/sse/",
       "transport": "http",
       "auth": {
         "type": "bearer",
@@ -84,11 +84,13 @@
 
 For real-time updates:
 
+Note: the default local Docker Compose stack publishes the SSE endpoint on the `api` service. Use this WebSocket option only if you separately expose the WebSocket route.
+
 ```json
 {
   "mcpServers": {
     "contextiq": {
-      "url": "ws://localhost:8080/mcp/ws",
+      "url": "ws://localhost:8000/mcp/ws",
       "transport": "websocket",
       "auth": {
         "type": "bearer",
@@ -109,7 +111,7 @@ Configure multiple ContextIQ connections:
 {
   "mcpServers": {
     "contextiq-frontend": {
-      "url": "http://localhost:8080/mcp/sse",
+      "url": "http://localhost:8000/mcp/sse/",
       "transport": "http",
       "auth": {
         "type": "bearer",
@@ -120,7 +122,7 @@ Configure multiple ContextIQ connections:
       }
     },
     "contextiq-backend": {
-      "url": "http://localhost:8080/mcp/sse",
+      "url": "http://localhost:8000/mcp/sse/",
       "transport": "http",
       "auth": {
         "type": "bearer",
@@ -240,10 +242,11 @@ $env:CONTEXTIQ_PROD_TOKEN = "production-token"
 ```bash
 # Test ContextIQ endpoint
 curl -H "Authorization: Bearer $CONTEXTIQ_TOKEN" \
-     http://localhost:8080/mcp/sse
+  -H "Accept: text/event-stream" \
+  http://localhost:8000/mcp/sse/
 
 # Check ContextIQ logs
-docker compose logs -f gateway
+docker compose logs -f api
 ```
 
 ### Authentication Failed
@@ -263,7 +266,7 @@ docker compose logs -f gateway
 {
   "mcpServers": {
     "contextiq": {
-      "url": "http://localhost:8080/mcp/sse",
+      "url": "http://localhost:8000/mcp/sse/",
       "transport": "http",
       "auth": {
         "type": "bearer",
@@ -286,7 +289,7 @@ docker compose logs -f gateway
 {
   "mcpServers": {
     "contextiq": {
-      "url": "http://localhost:8080/mcp/sse",
+      "url": "http://localhost:8000/mcp/sse/",
       "transport": "http",
       "auth": {
         "type": "bearer",
@@ -310,7 +313,7 @@ docker compose logs -f gateway
 {
   "mcpServers": {
     "contextiq": {
-      "url": "http://localhost:8080/mcp/sse",
+      "url": "http://localhost:8000/mcp/sse/",
       "transport": "http",
       "auth": {
         "type": "bearer",
@@ -363,7 +366,7 @@ docker compose logs -f gateway
 {
   "mcpServers": {
     "contextiq": {
-      "url": "http://localhost:8080/mcp/sse",
+      "url": "http://localhost:8000/mcp/sse/",
       "transport": "http",
       "auth": {
         "type": "bearer",
@@ -385,6 +388,6 @@ docker compose logs -f gateway
 ## Support
 
 - **Windsurf Logs**: Help → Toggle Developer Tools → Console
-- **ContextIQ Logs**: `docker compose logs -f gateway`
-- **Test Connection**: `curl -H "Authorization: Bearer $CONTEXTIQ_TOKEN" http://localhost:8080/mcp/sse`
+- **ContextIQ Logs**: `docker compose logs -f api`
+- **Test Connection**: `curl -H "Authorization: Bearer $CONTEXTIQ_TOKEN" -H "Accept: text/event-stream" http://localhost:8000/mcp/sse/`
 - **Documentation**: See [MCP Client Setup Guide](./mcp-client-setup.md)

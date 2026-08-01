@@ -56,6 +56,7 @@ from src.governance.opa.client import OPAClient
 from src.knowledge_graph.extraction.extractor import ExtractionSettings
 from src.knowledge_graph.inference.edge_inference_engine import EdgeInferenceSettings
 from src.knowledge_graph.traversal.entity_linker import EntityLinkerSettings
+from src.knowledge_sources.runtime_connectors import apply_runtime_connector_overrides
 from src.llm.ollama_verify import verify_ollama_models_available
 
 logger = logging.getLogger(__name__)
@@ -81,6 +82,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     logger.info("agent_worker: loading connector registry")
     connector_registry = ConnectorRegistry()
     await connector_registry.load()
+    await apply_runtime_connector_overrides(
+        connector_registry,
+        primary_session_factory(),
+    )
     set_connector_registry(connector_registry)
     app.state.connector_registry = connector_registry
 

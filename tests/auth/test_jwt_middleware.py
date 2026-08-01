@@ -16,6 +16,7 @@ import httpx
 import pytest
 import respx
 from fastapi import FastAPI
+from starlette.requests import Request
 from httpx import ASGITransport, AsyncClient
 
 from src.auth.jwks_client import JWKSClient
@@ -106,3 +107,37 @@ async def test_health_endpoint_skips_auth(app_with_mock_jwks: FastAPI) -> None:
     async with AsyncClient(transport=ASGITransport(app_with_mock_jwks), base_url="http://test") as client:
         response = await client.get("/healthz")
     assert response.status_code == 200
+
+
+def test_create_app_includes_request_context_middleware() -> None:
+    app = create_app(jwks_client=None)
+    middleware_names = [entry.cls.__name__ for entry in app.user_middleware]
+    assert "RequestContextMiddleware" in middleware_names
+
+
+@pytest.mark.real_middleware
+async def test_valid_token_populates_request_state_identity(
+    app_with_mock_jwks: FastAPI,
+    mint_token: Any,
+) -> None:
+    observed: dict[str, Any] = {}
+
+    @app_with_mock_jwks.get("/_identity-check")
+    async def _identity_check(request: Request) -> dict[str, str | None]:
+        observed["user_id"] = getattr(request.state, "user_id", None)
+        observed["session_id"] = getattr(request.state, "session_id", None)
+        claims = getattr(request.state, "jwt_claims", None)
+        observed["sub"] = getattr(claims, "sub", None)
+        return observed
+
+    token = mint_token(roles=["admin"])
+    async with AsyncClient(transport=ASGITransport(app_with_mock_jwks), base_url="http://test") as client:
+        response = await client.get(
+            "/_identity-check",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["user_id"] == body["sub"]
+    assert body["session_id"]

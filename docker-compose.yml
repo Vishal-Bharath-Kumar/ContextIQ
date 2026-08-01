@@ -374,6 +374,7 @@ services:
     environment:
       VAULT_ADDR: "http://vault:8200"
       VAULT_TOKEN: "contextiq-dev-root-token"
+      GITHUB_CONNECTOR_TOKEN: ${GITHUB_CONNECTOR_TOKEN:-}
     entrypoint: >
       sh -c "
         vault auth enable approle 2>/dev/null || true &&
@@ -381,7 +382,11 @@ services:
         vault write auth/approle/role/contextiq-connectors token_policies=\"contextiq-connectors\" secret_id_ttl=0 token_ttl=1h token_max_ttl=4h &&
         vault write auth/approle/role/contextiq-connectors/role-id role_id=contextiq-connectors-role &&
         (vault write auth/approle/role/contextiq-connectors/custom-secret-id secret_id=contextiq-connectors-secret 2>/dev/null || true) &&
-        (vault kv get -format=json secret/connectors/github/my-org-pat >/dev/null 2>&1 || vault kv put secret/connectors/github/my-org-pat token=ghp_local_dev_dummy_token_1234 token_type=pat) &&
+        if [ -n \"$GITHUB_CONNECTOR_TOKEN\" ]; then \
+          vault kv put secret/connectors/github/my-org-pat token=\"$GITHUB_CONNECTOR_TOKEN\" token_type=pat >/dev/null; \
+        elif ! vault kv get -format=json secret/connectors/github/my-org-pat >/dev/null 2>&1; then \
+          vault kv put secret/connectors/github/my-org-pat token=ghp_local_dev_dummy_token_1234 token_type=pat >/dev/null; \
+        fi &&
         echo 'Vault bootstrap complete.'
       "
 
@@ -394,6 +399,11 @@ services:
       - "--addr=0.0.0.0:8181"
       - "--log-level=debug"
       - "--log-format=json"
+      - "--config-file=/config/opa-config.yaml"
+      - "/policy/contextiq_authz.rego"
+    volumes:
+      - ./docker/opa/opa-config.yaml:/config/opa-config.yaml:ro
+      - ./docker/opa/contextiq_authz.rego:/policy/contextiq_authz.rego:ro
     ports:
       - "8181:8181"
     healthcheck:

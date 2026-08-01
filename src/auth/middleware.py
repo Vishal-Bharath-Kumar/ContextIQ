@@ -87,4 +87,6 @@ class JWTAuthMiddleware(BaseHTTPMiddleware):
             )
 
         request.state.jwt_claims = claims
+        request.state.user_id = claims.sub
+        request.state.session_id = claims.jti or claims.sub
         return await call_next(request)

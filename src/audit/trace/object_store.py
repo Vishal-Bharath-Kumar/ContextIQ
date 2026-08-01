@@ -6,6 +6,7 @@ lifecycle expiry policy for 90-day minimum retention (AC-5).
 from __future__ import annotations
 
 import logging
+import os
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
@@ -33,10 +34,32 @@ class TraceObjectStoreSettings(BaseSettings):
     aws_access_key_id: str = "minioadmin"
     aws_secret_access_key: str = "minioadmin"  # noqa: S105
     region_name: str = "us-east-1"
+    server_side_encryption: str | None = None
 
     # AC-5: retention window (days); minimum 90, default 365
     retention_days: int = 365
     retention_days_min: int = 90  # validated in __init__; never configurable below 90
+
+    def model_post_init(self, __context: object) -> None:
+        self.endpoint_url = _coalesce_legacy_env(
+            current=self.endpoint_url,
+            default="http://minio:9000",
+            legacy_env="AUDIT_ARCHIVE_MINIO_ENDPOINT",
+        )
+        self.aws_access_key_id = _coalesce_legacy_env(
+            current=self.aws_access_key_id,
+            default="minioadmin",
+            legacy_env="AUDIT_ARCHIVE_MINIO_ACCESS_KEY",
+        )
+        self.aws_secret_access_key = _coalesce_legacy_env(
+            current=self.aws_secret_access_key,
+            default="minioadmin",
+            legacy_env="AUDIT_ARCHIVE_MINIO_SECRET_KEY",
+        )
+        self.server_side_encryption = _coalesce_optional_legacy_env(
+            current=self.server_side_encryption,
+            legacy_env="AUDIT_ARCHIVE_MINIO_SERVER_SIDE_ENCRYPTION",
+        )
 
 
 @dataclass(frozen=True)
@@ -73,16 +96,17 @@ class TraceObjectStore:
         """
         key = _build_key(trace)
         payload = trace.model_dump_json(indent=None).encode()
+        put_kwargs: dict[str, Any] = {
+            "Bucket": self._settings.bucket,
+            "Key": key,
+            "Body": payload,
+            "ContentType": _CONTENT_TYPE,
+        }
+        if self._settings.server_side_encryption:
+            put_kwargs["ServerSideEncryption"] = self._settings.server_side_encryption
 
         async with _s3_client(self._settings) as s3:
-            resp = await s3.put_object(
-                Bucket=self._settings.bucket,
-                Key=key,
-                Body=payload,
-                ContentType=_CONTENT_TYPE,
-                # Server-side encryption (EP-TECH-002 / NFR — encryption at rest)
-                ServerSideEncryption="AES256",
-            )
+            resp = await s3.put_object(**put_kwargs)
 
         version_id = resp.get("VersionId") or ""
         etag = (resp.get("ETag") or "").strip('"')
@@ -156,6 +180,20 @@ def _build_key(trace: ExecutionTrace) -> str:
         f"{ts.year:04d}/{ts.month:02d}/"
         f"{trace.request_id}.json"
     )
+
+
+def _coalesce_legacy_env(*, current: str, default: str, legacy_env: str) -> str:
+    legacy_value = os.environ.get(legacy_env, "")
+    if current == default and legacy_value:
+        return legacy_value
+    return current
+
+
+def _coalesce_optional_legacy_env(*, current: str | None, legacy_env: str) -> str | None:
+    if current:
+        return current
+    legacy_value = os.environ.get(legacy_env, "")
+    return legacy_value or None
 
 
 def _validate_retention(settings: TraceObjectStoreSettings) -> None:

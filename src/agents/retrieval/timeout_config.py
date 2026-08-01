@@ -25,7 +25,7 @@ DEFAULT_TIMEOUT: float = float(os.environ.get("CONNECTOR_TIMEOUT_SECONDS", "5.0"
 # ---------------------------------------------------------------------------
 
 CONNECTOR_TIMEOUT_OVERRIDES: dict[str, float] = {
-    "github": 8.0,      # GitHub API can be slow for large repos
+    "github": 8.0,
     "confluence": 5.0,
     "jira": 5.0,
     "grafana": 3.0,     # Metrics API should be fast

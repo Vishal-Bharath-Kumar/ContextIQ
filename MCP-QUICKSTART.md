@@ -23,18 +23,21 @@ docker compose ps
 Expected output should show services running:
 - `postgres` - Database
 - `redis` - Cache
-- `gateway` - MCP Gateway (port 8080)
-- `api` - API service
+- `api` - API + MCP service (port 8000)
 - `indexing` - Indexing service
 
 ## Step 2: Get Authentication Token
 
-### Option A: Local Development (No Auth)
-For local development, you can disable JWT authentication:
+### Option A: Local Development Token
+For local development, fetch a short-lived Keycloak JWT from the dev login endpoint:
 
 ```bash
-export CONTEXTIQ_JWT_AUTH_ENABLED=false
-docker compose restart gateway
+export CONTEXTIQ_TOKEN="$(
+  curl -s -X POST http://localhost:8000/auth/dev-login \
+    -H 'Content-Type: application/json' \
+    -d '{"username":"admin","password":"admin"}' \
+  | python3 -c 'import sys, json; print(json.load(sys.stdin)["access_token"])'
+)"
 ```
 
 ### Option B: JWT Token (Production)
@@ -63,18 +66,13 @@ echo '$env:CONTEXTIQ_TOKEN = "your-jwt-token"' >> $PROFILE
 
 ```bash
 # Test health endpoint
-curl http://localhost:8080/health
+curl http://localhost:8000/healthz
 
-# Test MCP endpoint (with auth)
-curl -H "Authorization: Bearer $CONTEXTIQ_TOKEN" \
-     http://localhost:8080/mcp/sse
-
-# List available tools
-curl -X POST \
-     -H "Authorization: Bearer $CONTEXTIQ_TOKEN" \
-     -H "Content-Type: application/json" \
-     -d '{"jsonrpc":"2.0","method":"tools/list","id":1}' \
-     http://localhost:8080/mcp/sse
+# Test MCP SSE handshake (with auth)
+curl --max-time 5 \
+  -H "Authorization: Bearer $CONTEXTIQ_TOKEN" \
+  -H "Accept: text/event-stream" \
+  http://localhost:8000/mcp/sse/
 ```
 
 ## Step 4: Configure Your AI Assistant
@@ -88,7 +86,7 @@ curl -X POST \
   "mcpServers": {
     "contextiq": {
       "type": "http",
-      "url": "http://localhost:8080/mcp/sse",
+      "url": "http://localhost:8000/mcp/sse/",
       "headers": {
         "Authorization": "Bearer ${CONTEXTIQ_TOKEN}",
         "Content-Type": "application/json"
@@ -109,7 +107,7 @@ Restart Claude Desktop after saving.
   "servers": {
     "contextiq": {
       "type": "http",
-      "url": "http://localhost:8080/mcp/sse",
+      "url": "http://localhost:8000/mcp/sse/",
       "headers": {
         "Authorization": "Bearer ${env:CONTEXTIQ_TOKEN}",
         "Content-Type": "application/json"
@@ -130,7 +128,7 @@ Restart Cursor after saving.
   "servers": {
     "contextiq": {
       "type": "http",
-      "url": "http://localhost:8080/mcp/sse",
+      "url": "http://localhost:8000/mcp/sse/",
       "headers": {
         "Authorization": "Bearer ${env:CONTEXTIQ_TOKEN}",
         "Content-Type": "application/json"
@@ -173,19 +171,19 @@ Search ContextIQ for API documentation
 docker compose ps
 
 # View logs
-docker compose logs gateway
+docker compose logs api
 
 # Restart services
-docker compose restart
+docker compose restart api
 ```
 
 ### Connection Refused
 ```bash
-# Verify port 8080 is accessible
-curl http://localhost:8080/health
+# Verify port 8000 is accessible
+curl http://localhost:8000/healthz
 
-# Check gateway logs
-docker compose logs -f gateway
+# Check API logs
+docker compose logs -f api
 ```
 
 ### Authentication Failed
@@ -193,9 +191,13 @@ docker compose logs -f gateway
 # Verify token is set
 echo $CONTEXTIQ_TOKEN
 
-# For local dev, disable auth
-export CONTEXTIQ_JWT_AUTH_ENABLED=false
-docker compose restart gateway
+# Refresh the local dev token
+export CONTEXTIQ_TOKEN="$(
+  curl -s -X POST http://localhost:8000/auth/dev-login \
+    -H 'Content-Type: application/json' \
+    -d '{"username":"admin","password":"admin"}' \
+  | python3 -c 'import sys, json; print(json.load(sys.stdin)["access_token"])'
+)"
 ```
 
 ### Tools Not Appearing
@@ -271,8 +273,8 @@ echo .env >> .gitignore
 
 ## Support
 
-- **Logs**: `docker compose logs -f gateway`
-- **Health Check**: `curl http://localhost:8080/health`
+- **Logs**: `docker compose logs -f api`
+- **Health Check**: `curl http://localhost:8000/healthz`
 - **Documentation**: See `docs/` directory
 - **Issues**: Check [troubleshooting guide](docs/config/mcp-client-setup.md#troubleshooting)
 

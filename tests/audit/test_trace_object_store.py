@@ -145,6 +145,20 @@ def test_init_raises_on_invalid_retention() -> None:
         TraceObjectStore(settings=TraceObjectStoreSettings(retention_days=30))
 
 
+def test_settings_fall_back_to_legacy_audit_archive_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("AUDIT_ARCHIVE_MINIO_ENDPOINT", "http://minio-legacy:9000")
+    monkeypatch.setenv("AUDIT_ARCHIVE_MINIO_ACCESS_KEY", "contextiq")
+    monkeypatch.setenv("AUDIT_ARCHIVE_MINIO_SECRET_KEY", "contextiq_dev")
+    monkeypatch.setenv("AUDIT_ARCHIVE_MINIO_SERVER_SIDE_ENCRYPTION", "AES256")
+
+    settings = TraceObjectStoreSettings()
+
+    assert settings.endpoint_url == "http://minio-legacy:9000"
+    assert settings.aws_access_key_id == "contextiq"
+    assert settings.aws_secret_access_key == "contextiq_dev"
+    assert settings.server_side_encryption == "AES256"
+
+
 # ------------------------------------------------------------------ #
 # TraceObjectStore.write                                               #
 # ------------------------------------------------------------------ #
@@ -169,6 +183,7 @@ async def test_write_returns_trace_write_result(
 async def test_write_sets_server_side_encryption_aes256(
     settings: TraceObjectStoreSettings, sample_trace: ExecutionTrace
 ) -> None:
+    settings.server_side_encryption = "AES256"
     mock_s3 = _make_mock_s3()
     store = TraceObjectStore(settings=settings)
 
@@ -177,6 +192,20 @@ async def test_write_sets_server_side_encryption_aes256(
 
     _, kwargs = mock_s3.put_object.call_args
     assert kwargs.get("ServerSideEncryption") == "AES256"
+
+
+async def test_write_omits_server_side_encryption_when_unset(
+    settings: TraceObjectStoreSettings, sample_trace: ExecutionTrace
+) -> None:
+    settings.server_side_encryption = None
+    mock_s3 = _make_mock_s3()
+    store = TraceObjectStore(settings=settings)
+
+    with patch("src.audit.trace.object_store._s3_client", _client_ctx(mock_s3)):
+        await store.write(sample_trace)
+
+    _, kwargs = mock_s3.put_object.call_args
+    assert "ServerSideEncryption" not in kwargs
 
 
 async def test_write_version_id_non_empty_when_versioning_enabled(

@@ -48,7 +48,7 @@ ContextIQ exposes two MCP transports:
 
 ### Server-Sent Events (Recommended)
 ```
-http://localhost:8080/mcp/sse
+http://localhost:8000/mcp/sse/
 ```
 - Best for: Most AI assistants
 - Protocol: HTTP with streaming responses
@@ -56,8 +56,9 @@ http://localhost:8080/mcp/sse
 
 ### WebSocket
 ```
-ws://localhost:8080/mcp/ws
+ws://localhost:8000/mcp/ws
 ```
+- Note: the default local Docker Compose stack publishes the SSE endpoint on the `api` service. Use SSE unless you separately expose the WebSocket route.
 - Best for: Real-time bidirectional communication
 - Protocol: WebSocket persistent connection
 - Use case: Interactive agents, live updates
@@ -87,7 +88,7 @@ ContextIQ supports working with multiple repositories simultaneously using custo
 {
   "contextiq-repo-a": {
     "type": "http",
-    "url": "http://localhost:8080/mcp/sse",
+      "url": "http://localhost:8000/mcp/sse/",
     "headers": {
       "Authorization": "Bearer ${env:CONTEXTIQ_TOKEN}",
       "X-Repository": "frontend-app",
@@ -140,18 +141,13 @@ Test your MCP connection:
 
 ```bash
 # Check ContextIQ health
-curl http://localhost:8080/health
+curl http://localhost:8000/healthz
 
-# Test MCP SSE endpoint
-curl -H "Authorization: Bearer $CONTEXTIQ_TOKEN" \
-     http://localhost:8080/mcp/sse
-
-# List available tools
-curl -X POST \
-     -H "Authorization: Bearer $CONTEXTIQ_TOKEN" \
-     -H "Content-Type: application/json" \
-     -d '{"jsonrpc":"2.0","method":"tools/list","id":1}' \
-     http://localhost:8080/mcp/sse
+# Test MCP SSE handshake
+curl --max-time 5 \
+   -H "Authorization: Bearer $CONTEXTIQ_TOKEN" \
+   -H "Accept: text/event-stream" \
+   http://localhost:8000/mcp/sse/
 ```
 
 ## Troubleshooting
@@ -160,7 +156,7 @@ curl -X POST \
 
 1. **Connection Refused**
    - Ensure ContextIQ is running: `docker compose ps`
-   - Check gateway logs: `docker compose logs gateway`
+   - Check API logs: `docker compose logs api`
 
 2. **Authentication Failed**
    - Verify token: `echo $CONTEXTIQ_TOKEN`
@@ -178,8 +174,8 @@ Enable debug logging in ContextIQ:
 
 ```bash
 export CONTEXTIQ_LOG_LEVEL=DEBUG
-docker compose restart gateway
-docker compose logs -f gateway
+docker compose restart api
+docker compose logs -f api
 ```
 
 ## Security Best Practices
@@ -201,7 +197,7 @@ docker compose logs -f gateway
          │
 ┌────────▼────────┐
 │ ContextIQ       │
-│ MCP Gateway     │ :8080/mcp/sse or /mcp/ws
+│ API + MCP       │ :8000/mcp/sse/ or /mcp/ws
 └────────┬────────┘
          │
     ┌────┴────┬──────────┬──────────┐
@@ -249,7 +245,7 @@ For production deployments:
 
 For questions or issues:
 - Check [Troubleshooting](#troubleshooting) section above
-- Review gateway logs: `docker compose logs gateway`
+- Review API logs: `docker compose logs api`
 - See [runbooks](../runbooks/) for operational guides
 - Contact: support@contextiq.example.com
 

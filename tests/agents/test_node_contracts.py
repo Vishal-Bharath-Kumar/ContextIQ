@@ -25,7 +25,15 @@ from src.agents.state import AgentState, ExecutionStatus
 # ---------------------------------------------------------------------------
 
 _IDENTITY_FIELDS = {"request_id", "user_id", "username", "roles", "tool_name", "prompt", "timestamp"}
-_PIPELINE_NODES = {"intent_agent", "retrieval_agent", "governance_agent", "compression_agent", "routing_agent"}
+_PIPELINE_NODES = {
+    "intent_agent",
+    "retrieval_agent",
+    "governance_agent",
+    "opa_filter",
+    "knowledge_graph",
+    "compression_agent",
+    "routing_agent",
+}
 
 
 def _make_state(**overrides: object) -> AgentState:
@@ -62,8 +70,8 @@ def _make_state(**overrides: object) -> AgentState:
 # ---------------------------------------------------------------------------
 
 class TestNodeOutputContracts:
-    def test_all_five_nodes_declared(self) -> None:
-        assert NODE_OUTPUT_CONTRACTS.keys() == _PIPELINE_NODES
+    def test_all_contract_nodes_declared(self) -> None:
+        assert set(NODE_OUTPUT_CONTRACTS.keys()) == _PIPELINE_NODES
 
     def test_identity_fields_absent_from_all_nodes(self) -> None:
         for node_name, allowed in NODE_OUTPUT_CONTRACTS.items():

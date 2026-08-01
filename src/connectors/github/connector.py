@@ -13,6 +13,8 @@ from __future__ import annotations
 
 import asyncio
 from datetime import UTC, datetime
+import logging
+import re
 from uuid import UUID
 
 import httpx
@@ -32,6 +34,19 @@ from src.connectors.github.sync_client import GitHubCommitsClient
 from src.connectors.github.sync_store import ConnectorSyncStore
 from src.events.producer import get_kafka_producer
 from src.indexing.schemas.chunk import ChunkPayload
+
+logger = logging.getLogger(__name__)
+
+_FALLBACK_QUERY_STOPWORDS: set[str] = {
+    "the", "and", "for", "with", "that", "this", "from", "into", "your",
+    "only", "full", "before", "after", "about", "include", "available",
+    "explicitly", "summary", "answer", "return", "working", "local",
+    "still", "empty", "context", "package", "json", "evidence",
+    "github", "contextiq", "repo", "retrieved", "returns",
+    "any", "base", "concrete", "explain", "fix", "items", "now",
+    "raw", "say", "why",
+}
+_WORD_RE = re.compile(r"[A-Za-z][A-Za-z0-9_]+")
 
 
 class GitHubConnector(BaseConnector):
@@ -62,7 +77,13 @@ class GitHubConnector(BaseConnector):
             ConnectorAuthError: when the Vault request fails or the secret is
                 missing the required ``"token"`` key.
         """
-        self._credential = await self._token_provider.get_credential()
+        credential = await self._token_provider.get_credential()
+        self._credential = credential
+
+        health = await self.health_check()
+        if not health.healthy:
+            self._credential = None
+            raise ConnectorAuthError(f"GitHub credential validation failed: {health.message}")
 
     def _auth_header(self) -> dict[str, str]:
         """
@@ -84,28 +105,44 @@ class GitHubConnector(BaseConnector):
         Search GitHub code and enrich each result with content excerpt and
         commit metadata.
 
-        Enforces a 2-second total latency budget via ``asyncio.wait_for()``.
+        Enforces a configured total latency budget via ``asyncio.wait_for()``.
 
         Raises:
             ConnectorAuthError: when ``authenticate()`` has not been called.
-            asyncio.TimeoutError: when total enrichment exceeds 2 seconds.
+            asyncio.TimeoutError: when total search and enrichment exceeds the
+                configured fetch timeout.
         """
         return await asyncio.wait_for(
             self._fetch_inner(query),
-            timeout=2.0,  # US-022 AC-7
+            timeout=self._config.fetch_timeout_s,
         )
 
     async def _fetch_inner(self, query: ConnectorQuery) -> list[ConnectorResult]:
         search_client = GitHubSearchClient(self._config)
         content_client = GitHubContentClient(self._config)
         auth = self._auth_header()
+        branch = query.filters.get("branch", "main")
 
-        items = await search_client.search_code(
-            query=query.query,
-            repos=self._config.repos,
-            auth_header=auth,
-            max_results=query.max_results,
-        )
+        try:
+            items = await search_client.search_code(
+                query=query.query,
+                repos=self._config.repos,
+                auth_header=auth,
+                max_results=query.max_results,
+            )
+        except httpx.HTTPStatusError as exc:
+            if exc.response is None or exc.response.status_code not in {403, 422}:
+                raise
+            items = []
+
+        if not items:
+            return await self._fallback_fetch_from_repo_paths(
+                query=query.query,
+                branch=branch,
+                content_client=content_client,
+                auth_header=auth,
+                max_results=query.max_results,
+            )
 
         async with httpx.AsyncClient(timeout=self._config.request_timeout_s) as client:
             tasks = [
@@ -114,6 +151,7 @@ class GitHubConnector(BaseConnector):
                     repo=item.repository,
                     file_path=item.path,
                     auth_header=auth,
+                    branch=branch,
                 )
                 for item in items
             ]
@@ -124,9 +162,6 @@ class GitHubConnector(BaseConnector):
             if isinstance(enrichment, Exception):
                 continue  # skip files that could not be enriched; do not fail the batch
             excerpt, commit_sha, committed_at = enrichment
-
-            # Derive branch from filters; default to "main" if not specified
-            branch = query.filters.get("branch", "main")
 
             results.append(
                 ConnectorResult(
@@ -140,6 +175,88 @@ class GitHubConnector(BaseConnector):
                             "file_path": item.path,
                             "repository": item.repository,
                             "branch": branch,
+                            "commit_sha": commit_sha,
+                        },
+                    ),
+                    fetched_at=datetime.now(tz=UTC),
+                )
+            )
+
+        return results
+
+    async def _fallback_fetch_from_repo_paths(
+        self,
+        *,
+        query: str,
+        branch: str,
+        content_client: GitHubContentClient,
+        auth_header: dict[str, str],
+        max_results: int,
+    ) -> list[ConnectorResult]:
+        keywords = _extract_fallback_keywords(query)
+        max_files = max(50, min(max_results * 50, 200))
+
+        candidates: list[tuple[int, str, str]] = []
+        selected_branch_by_repo: dict[str, str] = {}
+        async with httpx.AsyncClient(timeout=self._config.request_timeout_s) as client:
+            for repo in self._config.repos:
+                try:
+                    selected_branch, paths = await content_client.list_repo_files_with_branch(
+                        client=client,
+                        repo=repo,
+                        auth_header=auth_header,
+                        branch=branch,
+                        max_files=max_files,
+                    )
+                except Exception:
+                    continue
+
+                selected_branch_by_repo[repo] = selected_branch or branch
+
+                for path in paths:
+                    score = _score_fallback_path(path, keywords)
+                    candidates.append((score, repo, path))
+
+            if not candidates:
+                return []
+
+            candidates.sort(key=lambda item: (-item[0], item[2]))
+            selected = candidates[: max(max_results, 1)]
+
+            tasks = [
+                content_client.fetch_content_and_commit(
+                    client=client,
+                    repo=repo,
+                    file_path=path,
+                    auth_header=auth_header,
+                    branch=selected_branch_by_repo.get(repo, branch),
+                )
+                for _score, repo, path in selected
+            ]
+            enriched = await asyncio.gather(*tasks, return_exceptions=True)
+
+        results: list[ConnectorResult] = []
+        for (_score, repo, path), enrichment in zip(selected, enriched, strict=False):
+            if isinstance(enrichment, Exception):
+                continue
+            excerpt, commit_sha, committed_at = enrichment
+            if not excerpt.strip():
+                continue
+            results.append(
+                ConnectorResult(
+                    source_id=f"github:{repo}:{path}",
+                    content=excerpt,
+                    metadata=ResultMetadata(
+                        source_url=(
+                            f"https://github.com/{repo}/blob/"
+                            f"{selected_branch_by_repo.get(repo, branch)}/{path}"
+                        ),
+                        author=None,
+                        last_modified=committed_at,
+                        extra={
+                            "file_path": path,
+                            "repository": repo,
+                            "branch": selected_branch_by_repo.get(repo, branch),
                             "commit_sha": commit_sha,
                         },
                     ),
@@ -259,7 +376,7 @@ class GitHubConnector(BaseConnector):
         async with httpx.AsyncClient(timeout=self._config.request_timeout_s) as client:
             for repo in self._config.repos:
                 try:
-                    paths = await content_client.list_repo_files(
+                    selected_branch, paths = await content_client.list_repo_files_with_branch(
                         client=client,
                         repo=repo,
                         auth_header=auth,
@@ -270,7 +387,11 @@ class GitHubConnector(BaseConnector):
 
                 tasks = [
                     content_client.fetch_content_and_commit(
-                        client=client, repo=repo, file_path=path, auth_header=auth
+                        client=client,
+                        repo=repo,
+                        file_path=path,
+                        auth_header=auth,
+                        branch=selected_branch or "main",
                     )
                     for path in paths
                 ]
@@ -286,10 +407,17 @@ class GitHubConnector(BaseConnector):
                         ChunkPayload(
                             source_id=source_id,
                             tenant_id=tenant_id,
-                            document_id=f"github:{repo}:{sha}",
+                            # Use a file-stable document id so indexed document
+                            # counts reflect unique repo files instead of
+                            # collapsing every file touched by the same commit.
+                            document_id=f"github:{repo}:{path}",
                             text=excerpt,
                             token_count=max(1, len(excerpt) // 4),
-                            metadata={"repository": repo, "file_path": path},
+                            metadata={
+                                "repository": repo,
+                                "file_path": path,
+                                "commit_sha": sha,
+                            },
                         )
                     )
 
@@ -308,7 +436,7 @@ class GitHubConnector(BaseConnector):
                     message="Not authenticated; call authenticate() first",
                     checked_at=now,
                 )
-            async with httpx.AsyncClient(timeout=5.0) as client:
+            async with httpx.AsyncClient(timeout=5.0, trust_env=False) as client:
                 resp = await client.get(
                     f"{self._config.base_url}/rate_limit",
                     headers={
@@ -335,3 +463,52 @@ class GitHubConnector(BaseConnector):
                 message=f"{type(exc).__name__}: {str(exc)[:150]}",
                 checked_at=now,
             )
+
+
+def _extract_fallback_keywords(query: str) -> set[str]:
+    keywords: set[str] = set()
+    for token in _tokenize_overlap_text(query):
+        if len(token) < 3 or token in _FALLBACK_QUERY_STOPWORDS:
+            continue
+        keywords.add(token)
+    return keywords
+
+
+def _score_fallback_path(path: str, keywords: set[str]) -> int:
+    lowered = path.lower()
+    path_tokens = _tokenize_overlap_text(lowered)
+    overlap = len(path_tokens & keywords)
+
+    score = overlap * 5
+    if lowered.startswith("src/"):
+        score += 7
+    elif "/src/" in lowered:
+        score += 2
+    if lowered.endswith((".py", ".ts", ".tsx", ".js", ".jsx", ".go", ".java", ".kt", ".rb", ".cs")):
+        score += 3
+    if lowered.startswith(("src/agents/", "src/gateway/", "src/knowledge_sources/", "src/retrieval/")):
+        score += 8
+    if "/__tests__/" in lowered or ".test." in lowered or ".spec." in lowered:
+        score -= 10
+    if lowered.startswith("frontend/"):
+        score -= 3
+    if any(part in lowered for part in ("/node_modules/", "/dist/", "/build/", "/vendor/", "/coverage/", "/.venv/")):
+        score -= 12
+    if lowered.startswith(".github/") or "/.github/" in lowered:
+        score -= 8
+    if lowered.startswith(".npm-package/") or lowered.startswith(".propel/"):
+        score -= 8
+    if lowered.startswith("docs/") or lowered.endswith(".md"):
+        score -= 3
+    return score
+
+
+def _tokenize_overlap_text(text: str) -> set[str]:
+    normalized = re.sub(r"[\/_.-]+", " ", text.lower())
+    tokens = set(_WORD_RE.findall(normalized))
+    singularized = {
+        token[:-1]
+        for token in tokens
+        if token.endswith("s") and len(token) > 4
+    }
+    return tokens | singularized

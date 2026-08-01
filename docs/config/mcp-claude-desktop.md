@@ -12,7 +12,7 @@
   "mcpServers": {
     "contextiq": {
       "type": "http",
-      "url": "http://localhost:8080/mcp/sse",
+      "url": "http://localhost:8000/mcp/sse/",
       "headers": {
         "Authorization": "Bearer ${CONTEXTIQ_TOKEN}",
         "Content-Type": "application/json"
@@ -75,7 +75,7 @@ Configure multiple ContextIQ connections for different repositories:
   "mcpServers": {
     "contextiq-repo-frontend": {
       "type": "http",
-      "url": "http://localhost:8080/mcp/sse",
+      "url": "http://localhost:8000/mcp/sse/",
       "headers": {
         "Authorization": "Bearer ${CONTEXTIQ_TOKEN}",
         "X-Repository": "frontend-app",
@@ -84,7 +84,7 @@ Configure multiple ContextIQ connections for different repositories:
     },
     "contextiq-repo-backend": {
       "type": "http",
-      "url": "http://localhost:8080/mcp/sse",
+      "url": "http://localhost:8000/mcp/sse/",
       "headers": {
         "Authorization": "Bearer ${CONTEXTIQ_TOKEN}",
         "X-Repository": "backend-api",
@@ -121,18 +121,18 @@ If Claude can't read the environment variable:
 
 ### Connection Refused
 - Ensure ContextIQ is running: `docker compose ps`
-- Check gateway is accessible: `curl http://localhost:8080/health`
-- Verify no firewall blocking port 8080
+- Check API is accessible: `curl http://localhost:8000/healthz`
+- Verify no firewall blocking port 8000
 
 ### Tools Not Appearing
 - Check Claude Developer Console for errors
 - View logs: Settings → Developer → Logs
 - Verify JSON syntax in config file
-- Try using WebSocket transport instead:
+- If you separately expose the WebSocket route, you can try this alternative transport:
   ```json
   {
     "type": "websocket",
-    "url": "ws://localhost:8080/mcp/ws"
+    "url": "ws://localhost:8000/mcp/ws"
   }
   ```
 

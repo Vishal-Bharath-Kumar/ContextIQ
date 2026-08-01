@@ -240,14 +240,24 @@ class SyncTriggerResponse(BaseModel):
     message: str = "Sync job queued"
 
 
-async def _run_sync_background(source_id: UUID, app_state: object) -> None:
+async def _run_sync_background(source_id: UUID, job_id: UUID, app_state: object) -> None:
     """Background coroutine: opens its own session to isolate from request lifecycle."""
     async with primary_session_factory()() as session:
         executor = SyncJobExecutor(
             session=session,
             registry=app_state.connector_registry,  # type: ignore[attr-defined]
         )
-        await executor.run(source_id=source_id, is_full_sync=True)
+        try:
+            await executor.run_existing_job(
+                source_id=source_id,
+                job_id=job_id,
+                is_full_sync=True,
+            )
+        except Exception:
+            _log.exception(
+                "on_demand_sync_failed",
+                extra={"source_id": str(source_id), "job_id": str(job_id)},
+            )
 
 
 @router.post(
@@ -279,7 +289,7 @@ async def trigger_sync(
     await session.commit()
 
     asyncio.create_task(
-        _run_sync_background(source_id, request.app.state),
+        _run_sync_background(source_id, job.id, request.app.state),
         name=f"on_demand_sync_{source_id}",
     )
 

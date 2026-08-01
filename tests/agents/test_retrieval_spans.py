@@ -15,6 +15,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from opentelemetry import trace as otel_trace
+from opentelemetry.trace import ProxyTracerProvider
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
@@ -40,9 +41,13 @@ _otel_exporter: InMemorySpanExporter
 def _module_otel_provider() -> None:
     global _otel_exporter  # noqa: PLW0603
     exporter = InMemorySpanExporter()
-    provider = TracerProvider()
-    provider.add_span_processor(SimpleSpanProcessor(exporter))
-    otel_trace.set_tracer_provider(provider)
+    provider = otel_trace.get_tracer_provider()
+    if isinstance(provider, ProxyTracerProvider):
+        provider = TracerProvider()
+        provider.add_span_processor(SimpleSpanProcessor(exporter))
+        otel_trace.set_tracer_provider(provider)
+    else:
+        provider.add_span_processor(SimpleSpanProcessor(exporter))
     _otel_exporter = exporter
     yield
     exporter.shutdown()

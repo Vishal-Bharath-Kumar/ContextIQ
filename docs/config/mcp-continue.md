@@ -12,7 +12,7 @@
     {
       "name": "contextiq",
       "type": "http",
-      "url": "http://localhost:8080/mcp/sse",
+      "url": "http://localhost:8000/mcp/sse/",
       "headers": {
         "Authorization": "Bearer ${CONTEXTIQ_TOKEN}",
         "Content-Type": "application/json"
@@ -38,7 +38,7 @@
     {
       "name": "contextiq",
       "type": "http",
-      "url": "http://localhost:8080/mcp/sse",
+      "url": "http://localhost:8000/mcp/sse/",
       "headers": {
         "Authorization": "Bearer ${CONTEXTIQ_TOKEN}",
         "Content-Type": "application/json"
@@ -98,13 +98,15 @@
 
 For real-time bidirectional communication:
 
+Note: the default local Docker Compose stack publishes the SSE endpoint on the `api` service. Use this WebSocket option only if you separately expose the WebSocket route.
+
 ```json
 {
   "mcpServers": [
     {
       "name": "contextiq-ws",
       "type": "websocket",
-      "url": "ws://localhost:8080/mcp/ws",
+      "url": "ws://localhost:8000/mcp/ws",
       "headers": {
         "Authorization": "Bearer ${CONTEXTIQ_TOKEN}"
       },
@@ -124,7 +126,7 @@ Work with multiple repositories:
     {
       "name": "contextiq-frontend",
       "type": "http",
-      "url": "http://localhost:8080/mcp/sse",
+      "url": "http://localhost:8000/mcp/sse/",
       "headers": {
         "Authorization": "Bearer ${CONTEXTIQ_TOKEN}",
         "X-Repository": "frontend-app",
@@ -134,7 +136,7 @@ Work with multiple repositories:
     {
       "name": "contextiq-backend",
       "type": "http",
-      "url": "http://localhost:8080/mcp/sse",
+      "url": "http://localhost:8000/mcp/sse/",
       "headers": {
         "Authorization": "Bearer ${CONTEXTIQ_TOKEN}",
         "X-Repository": "backend-api",
@@ -144,7 +146,7 @@ Work with multiple repositories:
     {
       "name": "contextiq-docs",
       "type": "http",
-      "url": "http://localhost:8080/mcp/sse",
+      "url": "http://localhost:8000/mcp/sse/",
       "headers": {
         "Authorization": "Bearer ${CONTEXTIQ_TOKEN}",
         "X-Repository": "documentation",
@@ -230,7 +232,7 @@ export CONTEXTIQ_TOKEN="eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9..."
 export CONTEXTIQ_PROD_TOKEN="production-token"
 
 # Optional
-export CONTEXTIQ_MCP_URL="http://localhost:8080/mcp/sse"
+export CONTEXTIQ_MCP_URL="http://localhost:8000/mcp/sse/"
 export CONTEXTIQ_LOG_LEVEL="DEBUG"
 
 # Reload
@@ -291,13 +293,14 @@ Alternatively, add to `.vscode/settings.json`:
 ```bash
 # Test ContextIQ endpoint
 curl -H "Authorization: Bearer $CONTEXTIQ_TOKEN" \
-     http://localhost:8080/mcp/sse
+  -H "Accept: text/event-stream" \
+  http://localhost:8000/mcp/sse/
 
 # Verify ContextIQ is running
 docker compose ps
 
-# Check gateway logs
-docker compose logs -f gateway
+# Check API logs
+docker compose logs -f api
 ```
 
 ### Authentication Errors
@@ -312,7 +315,7 @@ docker compose logs -f gateway
 1. Reload VS Code window
 2. Restart Continue extension
 3. Check Continue extension version (update if needed)
-4. Verify ContextIQ gateway is healthy: `curl http://localhost:8080/health`
+4. Verify ContextIQ API is healthy: `curl http://localhost:8000/healthz`
 
 ## Advanced Configuration
 
@@ -324,7 +327,7 @@ docker compose logs -f gateway
     {
       "name": "contextiq",
       "type": "http",
-      "url": "http://localhost:8080/mcp/sse",
+      "url": "http://localhost:8000/mcp/sse/",
       "headers": {
         "Authorization": "Bearer ${CONTEXTIQ_TOKEN}"
       },
@@ -344,7 +347,7 @@ docker compose logs -f gateway
     {
       "name": "contextiq",
       "type": "http",
-      "url": "http://localhost:8080/mcp/sse",
+      "url": "http://localhost:8000/mcp/sse/",
       "headers": {
         "Authorization": "Bearer ${CONTEXTIQ_TOKEN}"
       },
@@ -362,7 +365,7 @@ docker compose logs -f gateway
     {
       "name": "contextiq",
       "type": "http",
-      "url": "http://localhost:8080/mcp/sse",
+      "url": "http://localhost:8000/mcp/sse/",
       "headers": {
         "Authorization": "Bearer ${CONTEXTIQ_TOKEN}",
         "X-Repository": "my-repo",
@@ -405,7 +408,7 @@ Continue can combine ContextIQ with other context providers:
     {
       "name": "contextiq",
       "type": "http",
-      "url": "http://localhost:8080/mcp/sse",
+      "url": "http://localhost:8000/mcp/sse/",
       "headers": {
         "Authorization": "Bearer ${CONTEXTIQ_TOKEN}"
       }
@@ -477,7 +480,7 @@ Compare the frontend and backend authentication approaches
     {
       "name": "contextiq",
       "type": "http",
-      "url": "http://localhost:8080/mcp/sse",
+      "url": "http://localhost:8000/mcp/sse/",
       "headers": {
         "Authorization": "Bearer ${CONTEXTIQ_TOKEN}"
       },
@@ -502,8 +505,8 @@ Default Continue shortcuts that work with ContextIQ:
 ## Support
 
 - **Continue Logs**: Extensions → Continue → Right-click → Show Logs
-- **ContextIQ Logs**: `docker compose logs -f gateway`
-- **Test Connection**: `curl -H "Authorization: Bearer $CONTEXTIQ_TOKEN" http://localhost:8080/mcp/sse`
+- **ContextIQ Logs**: `docker compose logs -f api`
+- **Test Connection**: `curl -H "Authorization: Bearer $CONTEXTIQ_TOKEN" -H "Accept: text/event-stream" http://localhost:8000/mcp/sse/`
 - **Documentation**: 
   - [Continue Docs](https://continue.dev/docs)
   - [ContextIQ MCP Setup](./mcp-client-setup.md)

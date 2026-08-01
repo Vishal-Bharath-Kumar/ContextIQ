@@ -5,11 +5,11 @@ that never splits a chunk and never exceeds the allocated token quota.
 """
 from __future__ import annotations
 
-import tiktoken
+from src.llm.token_encoding import get_cl100k_encoding
 
 # Module-level singleton — initialised once at import time.
 # cl100k_base is the encoding used by GPT-3.5/GPT-4 and most hosted LLMs.
-_enc = tiktoken.get_encoding("cl100k_base")
+_enc = get_cl100k_encoding()
 
 
 def truncate_to_budget(chunks: list[str], token_budget: int) -> list[str]:

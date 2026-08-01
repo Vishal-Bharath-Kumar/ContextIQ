@@ -24,6 +24,7 @@ import logging
 from unittest.mock import Mock
 
 from fastmcp import FastMCP
+from mcp.types import Tool as MCPTool
 from opentelemetry import trace
 from prometheus_client import Counter
 
@@ -77,7 +78,7 @@ def register_tools_list_handler(
         registrar_factory = mcp.list_tools
 
     @registrar_factory()
-    async def handle_tools_list() -> list[ToolDefinition]:
+    async def handle_tools_list() -> list[MCPTool]:
         """Return the active tool definitions sorted by name (ASC)."""
         with _tracer.start_as_current_span("mcp.tools.list") as span:
             logger.debug("tools/list: fetching active tools from registry")
@@ -93,7 +94,7 @@ def register_tools_list_handler(
             span.set_attribute("contextiq.cache.hit", cache_hit)
             tools_list_calls_total.labels(cache_hit=str(cache_hit).lower()).inc()
             logger.debug("tools/list: returning %d tool(s)", tool_count)
-            return merged_tools
+            return [_to_mcp_tool(tool) for tool in merged_tools]
 
 
 async def _list_builtin_tool_definitions(mcp: FastMCP) -> list[ToolDefinition]:
@@ -125,4 +126,15 @@ async def _list_builtin_tool_definitions(mcp: FastMCP) -> list[ToolDefinition]:
             )
         )
     return results
+
+
+def _to_mcp_tool(tool: ToolDefinition) -> MCPTool:
+    payload: dict[str, object] = {
+        "name": tool.name,
+        "description": tool.description,
+        "inputSchema": tool.inputSchema.model_dump(),
+    }
+    if tool.output_schema is not None:
+        payload["outputSchema"] = tool.output_schema
+    return MCPTool.model_validate(payload)
 

@@ -45,6 +45,21 @@ def _make_api_item(n: int = 1) -> dict:
     }
 
 
+def _make_real_api_item(n: int = 1) -> dict:
+    return {
+        "name": f"file{n}.py",
+        "path": f"src/file{n}.py",
+        "repository": {
+            "name": "repo",
+            "full_name": "owner/repo",
+            "owner": {"login": "owner"},
+        },
+        "html_url": f"https://github.com/owner/repo/blob/main/src/file{n}.py",
+        "sha": f"abc{n:04d}",
+        "url": f"https://api.github.com/repos/owner/repo/git/blobs/abc{n:04d}",
+    }
+
+
 # ---------------------------------------------------------------------------
 # search_code — happy path
 # ---------------------------------------------------------------------------
@@ -75,6 +90,17 @@ class TestSearchCodeHappyPath:
 
         assert len(result) == 30
         assert all(isinstance(r, GitHubFileItem) for r in result)
+
+    @respx.mock
+    async def test_accepts_real_github_repository_object_shape(self) -> None:
+        respx.get(_SEARCH_URL).mock(
+            return_value=httpx.Response(200, json={"items": [_make_real_api_item(1)]})
+        )
+        client = GitHubSearchClient(_make_config())
+        result = await client.search_code("auth", ["owner/repo"], _AUTH_HEADER)
+
+        assert len(result) == 1
+        assert result[0].repository == "owner/repo"
 
     @respx.mock
     async def test_max_results_caps_output(self) -> None:

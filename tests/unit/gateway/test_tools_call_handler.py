@@ -21,6 +21,7 @@ import pytest
 from mcp.types import TextContent
 
 from src.gateway.clients.agent_worker_client import AgentWorkerClient
+from src.gateway.context.request_context import RequestContext
 from src.gateway.handlers.tools_call import register_tools_call_handler, set_user_id_context
 from src.gateway.schemas.call_types import ToolCallDispatch, ToolCallOutput, ToolCallResponse
 from src.gateway.schemas.tool_types import InputSchema, ToolDefinition, ToolListResult
@@ -198,6 +199,30 @@ class TestHandleToolCallValid:
         # limit is optional — should not raise
         result = await handler("flexible", {"q": "hello"})
         assert len(result) == 1
+
+    @pytest.mark.asyncio
+    async def test_info_log_emitted_for_tool_call(self) -> None:
+        handler, _, _ = _build_handler([_make_tool("search")])
+        ctx = RequestContext(
+            request_id="123e4567-e89b-42d3-a456-426614174000",
+            user_id="log-user",
+            username="logger",
+            roles=frozenset(),
+            session_id="sess-123",
+            trace_id=0,
+        )
+
+        with patch("src.gateway.handlers.tools_call.runtime_logger.info") as mock_info:
+            with patch("src.gateway.handlers.tools_call.get_request_context", return_value=ctx):
+                await handler("search", {"query": "hello"})
+
+        call_args = mock_info.call_args[0]
+        assert call_args[0] == "tools/call received: tool=%s request_id=%s session_id=%s user_id=%s execution=%s"
+        assert call_args[1] == "search"
+        assert call_args[2] == "123e4567-e89b-42d3-a456-426614174000"
+        assert call_args[3] == "sess-123"
+        assert call_args[4] == "log-user"
+        assert call_args[5] == "agent_worker"
 
 
 class TestHandleToolCallBuiltinFallback:

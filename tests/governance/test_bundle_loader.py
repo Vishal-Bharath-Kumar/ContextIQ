@@ -71,3 +71,32 @@ async def test_bundle_loader_raises_when_bundle_never_activates() -> None:
     with patch("src.governance.opa.bundle_loader.asyncio.sleep", new_callable=AsyncMock):
         with pytest.raises(BundleNotReadyError):
             await loader.verify()
+
+
+@respx.mock
+async def test_bundle_loader_accepts_local_inline_policy_when_status_unavailable() -> None:
+    respx.get("http://localhost:8181/v1/status").mock(
+        return_value=httpx.Response(
+            500,
+            json={"code": "internal_error", "message": "status plugin not enabled"},
+        )
+    )
+    respx.get("http://localhost:8181/v1/policies").mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "result": [
+                    {
+                        "id": "contextiq_authz.rego",
+                        "raw": "package contextiq.authz\n\ndefault allow := false",
+                    }
+                ]
+            },
+        )
+    )
+
+    settings = OPAClientSettings(expected_bundle_name="contextiq_policies")
+    loader = PolicyBundleLoader(settings)
+    info = await loader.verify()
+
+    assert info.version == "local-inline-policy"

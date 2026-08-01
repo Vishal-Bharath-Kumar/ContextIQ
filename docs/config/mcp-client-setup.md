@@ -34,8 +34,8 @@ Ensure ContextIQ is running and accessible:
 # Local development
 docker compose up -d
 
-# Verify the gateway is running
-curl http://localhost:8080/health
+# Verify the API service is running
+curl http://localhost:8000/healthz
 ```
 
 ### 2. Authentication Token
@@ -54,7 +54,7 @@ export CONTEXTIQ_PROD_TOKEN="your-production-jwt-token"
 
 ### 3. Network Access
 
-- **Local**: ContextIQ should be accessible at `http://localhost:8080`
+- **Local**: ContextIQ should be accessible at `http://localhost:8000`
 - **Production**: Configure your production URL (e.g., `https://contextiq.example.com`)
 - Ensure firewall rules allow access to the MCP endpoints
 
@@ -72,7 +72,7 @@ export CONTEXTIQ_PROD_TOKEN="your-production-jwt-token"
   "mcpServers": {
     "contextiq": {
       "type": "http",
-      "url": "http://localhost:8080/mcp/sse",
+      "url": "http://localhost:8000/mcp/sse/",
       "headers": {
         "Authorization": "Bearer ${CONTEXTIQ_TOKEN}",
         "Content-Type": "application/json"
@@ -101,7 +101,7 @@ export CONTEXTIQ_PROD_TOKEN="your-production-jwt-token"
   "servers": {
     "contextiq": {
       "type": "http",
-      "url": "http://localhost:8080/mcp/sse",
+      "url": "http://localhost:8000/mcp/sse/",
       "headers": {
         "Authorization": "Bearer ${env:CONTEXTIQ_TOKEN}",
         "Content-Type": "application/json"
@@ -128,7 +128,7 @@ export CONTEXTIQ_PROD_TOKEN="your-production-jwt-token"
   "servers": {
     "contextiq": {
       "type": "http",
-      "url": "http://localhost:8080/mcp/sse",
+      "url": "http://localhost:8000/mcp/sse/",
       "headers": {
         "Authorization": "Bearer ${env:CONTEXTIQ_TOKEN}",
         "Content-Type": "application/json"
@@ -155,7 +155,7 @@ export CONTEXTIQ_PROD_TOKEN="your-production-jwt-token"
 {
   "mcpServers": {
     "contextiq": {
-      "url": "http://localhost:8080/mcp/sse",
+      "url": "http://localhost:8000/mcp/sse/",
       "transport": "http",
       "auth": {
         "type": "bearer",
@@ -178,7 +178,7 @@ export CONTEXTIQ_PROD_TOKEN="your-production-jwt-token"
     {
       "name": "contextiq",
       "type": "http",
-      "url": "http://localhost:8080/mcp/sse",
+      "url": "http://localhost:8000/mcp/sse/",
       "headers": {
         "Authorization": "Bearer ${CONTEXTIQ_TOKEN}"
       }
@@ -198,7 +198,7 @@ These extensions typically read from `.vscode/mcp.json` in your workspace.
   "servers": {
     "contextiq": {
       "type": "http",
-      "url": "http://localhost:8080/mcp/sse",
+      "url": "http://localhost:8000/mcp/sse/",
       "headers": {
         "Authorization": "Bearer ${env:CONTEXTIQ_TOKEN}"
       }
@@ -214,12 +214,13 @@ These extensions typically read from `.vscode/mcp.json` in your workspace.
 ContextIQ supports two MCP transports:
 
 ### Server-Sent Events (SSE) - Recommended
-- **Endpoint**: `http://localhost:8080/mcp/sse`
+- **Endpoint**: `http://localhost:8000/mcp/sse/`
 - **Best for**: Most AI assistants, long-running operations
 - **Protocol**: HTTP with streaming responses
 
 ### WebSocket (WS)
-- **Endpoint**: `ws://localhost:8080/mcp/ws`
+- **Endpoint**: `ws://localhost:8000/mcp/ws`
+- **Note**: the default local Docker Compose stack publishes the SSE endpoint on the `api` service. Use WebSocket only if you separately expose that route.
 - **Best for**: Real-time bidirectional communication
 - **Protocol**: WebSocket with persistent connection
 
@@ -228,7 +229,7 @@ Example WebSocket configuration:
 {
   "contextiq-ws": {
     "type": "websocket",
-    "url": "ws://localhost:8080/mcp/ws",
+    "url": "ws://localhost:8000/mcp/ws",
     "headers": {
       "Authorization": "Bearer ${env:CONTEXTIQ_TOKEN}"
     }
@@ -290,15 +291,10 @@ Test your connection using curl:
 
 ```bash
 # Test SSE endpoint
-curl -H "Authorization: Bearer $CONTEXTIQ_TOKEN" \
-     http://localhost:8080/mcp/sse
-
-# List available tools
-curl -X POST \
-     -H "Authorization: Bearer $CONTEXTIQ_TOKEN" \
-     -H "Content-Type: application/json" \
-     -d '{"jsonrpc":"2.0","method":"tools/list","id":1}' \
-     http://localhost:8080/mcp/sse
+curl --max-time 5 \
+  -H "Authorization: Bearer $CONTEXTIQ_TOKEN" \
+  -H "Accept: text/event-stream" \
+  http://localhost:8000/mcp/sse/
 ```
 
 ---
@@ -307,8 +303,8 @@ curl -X POST \
 
 ### Connection Refused
 - Verify ContextIQ is running: `docker compose ps`
-- Check gateway logs: `docker compose logs gateway`
-- Ensure port 8080 is not blocked
+- Check API logs: `docker compose logs api`
+- Ensure port 8000 is not blocked
 
 ### Authentication Failed
 - Verify token is set: `echo $CONTEXTIQ_TOKEN`
@@ -321,15 +317,15 @@ curl -X POST \
 - Verify `capabilities.tools` is set to `true`
 
 ### Logs
-View ContextIQ gateway logs:
+View ContextIQ API logs:
 ```bash
-docker compose logs -f gateway
+docker compose logs -f api
 ```
 
 Enable debug logging:
 ```bash
 export CONTEXTIQ_LOG_LEVEL=DEBUG
-docker compose restart gateway
+docker compose restart api
 ```
 
 ---
@@ -409,7 +405,7 @@ ContextIQ supports working across multiple repositories:
 {
   "contextiq-repo-a": {
     "type": "http",
-    "url": "http://localhost:8080/mcp/sse",
+    "url": "http://localhost:8000/mcp/sse/",
     "headers": {
       "Authorization": "Bearer ${env:CONTEXTIQ_TOKEN}",
       "X-Repository": "repo-a",
@@ -418,7 +414,7 @@ ContextIQ supports working across multiple repositories:
   },
   "contextiq-repo-b": {
     "type": "http",
-    "url": "http://localhost:8080/mcp/sse",
+    "url": "http://localhost:8000/mcp/sse/",
     "headers": {
       "Authorization": "Bearer ${env:CONTEXTIQ_TOKEN}",
       "X-Repository": "repo-b",
@@ -446,7 +442,7 @@ Use custom headers to scope requests:
 {
   "contextiq": {
     "type": "http",
-    "url": "http://localhost:8080/mcp/sse",
+    "url": "http://localhost:8000/mcp/sse/",
     "headers": {
       "Authorization": "Bearer ${env:CONTEXTIQ_TOKEN}"
     },
@@ -463,7 +459,7 @@ Use custom headers to scope requests:
 {
   "contextiq": {
     "type": "http",
-    "url": "http://localhost:8080/mcp/sse",
+    "url": "http://localhost:8000/mcp/sse/",
     "proxy": "http://proxy.example.com:8080",
     "headers": {
       "Authorization": "Bearer ${env:CONTEXTIQ_TOKEN}"
@@ -477,7 +473,7 @@ Use custom headers to scope requests:
 ## Support
 
 For issues or questions:
-- Check logs: `docker compose logs gateway`
+- Check logs: `docker compose logs api`
 - Review documentation: `docs/api/mcp-response-schemas.md`
 - Contact: support@contextiq.example.com
 

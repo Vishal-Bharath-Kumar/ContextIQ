@@ -351,6 +351,37 @@ async def test_bundle_loader_raises_on_all_http_errors(
             await loader.verify()
 
 
+@respx.mock
+async def test_bundle_loader_accepts_local_inline_policy_when_status_plugin_disabled(
+    settings: OPAClientSettings,
+) -> None:
+    respx.get("http://localhost:8181/v1/status").mock(
+        return_value=httpx.Response(
+            500,
+            json={"code": "internal_error", "message": "status plugin not enabled"},
+        )
+    )
+    respx.get("http://localhost:8181/v1/policies").mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "result": [
+                    {
+                        "id": "contextiq_authz.rego",
+                        "raw": "package contextiq.authz\n\ndefault allow := false",
+                    }
+                ]
+            },
+        )
+    )
+
+    loader = PolicyBundleLoader(settings=settings)
+    info = await loader.verify()
+
+    assert info.version == "local-inline-policy"
+    assert info.source_url == "http://localhost:8181"
+
+
 # ---------------------------------------------------------------------------
 # TASK-US032-05 — AC-2: required fields sent to OPA (named per acceptance criteria)
 # ---------------------------------------------------------------------------

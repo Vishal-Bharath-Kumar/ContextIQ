@@ -16,6 +16,7 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
+import httpx
 import pytest
 
 from src.connector_sdk.exceptions import ConnectorAuthError  # noqa: E402
@@ -64,6 +65,7 @@ class TestGitHubConnectorConfig:
         )
         assert config.default_days == 30
         assert config.base_url == "https://api.github.com"
+        assert config.fetch_timeout_s == 8.0
         assert config.repos == []
 
     def test_repos_list(self) -> None:
@@ -189,7 +191,10 @@ class TestGitHubConnector:
         connector = GitHubConnector(config=config)
         mock_client = _mock_vault_client(token="ghp_success")
 
-        with patch("src.connectors.github.auth.hvac.Client", return_value=mock_client):
+        with patch("src.connectors.github.auth.hvac.Client", return_value=mock_client), patch(
+            "httpx.AsyncClient.get",
+            return_value=httpx.Response(200, json={"rate": {"remaining": 4999}}),
+        ):
             await connector.authenticate()
 
         assert connector._credential is not None
@@ -235,7 +240,10 @@ class TestGitHubConnector:
         connector = GitHubConnector(config=config)
         mock_client = _mock_vault_client(token="ghp_bearer")
 
-        with patch("src.connectors.github.auth.hvac.Client", return_value=mock_client):
+        with patch("src.connectors.github.auth.hvac.Client", return_value=mock_client), patch(
+            "httpx.AsyncClient.get",
+            return_value=httpx.Response(200, json={"rate": {"remaining": 4999}}),
+        ):
             await connector.authenticate()
 
         headers = connector._auth_header()
@@ -248,9 +256,27 @@ class TestGitHubConnector:
         connector = GitHubConnector(config=config)
         mock_client = _mock_vault_client(token="ghp_cached")
 
-        with patch("src.connectors.github.auth.hvac.Client", return_value=mock_client):
+        with patch("src.connectors.github.auth.hvac.Client", return_value=mock_client), patch(
+            "httpx.AsyncClient.get",
+            return_value=httpx.Response(200, json={"rate": {"remaining": 4999}}),
+        ):
             await connector.authenticate()
 
         h1 = connector._auth_header()
         h2 = connector._auth_header()
         assert h1 == h2
+
+    @pytest.mark.asyncio
+    async def test_authenticate_raises_when_github_token_invalid(self) -> None:
+        config = _make_config()
+        connector = GitHubConnector(config=config)
+        mock_client = _mock_vault_client(token="ghp_invalid")
+
+        with patch("src.connectors.github.auth.hvac.Client", return_value=mock_client), patch(
+            "httpx.AsyncClient.get",
+            return_value=httpx.Response(401, json={"message": "Bad credentials"}),
+        ):
+            with pytest.raises(ConnectorAuthError, match="GitHub credential validation failed"):
+                await connector.authenticate()
+
+        assert connector._credential is None

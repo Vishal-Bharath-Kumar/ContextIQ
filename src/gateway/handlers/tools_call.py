@@ -29,6 +29,7 @@ import time
 from contextvars import ContextVar
 from unittest.mock import Mock
 from uuid import uuid4
+from typing import Any
 
 import httpx
 import jsonschema
@@ -51,6 +52,7 @@ from src.gateway.schemas.clarification_response import ClarificationNeededRespon
 from src.gateway.services.tool_registry import ToolRegistryService
 
 logger = logging.getLogger(__name__)
+runtime_logger = logging.getLogger("uvicorn.error")
 
 _tracer = trace.get_tracer("contextiq.gateway")
 
@@ -101,8 +103,8 @@ def set_user_id_context(user_id: str) -> None:
     _user_id_ctx.set(user_id)
 
 
-def _resolve_request_context() -> tuple[str, str, str]:
-    """Return ``(request_id, user_id, trace_id_hex)`` for the current invocation.
+def _resolve_request_context() -> tuple[str, str, str, str]:
+    """Return ``(request_id, user_id, session_id, trace_id_hex)`` for the current invocation.
 
     Prefers the full ``RequestContext`` populated by ``RequestContextMiddleware``.
     Falls back to generating a fresh ``request_id`` and reading ``_user_id_ctx``
@@ -111,12 +113,12 @@ def _resolve_request_context() -> tuple[str, str, str]:
     try:
         ctx = get_request_context()
         trace_id_hex = format(ctx.trace_id, "032x") if ctx.trace_id else "0" * 32
-        return ctx.request_id, ctx.user_id, trace_id_hex
+        return ctx.request_id, ctx.user_id, ctx.session_id, trace_id_hex
     except LookupError:
         # Middleware not present — generate a fresh request_id and fall back.
         span_ctx = trace.get_current_span().get_span_context()
         trace_id_hex = format(span_ctx.trace_id, "032x") if span_ctx.trace_id else "0" * 32
-        return str(uuid4()), _user_id_ctx.get(), trace_id_hex
+        return str(uuid4()), _user_id_ctx.get(), "unknown", trace_id_hex
 
 
 def _record_span_outcome(span: trace.Span, elapsed_seconds: float, *, success: bool) -> None:  # type: ignore[name-defined]
@@ -195,7 +197,7 @@ def register_tools_call_handler(
                 tool_def = _builtin_tool_definition(builtin_tool)
 
             # 2. Validate arguments against the tool's JSON Schema.
-            schema = tool_def.inputSchema.model_dump()
+            schema = _normalise_json_schema(getattr(tool_def, "inputSchema", {}))
             try:
                 jsonschema.validate(instance=arguments, schema=schema)
             except jsonschema.ValidationError as exc:
@@ -204,7 +206,7 @@ def register_tools_call_handler(
 
             # 3. Build dispatch payload — sourced from RequestContext so that
             #    concurrent tasks each carry their own isolated identifiers.
-            request_id, user_id, trace_id_hex = _resolve_request_context()
+            request_id, user_id, session_id, trace_id_hex = _resolve_request_context()
             dispatch = ToolCallDispatch(
                 request_id=request_id,
                 user_id=user_id,
@@ -215,8 +217,17 @@ def register_tools_call_handler(
 
             # TASK-US003-05: Enrich root span with correlation + user identity.
             span.set_attribute("mcp.request_id", dispatch.request_id)
+            span.set_attribute("mcp.session_id", session_id)
             span.set_attribute("mcp.tools.call.request_id", dispatch.request_id)  # kept for compat
             span.set_attribute("contextiq.user_id", user_id)
+            runtime_logger.info(
+                "tools/call received: tool=%s request_id=%s session_id=%s user_id=%s execution=%s",
+                name,
+                dispatch.request_id,
+                session_id,
+                user_id,
+                "builtin" if builtin_tool is not None else "agent_worker",
+            )
 
             # 4. Forward to Agent Worker.
             client = effective_client if effective_client is not None else _default_client
@@ -310,6 +321,14 @@ async def _get_builtin_tool(mcp: FastMCP, name: str) -> object | None:
     except Exception:
         logger.debug("tools/call: built-in tool lookup failed for %s", name, exc_info=True)
         return None
+
+
+def _normalise_json_schema(schema: Any) -> dict[str, Any]:
+    if hasattr(schema, "model_dump"):
+        schema = schema.model_dump()
+    if isinstance(schema, dict):
+        return schema
+    return {}
 
 
 def _builtin_tool_definition(tool: object):

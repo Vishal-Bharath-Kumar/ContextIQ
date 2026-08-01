@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 import time
 
 from opentelemetry import trace
@@ -45,6 +46,42 @@ __all__ = [
     "FailedSource",
     "ParallelConnectorDispatcher",
 ]
+
+_DEFAULT_MAX_RESULTS = 10
+_PER_CONNECTOR_MAX_RESULTS: dict[str, int] = {
+    "github": 2,
+}
+
+_CODE_RELATED_INTENTS: set[str] = {"debugging", "code-gen", "code-review"}
+_CODE_FOCUSED_PHRASES: tuple[str, ...] = (
+    "source code",
+    "code file",
+    "code files",
+    "implementation",
+    "class ",
+    "function",
+    "middleware",
+    "router",
+    "endpoint",
+)
+_CODE_SEARCH_STOPWORDS: set[str] = {
+    "use", "the", "contextiq", "mcp", "tool", "generate_context",
+    "to", "find", "real", "code", "related",
+    "this", "repository", "include", "retrieved", "sources",
+    "governance", "summary", "and", "selected", "model", "in", "for",
+    "how", "with", "from", "that", "into", "about", "request",
+    "requests", "flow", "return", "caller", "local", "repo", "github",
+    "available", "explicitly", "evidence", "fix", "working", "answer",
+    "concrete", "items", "raw", "package", "json", "empty", "say",
+    "full", "after", "before", "why", "now", "still",
+}
+_TECHNICAL_KEYWORDS: set[str] = {
+    "fastapi", "jwt", "auth", "middleware", "connector", "registry",
+    "router", "routing", "policy", "opa", "governance", "retrieval",
+    "context", "graph", "langgraph", "pydantic", "sqlalchemy", "keycloak",
+    "vault", "kafka", "redis", "qdrant", "opensearch", "neo4j", "source",
+}
+_TOKEN_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]{2,}")
 
 # ---------------------------------------------------------------------------
 # Typed exceptions
@@ -146,6 +183,7 @@ class ParallelConnectorDispatcher:
         query: str,
         source_ids: list[str],
         token_budget_per_source: dict[str, int],
+        intent_type: str | None = None,
     ) -> FetchAllResult:
         """Fetch from all requested active sources concurrently.
 
@@ -193,6 +231,7 @@ class ParallelConnectorDispatcher:
                 connector=connector,
                 query=query,
                 token_budget=token_budget_per_source.get(src),
+                intent_type=intent_type,
             )
             for src, connector in dispatchable
         ]
@@ -233,6 +272,7 @@ class ParallelConnectorDispatcher:
         connector: BaseConnector,
         query: str,
         token_budget: int | None,
+        intent_type: str | None = None,
     ) -> _FetchResult:
         """Fetch from a single connector with a hard timeout.
 
@@ -264,7 +304,20 @@ class ParallelConnectorDispatcher:
             if token_budget is not None:
                 filters["token_budget"] = str(token_budget)
 
-            connector_query = ConnectorQuery(query=query, filters=filters)
+            rewritten_query = _rewrite_query_for_connector(
+                connector_type=connector_type,
+                query=query,
+                intent_type=intent_type,
+            )
+            max_results = _PER_CONNECTOR_MAX_RESULTS.get(
+                connector_type,
+                _DEFAULT_MAX_RESULTS,
+            )
+            connector_query = ConnectorQuery(
+                query=rewritten_query,
+                filters=filters,
+                max_results=max_results,
+            )
             timeout = self._get_timeout(source_id)
             t_start = time.monotonic()
 
@@ -345,3 +398,61 @@ class ParallelConnectorDispatcher:
                 span.record_exception(exc)
                 span.set_status(StatusCode.ERROR, str(exc))
                 raise
+
+
+def _rewrite_query_for_connector(
+    *,
+    connector_type: str,
+    query: str,
+    intent_type: str | None,
+) -> str:
+    if connector_type != "github":
+        return query
+
+    stripped = query.strip()
+    if not stripped:
+        return stripped
+
+    if any(qualifier in stripped for qualifier in ("repo:", "path:", "language:", "filename:", "extension:")):
+        return stripped
+
+    candidates: list[tuple[int, int, str]] = []
+    seen: set[str] = set()
+    for index, match in enumerate(_TOKEN_RE.finditer(stripped)):
+        token = match.group(0)
+        key = token.lower()
+        if key in seen or key in _CODE_SEARCH_STOPWORDS:
+            continue
+        seen.add(key)
+        score = 0
+        if any(ch.isupper() for ch in token[1:]):
+            score += 4
+        if key in _TECHNICAL_KEYWORDS:
+            score += 3
+        if len(token) >= 8:
+            score += 1
+        candidates.append((score, index, token))
+
+    if not candidates:
+        return stripped
+
+    selected = [
+        token
+        for score, _idx, token in sorted(candidates, key=lambda item: (-item[0], item[1]))
+        if score > 0
+    ][:4]
+
+    if not selected:
+        selected = [token for _score, _idx, token in candidates[:3]]
+
+    rewritten = " ".join(selected)
+    if _is_code_related_query(intent_type, stripped) and "path:src" not in rewritten:
+        rewritten = f"{rewritten} path:src"
+    return rewritten
+
+
+def _is_code_related_query(intent_type: str | None, query: str) -> bool:
+    if intent_type in _CODE_RELATED_INTENTS:
+        return True
+    lowered = query.lower()
+    return any(phrase in lowered for phrase in _CODE_FOCUSED_PHRASES)

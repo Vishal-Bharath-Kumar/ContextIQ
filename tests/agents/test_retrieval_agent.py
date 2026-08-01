@@ -306,6 +306,62 @@ class TestParallelConnectorDispatcherTokenBudget:
         query_arg: ConnectorQuery = call_args[0][0]
         assert "token_budget" not in query_arg.filters
 
+    async def test_github_query_rewritten_for_code_related_intent(self) -> None:
+        connector = _make_mock_connector([])
+        registry = _make_registry({"github": connector})
+        dispatcher = ParallelConnectorDispatcher(registry, timeout_seconds=5.0)
+
+        await dispatcher.fetch_all(
+            query="Use the ContextIQ MCP generate_context tool to find real source code context related to FastAPI in this repository.",
+            source_ids=["github"],
+            token_budget_per_source={},
+            intent_type="code-gen",
+        )
+
+        query_arg: ConnectorQuery = connector.fetch.call_args[0][0]
+        assert "FastAPI" in query_arg.query
+        assert "path:src" in query_arg.query
+
+    async def test_github_query_rewritten_for_code_focused_prompt_even_if_non_code_intent(self) -> None:
+        connector = _make_mock_connector([])
+        registry = _make_registry({"github": connector})
+        dispatcher = ParallelConnectorDispatcher(registry, timeout_seconds=5.0)
+
+        await dispatcher.fetch_all(
+            query="Find real source code context related to FastAPI in this repository.",
+            source_ids=["github"],
+            token_budget_per_source={},
+            intent_type="docs",
+        )
+
+        query_arg: ConnectorQuery = connector.fetch.call_args[0][0]
+        assert "FastAPI" in query_arg.query
+        assert "path:src" in query_arg.query
+
+    async def test_github_query_rewrite_drops_low_signal_prompt_words(self) -> None:
+        connector = _make_mock_connector([])
+        registry = _make_registry({"github": connector})
+        dispatcher = ParallelConnectorDispatcher(registry, timeout_seconds=5.0)
+
+        await dispatcher.fetch_all(
+            query=(
+                "Explain why the local ContextIQ repo retrieval is now working after the GitHub source fix. "
+                "Base the answer only on ContextIQ-retrieved evidence. Include concrete retrieved items "
+                "from the ContextIQ GitHub source if available."
+            ),
+            source_ids=["github"],
+            token_budget_per_source={},
+            intent_type="debugging",
+        )
+
+        query_arg: ConnectorQuery = connector.fetch.call_args[0][0]
+        assert "retrieval" in query_arg.query
+        assert "source" in query_arg.query
+        assert "path:src" in query_arg.query
+        assert "evidence" not in query_arg.query.lower()
+        assert "available" not in query_arg.query.lower()
+        assert "contextiq" not in query_arg.query.lower()
+
 
 # ---------------------------------------------------------------------------
 # retrieval_node tests
@@ -366,3 +422,32 @@ class TestRetrievalNode:
         registry = _make_registry({})
         set_connector_registry(registry)
         assert get_connector_registry() is registry
+
+    async def test_code_related_intent_prefers_source_code_over_docs(self) -> None:
+        code = ConnectorResult(
+            source_id="code-1",
+            content="def app(): return 'ok'",
+            metadata=ResultMetadata(
+                source_url="https://example.com/src/main.py",
+                extra={"file_path": "src/main.py"},
+            ),
+            fetched_at=datetime(2026, 7, 16, tzinfo=UTC),
+        )
+        docs = ConnectorResult(
+            source_id="doc-1",
+            content="# README",
+            metadata=ResultMetadata(
+                source_url="https://example.com/docs/README.md",
+                extra={"file_path": "docs/README.md"},
+            ),
+            fetched_at=datetime(2026, 7, 16, tzinfo=UTC),
+        )
+        connector = _make_mock_connector([docs, code])
+        registry = _make_registry({"github": connector})
+        set_connector_registry(registry)
+
+        state = _make_state(intent_type="code-gen")
+        result = await retrieval_node(state)
+
+        assert result["raw_context"][0]["metadata"]["file_path"] == "docs/README.md"
+        assert result["ranked_context"][0]["metadata"]["file_path"] == "src/main.py"

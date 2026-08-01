@@ -33,6 +33,7 @@ _TOKEN = "ghp_test_token"
 def _make_config(**overrides: object) -> GitHubConnectorConfig:
     defaults: dict[str, object] = {
         "base_url": _BASE_URL,
+        "fetch_timeout_s": 8.0,
         "request_timeout_s": 10.0,
         "repos": ["owner/repo"],
     }
@@ -55,6 +56,10 @@ def _content_url(path: str) -> str:
     return f"{_BASE_URL}/repos/owner/repo/contents/{path}"
 
 
+def _trees_url(repo: str = "owner/repo", branch: str = "main") -> str:
+    return f"{_BASE_URL}/repos/{repo}/git/trees/{branch}"
+
+
 def _commits_url() -> str:
     return f"{_BASE_URL}/repos/owner/repo/commits"
 
@@ -70,6 +75,10 @@ def _make_commit_response(sha: str = "commitabc123", date: str = "2024-01-15T10:
     ]
 
 
+def _tree_response(paths: list[tuple[str, str]]) -> dict:
+    return {"tree": [{"path": p, "type": t} for p, t in paths]}
+
+
 async def _authenticated_connector(config: GitHubConnectorConfig | None = None) -> GitHubConnector:
     """Return a connector with authenticate() already called (token mocked)."""
     connector = GitHubConnector(config or _make_config())
@@ -79,6 +88,10 @@ async def _authenticated_connector(config: GitHubConnectorConfig | None = None) 
         new=AsyncMock(
             return_value=type("Cred", (), {"token": _TOKEN})()
         ),
+    ), patch.object(
+        connector,
+        "health_check",
+        new=AsyncMock(return_value=type("Health", (), {"healthy": True, "message": "ok"})()),
     ):
         await connector.authenticate()
     return connector
@@ -203,13 +216,13 @@ class TestFetchMetadataExtra:
 
 class TestFetchTimeout:
     async def test_raises_timeout_error_on_slow_fetch(self) -> None:
-        """fetch() must raise asyncio.TimeoutError when enrichment exceeds 2 s."""
+        """fetch() must raise asyncio.TimeoutError when enrichment exceeds the configured budget."""
 
         async def _slow_inner(_query: ConnectorQuery) -> list[ConnectorResult]:
             await asyncio.sleep(10)
             return []
 
-        connector = await _authenticated_connector()
+        connector = await _authenticated_connector(_make_config(fetch_timeout_s=0.01))
         with patch.object(connector, "_fetch_inner", side_effect=_slow_inner):
             with pytest.raises(asyncio.TimeoutError):
                 await connector.fetch(ConnectorQuery(query="slow"))
@@ -260,6 +273,57 @@ class TestFetchEnrichmentFailures:
         results = await connector.fetch(ConnectorQuery(query="missing"))
 
         assert results == []
+
+
+class TestFetchFallbackPathSearch:
+    @respx.mock
+    async def test_falls_back_to_repo_paths_when_code_search_is_empty(self) -> None:
+        respx.get(_SEARCH_URL).mock(
+            return_value=httpx.Response(200, json={"items": []})
+        )
+        respx.get(_trees_url("owner/repo", "main")).mock(
+            return_value=httpx.Response(
+                200,
+                json=_tree_response(
+                    [
+                        (".github/skills/helper.py", "blob"),
+                        ("docs/BRD.md", "blob"),
+                        ("src/agents/nodes/retrieval.py", "blob"),
+                        ("src/gateway/tools/enterprise/context_tools.py", "blob"),
+                    ]
+                ),
+            )
+        )
+        respx.get(_content_url(".github/skills/helper.py")).mock(
+            return_value=httpx.Response(200, text="helper code")
+        )
+        respx.get(_content_url("src/agents/nodes/retrieval.py")).mock(
+            return_value=httpx.Response(200, text="retrieval_node code")
+        )
+        respx.get(_content_url("src/gateway/tools/enterprise/context_tools.py")).mock(
+            return_value=httpx.Response(200, text="generate_context code")
+        )
+        respx.get(_commits_url()).mock(
+            return_value=httpx.Response(200, json=_make_commit_response())
+        )
+
+        connector = await _authenticated_connector()
+        results = await connector.fetch(
+            ConnectorQuery(
+                query=(
+                    "Explain why the local ContextIQ repo retrieval is now working after the GitHub source fix. "
+                    "Base the answer only on ContextIQ-retrieved evidence."
+                ),
+                max_results=2,
+            )
+        )
+
+        assert len(results) == 2
+        assert {result.source_id for result in results} == {
+            "github:owner/repo:src/agents/nodes/retrieval.py",
+            "github:owner/repo:src/gateway/tools/enterprise/context_tools.py",
+        }
+        assert all(result.metadata.extra["branch"] == "main" for result in results)
 
 
 # ---------------------------------------------------------------------------
@@ -390,3 +454,36 @@ class TestGitHubContentClient:
 
         assert len(excerpt) == 2000
         assert excerpt == "x" * 2000
+
+    @respx.mock
+    async def test_fetch_content_and_commit_uses_branch_ref_when_provided(self) -> None:
+        config = _make_config()
+        client_obj = GitHubContentClient(config)
+        auth = {"Authorization": f"Bearer {_TOKEN}"}
+
+        respx.get(
+            f"{_BASE_URL}/repos/owner/repo/contents/src/main.py",
+            params={"ref": "feature/develop"},
+        ).mock(return_value=httpx.Response(200, text="print('branch')"))
+        respx.get(
+            f"{_BASE_URL}/repos/owner/repo/commits",
+            params={"path": "src/main.py", "per_page": 1, "sha": "feature/develop"},
+        ).mock(
+            return_value=httpx.Response(
+                200,
+                json=_make_commit_response("branchsha", "2024-06-02T12:00:00Z"),
+            )
+        )
+
+        async with httpx.AsyncClient() as client:
+            excerpt, sha, committed_at = await client_obj.fetch_content_and_commit(
+                client=client,
+                repo="owner/repo",
+                file_path="src/main.py",
+                auth_header=auth,
+                branch="feature/develop",
+            )
+
+        assert excerpt == "print('branch')"
+        assert sha == "branchsha"
+        assert committed_at == datetime(2024, 6, 2, 12, 0, 0, tzinfo=UTC)
