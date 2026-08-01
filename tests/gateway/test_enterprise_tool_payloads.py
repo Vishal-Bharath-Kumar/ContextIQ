@@ -12,6 +12,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from fastmcp import FastMCP
 
+from src.gateway.context.request_context import RequestContext
 from src.gateway.tools.enterprise.context_tools import register_context_tools
 from src.gateway.tools.enterprise.documentation_tools import register_documentation_tools
 from src.gateway.tools.enterprise.knowledge_graph_tools import register_knowledge_graph_tools
@@ -84,6 +85,46 @@ class TestContextToolPayloads:
         assert payload["execution_id"] == "req-123"
         assert payload["status"] == "success"
         assert payload["trace"]["model_selected"] == "gpt-4o-mini"
+
+    async def test_generate_context_pipeline_uses_request_context_identity(self) -> None:
+        mcp = FastMCP("test-context")
+        register_context_tools(mcp)
+
+        request_ctx = RequestContext(
+            request_id="req-123",
+            user_id="user-123",
+            username="admin",
+            roles=frozenset({"admin"}),
+            session_id="sess-123",
+            trace_id=0,
+        )
+
+        async def _fake_pipeline(prompt: str) -> dict:
+            return {
+                "status": "complete",
+                "final_response": {
+                    "type": "context_package",
+                    "prompt": prompt,
+                    "intent": "debugging",
+                    "context": [],
+                    "governance": {"summary": {"audit_log": {"user": "user-123"}}},
+                    "degraded_sources": [],
+                },
+            }
+
+        with (
+            patch("src.gateway.tools.enterprise.context_tools.get_request_context", return_value=request_ctx),
+            patch("src.gateway.tools.enterprise.context_tools._try_pipeline_context", side_effect=_fake_pipeline),
+        ):
+            payload = await _invoke_tool(
+                mcp,
+                "generate_context",
+                {"prompt": "debug auth flow", "max_tokens": 1024, "compression_level": "high"},
+            )
+
+        assert payload["status"] == "success"
+        assert payload["mode"] == "pipeline"
+        assert payload["context"]["governance"]["summary"]["audit_log"]["user"] == "user-123"
 
 
 @pytest.mark.asyncio

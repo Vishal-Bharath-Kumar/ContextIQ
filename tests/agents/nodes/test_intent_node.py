@@ -204,6 +204,43 @@ class TestIntentNodeOutput:
 
         assert result["status"] == ExecutionStatus.RUNNING
 
+    @pytest.mark.asyncio
+    async def test_falls_back_to_heuristic_intent_on_chain_error(self) -> None:
+        chain = MagicMock()
+        chain.ainvoke = AsyncMock(side_effect=TimeoutError("ollama timeout"))
+
+        with patch("src.agents.nodes.intent._get_chain", return_value=chain):
+            result = await intent_node(_make_state("Why does my function fail with this error?"))
+
+        assert result["intent_type"] == IntentType.DEBUGGING
+        assert result["intent_confidence"] == pytest.approx(0.6)
+        assert result["status"] == ExecutionStatus.RUNNING
+
+    @pytest.mark.asyncio
+    async def test_code_focused_prompt_overrides_docs_to_code_gen(self) -> None:
+        with patch(
+            "src.agents.nodes.intent._get_chain",
+            return_value=_mock_chain("docs", 0.88),
+        ):
+            result = await intent_node(
+                _make_state("Find real source code context related to FastAPI and prefer source code files over docs.")
+            )
+
+        assert result["intent_type"] == IntentType.CODE_GEN
+        assert result["intent_confidence"] == pytest.approx(0.88)
+
+    @pytest.mark.asyncio
+    async def test_code_focused_prompt_keeps_existing_code_intent(self) -> None:
+        with patch(
+            "src.agents.nodes.intent._get_chain",
+            return_value=_mock_chain("debugging", 0.91),
+        ):
+            result = await intent_node(
+                _make_state("Debug this middleware and show the relevant source code.")
+            )
+
+        assert result["intent_type"] == IntentType.DEBUGGING
+
 
 # ---------------------------------------------------------------------------
 # Parametrised tests: all 8 intent types reachable

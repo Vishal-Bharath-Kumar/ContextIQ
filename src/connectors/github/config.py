@@ -42,3 +42,10 @@ class GitHubConnectorConfig(BaseSettings):
     )
     vault_addr: str = "https://vault.internal:8200"
     request_timeout_s: float = 10.0
+    fetch_timeout_s: float = Field(
+        default=20.0,
+        description=(
+            "End-to-end timeout for a fetch, including search, branch-aware "
+            "fallback discovery, and content enrichment."
+        ),
+    )

@@ -24,7 +24,7 @@ class ChunkPayload(BaseModel):
     source_id: UUID
     tenant_id: str = Field(min_length=1, max_length=128)
     document_id: str = Field(
-        description="Connector-native document identifier, e.g. 'github:owner/repo:sha'",
+        description="Connector-native document identifier, e.g. 'github:owner/repo:path/to/file.py'",
         min_length=1,
         max_length=512,
     )

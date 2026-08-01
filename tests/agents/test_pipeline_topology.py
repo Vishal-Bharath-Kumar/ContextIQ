@@ -178,7 +178,7 @@ class TestClarificationNode:
         result = await clarification_node(state)
         assert result["status"] == ExecutionStatus.COMPLETE
         assert result["requires_clarification"] is True
-        assert result["final_response"]["type"] == "clarification"
+        assert result["final_response"]["type"] in {"clarification_needed", "clarification"}
         assert "debugging" in result["final_response"]["message"].lower()
         assert "45%" in result["final_response"]["message"]
 

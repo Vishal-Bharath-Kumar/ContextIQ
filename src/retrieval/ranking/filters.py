@@ -10,8 +10,7 @@ Provides two pure, stateless functions consumed by ``ContextRanker``:
 
 from __future__ import annotations
 
-import tiktoken
-
+from src.llm.token_encoding import get_cl100k_encoding
 from src.retrieval.ranking.config import DEFAULT_RELEVANCE_THRESHOLD
 from src.retrieval.schemas.retrieved_chunk import RetrievedChunk
 
@@ -19,7 +18,7 @@ from src.retrieval.schemas.retrieved_chunk import RetrievedChunk
 # Token counting
 # ---------------------------------------------------------------------------
 
-_enc = tiktoken.get_encoding("cl100k_base")  # module-level singleton
+_enc = get_cl100k_encoding()
 
 
 def count_tokens(text: str) -> int:

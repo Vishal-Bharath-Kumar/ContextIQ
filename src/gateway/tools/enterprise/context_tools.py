@@ -14,6 +14,7 @@ from typing import Any
 
 from fastmcp import FastMCP
 from src.agents.state import ExecutionStatus
+from src.gateway.context.request_context import get_request_context
 from src.gateway.tools.enterprise._local_tools import CODE_ROOTS, DOC_ROOT, json_text_response, search_workspace
 from mcp.types import TextContent
 
@@ -217,19 +218,33 @@ async def _try_pipeline_context(prompt: str) -> dict[str, Any] | None:
     try:
         from src.gateway.tools.clarification_reply import get_graph  # noqa: PLC0415
     except Exception:
+        logger.debug("generate_context pipeline unavailable: graph accessor import failed", exc_info=True)
         return None
 
     try:
         graph = get_graph()
     except Exception:
+        logger.debug("generate_context pipeline unavailable: graph not initialised", exc_info=True)
         return None
 
     request_id = str(uuid.uuid4())
+    user_id = "enterprise-tools"
+    username = "enterprise-tools"
+    roles = ["platform_engineer"]
+    try:
+        ctx = get_request_context()
+    except LookupError:
+        ctx = None
+    if ctx is not None:
+        user_id = ctx.user_id
+        username = ctx.username or ctx.user_id
+        roles = list(ctx.roles) or roles
+
     state = {
         "request_id": request_id,
-        "user_id": "enterprise-tools",
-        "username": "enterprise-tools",
-        "roles": ["platform_engineer"],
+        "user_id": user_id,
+        "username": username,
+        "roles": roles,
         "tool_name": "generate_context",
         "prompt": prompt,
         "timestamp": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
@@ -258,8 +273,15 @@ async def _try_pipeline_context(prompt: str) -> dict[str, Any] | None:
     try:
         result = await graph.ainvoke(state, config={"configurable": {"thread_id": request_id}})
     except Exception:
+        logger.warning("generate_context pipeline invocation failed", exc_info=True)
         return None
-    return result if result.get("status") != ExecutionStatus.FAILED else None
+    if result.get("status") == ExecutionStatus.FAILED:
+        logger.warning(
+            "generate_context pipeline returned failed state: %s",
+            result.get("error"),
+        )
+        return None
+    return result
 
 
 async def _replay_execution_payload(execution_id: str, context_service: Any = None) -> dict[str, Any]:

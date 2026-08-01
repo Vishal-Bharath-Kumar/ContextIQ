@@ -12,7 +12,9 @@ JWKSClient backed by a respx mock without touching the module-level client.
 """
 from __future__ import annotations
 
+from contextlib import AsyncExitStack
 import logging
+import os
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
@@ -26,10 +28,23 @@ from src.auth.dev_login import router as dev_login_router
 from src.auth.jwks_client import JWKSClient
 from src.auth.keycloak_settings import KeycloakSettings
 from src.auth.middleware import JWTAuthMiddleware
+from src.agents.checkpointer import get_redis_checkpointer
 from src.connector_sdk.registry import ConnectorRegistry
 from src.data.database import primary_session_factory
+from src.agents.graph import build_graph
+from src.agents.nodes.retrieval import set_connector_registry
+from src.audit.trace.object_store import TraceObjectStore
+from src.audit.trace.writer_node import set_trace_object_store, set_trace_session_factory
+from src.gateway.config import settings as gateway_settings
+from src.gateway.middleware.context_middleware import RequestContextMiddleware
 from src.gateway.mcp_handler import mcp_router
+from src.gateway.mcp_server import sse_app, streamable_http_app
+from src.gateway.tools.clarification_reply import set_graph as set_clarification_graph
+from src.governance.nodes.opa_filter_node import set_opa_client
+from src.governance.opa.bundle_loader import BundleNotReadyError, PolicyBundleLoader
+from src.governance.opa.client import OPAClient
 from src.knowledge_sources.routers.knowledge_source_router import router as knowledge_sources_router
+from src.knowledge_sources.runtime_connectors import apply_runtime_connector_overrides
 from src.knowledge_sources.sync.scheduler import CronSyncScheduler
 from src.model_registry.routers.model_router import router as model_router
 from src.model_router.routers.routing_weight_router import router as routing_weight_router
@@ -75,61 +90,127 @@ def create_app(jwks_client: JWKSClient | None = None) -> FastAPI:
         # Initialize observability stack
         setup_tracing()  # AC-7: OpenTelemetry tracing
         setup_langfuse()  # Langfuse LLM tracing
-        
-        if manage_lifecycle:
-            await client.startup()
-        app.state.jwks_client = client
-        _langfuse_settings = LangfuseSettings()
-        if _langfuse_settings.is_configured:
-            logger.info(
-                "Langfuse observability enabled (environment: %s, base_url: %s)",
-                _langfuse_settings.environment,
-                _langfuse_settings.base_url,
+
+        async with AsyncExitStack() as stack:
+            await stack.enter_async_context(sse_app.lifespan(app))
+            await stack.enter_async_context(streamable_http_app.lifespan(app))
+            if manage_lifecycle:
+                await client.startup()
+            app.state.jwks_client = client
+            _langfuse_settings = LangfuseSettings()
+            if _langfuse_settings.is_configured:
+                logger.info(
+                    "Langfuse observability enabled (environment: %s, base_url: %s)",
+                    _langfuse_settings.environment,
+                    _langfuse_settings.base_url,
+                )
+
+            app.state.ollama_verification = await verify_ollama_models_available(
+                [
+                    agent_settings.llm_model_id,
+                    EntityLinkerSettings().model_id,
+                    ExtractionSettings().model_id,
+                    EdgeInferenceSettings().model_id,
+                ]
+            )
+            app.state.opa_health = opa_health_status(
+                configured=False,
+                bundle_ready=False,
+                degraded=False,
             )
 
-        app.state.ollama_verification = await verify_ollama_models_available(
-            [
-                agent_settings.llm_model_id,
-                EntityLinkerSettings().model_id,
-                ExtractionSettings().model_id,
-                EdgeInferenceSettings().model_id,
-            ]
-        )
-        app.state.opa_health = opa_health_status(
-            configured=False,
-            bundle_ready=False,
-            degraded=False,
-        )
+            # Initialise ConnectorRegistry (TASK-US021-02) so the real GitHub/
+            # Confluence/Jira/Grafana connectors are discovered and available to
+            # the knowledge-sources sync endpoints/scheduler via app.state.
+            # Connectors that fail authenticate() are registered as disabled so
+            # the API continues serving the rest of the platform.
+            connector_registry = ConnectorRegistry()
+            await connector_registry.load()
+            await apply_runtime_connector_overrides(
+                connector_registry,
+                primary_session_factory(),
+            )
+            app.state.connector_registry = connector_registry
+            set_connector_registry(connector_registry)
 
-        # Initialise ConnectorRegistry (TASK-US021-02) so the real GitHub/
-        # Confluence/Jira/Grafana connectors are discovered and available to
-        # the knowledge-sources sync endpoints/scheduler via app.state.
-        # Connectors that fail authenticate() are registered as disabled so
-        # the API continues serving the rest of the platform.
-        connector_registry = ConnectorRegistry()
-        await connector_registry.load()
-        app.state.connector_registry = connector_registry
+            try:
+                trace_store = TraceObjectStore()
+                await trace_store.ensure_bucket_ready()
+                set_trace_object_store(trace_store)
+                set_trace_session_factory(primary_session_factory())
+                app.state.trace_object_store = trace_store
+            except Exception:
+                logger.warning("Could not configure trace writer dependencies", exc_info=True)
 
-        scheduler = CronSyncScheduler(
-            session_factory=primary_session_factory(),
-            registry=connector_registry,
-        )
-        scheduler.start()
-        app.state.sync_scheduler = scheduler
+            graph_checkpointer = None
+            try:
+                graph_checkpointer = await get_redis_checkpointer()
+            except Exception:
+                logger.warning("Could not initialise MCP graph checkpointer", exc_info=True)
 
-        yield
+            try:
+                graph = build_graph(checkpointer=graph_checkpointer)
+                set_clarification_graph(graph)
+                app.state.agent_graph = graph
+                app.state.agent_graph_checkpointer = graph_checkpointer
+            except Exception:
+                logger.warning("Could not initialise MCP agent graph", exc_info=True)
 
-        # Cleanup observability stack
-        scheduler.stop()
-        if manage_lifecycle:
-            await client.shutdown()
-        teardown_langfuse()  # Flush Langfuse traces
-        teardown_tracing()  # Flush OpenTelemetry spans
+            opa_base_url = os.environ.get("OPA_BASE_URL")
+            if opa_base_url:
+                bundle_loader = PolicyBundleLoader()
+                try:
+                    app.state.bundle_info = await bundle_loader.verify()
+                    app.state.opa_client = OPAClient()
+                    set_opa_client(app.state.opa_client)
+                    app.state.opa_health = opa_health_status(
+                        configured=True,
+                        bundle_ready=True,
+                        degraded=False,
+                        bundle_version=app.state.bundle_info.version,
+                    )
+                    logger.info(
+                        "OPA client ready — bundle version=%s",
+                        app.state.bundle_info.version,
+                    )
+                except BundleNotReadyError as exc:
+                    app.state.opa_client = OPAClient()
+                    set_opa_client(app.state.opa_client)
+                    app.state.opa_health = opa_health_status(
+                        configured=True,
+                        bundle_ready=False,
+                        degraded=True,
+                        error=str(exc),
+                    )
+                    logger.warning(
+                        "OPA bundle not verified at startup; continuing with degraded policy health",
+                        exc_info=True,
+                    )
+
+            scheduler = CronSyncScheduler(
+                session_factory=primary_session_factory(),
+                registry=connector_registry,
+            )
+            scheduler.start()
+            app.state.sync_scheduler = scheduler
+
+            yield
+
+            # Cleanup observability stack
+            scheduler.stop()
+            if manage_lifecycle:
+                await client.shutdown()
+            teardown_langfuse()  # Flush Langfuse traces
+            teardown_tracing()  # Flush OpenTelemetry spans
 
     new_app = FastAPI(title="ContextIQ", version="0.1.0", lifespan=_lifespan)
 
     # Metrics middleware — mount BEFORE JWT so instrumentation wraps all request handling
     new_app.add_middleware(MetricsMiddleware, settings=MetricsSettings())
+
+    # RequestContext middleware — JWTAuthMiddleware must remain outermost so it
+    # populates request.state before RequestContextMiddleware reads it.
+    new_app.add_middleware(RequestContextMiddleware)
 
     # JWT middleware — wraps all routes; pre-started client passed directly.
     new_app.add_middleware(JWTAuthMiddleware, jwks_client=client)
@@ -150,6 +231,12 @@ def create_app(jwks_client: JWKSClient | None = None) -> FastAPI:
     new_app.include_router(metrics_router)
     new_app.include_router(audit_log_router)
     new_app.include_router(tool_registry_router)
+
+    # FastMCP SSE transport for legacy IDE MCP clients.
+    new_app.mount(f"{gateway_settings.mcp_path}/sse", sse_app)
+
+    # FastMCP Streamable HTTP transport for modern MCP clients.
+    new_app.mount(f"{gateway_settings.mcp_path}", streamable_http_app)
 
     @new_app.get("/healthz")
     async def healthz() -> dict[str, object]:

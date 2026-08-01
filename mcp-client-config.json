@@ -3,8 +3,7 @@
   "mcpServers": {
     "contextiq": {
       "type": "http",
-      "url": "http://localhost:8080/mcp/sse",
-      "transport": "sse",
+      "url": "http://localhost:8000/mcp/",
       "description": "ContextIQ Enterprise MCP Server - Provides access to enterprise knowledge sources, retrieval, and agent capabilities",
       "headers": {
         "Authorization": "Bearer ${env:CONTEXTIQ_TOKEN}",
@@ -16,23 +15,9 @@
         "prompts": false
       }
     },
-    "contextiq-ws": {
-      "type": "websocket",
-      "url": "ws://localhost:8080/mcp/ws",
-      "description": "ContextIQ Enterprise MCP Server (WebSocket) - Real-time bidirectional connection",
-      "headers": {
-        "Authorization": "Bearer ${env:CONTEXTIQ_TOKEN}"
-      },
-      "capabilities": {
-        "tools": true,
-        "resources": true,
-        "prompts": false
-      }
-    },
     "contextiq-production": {
       "type": "http",
-      "url": "https://contextiq.example.com/mcp/sse",
-      "transport": "sse",
+      "url": "https://contextiq.example.com/mcp/",
       "description": "ContextIQ Production Environment",
       "headers": {
         "Authorization": "Bearer ${env:CONTEXTIQ_PROD_TOKEN}",

@@ -14,6 +14,7 @@ import time
 from collections.abc import Callable
 from unittest.mock import AsyncMock, MagicMock
 
+from mcp.types import Tool as MCPTool
 import pytest
 from pydantic import ValidationError
 
@@ -165,7 +166,7 @@ class TestHandleToolsList:
         _, handler = self._build_mcp_with_handler(_make_registry(tools))
         result = await handler()
         assert len(result) == 3
-        assert all(isinstance(t, ToolDefinition) for t in result)
+        assert all(isinstance(t, MCPTool) for t in result)
 
     @pytest.mark.asyncio
     async def test_tools_sorted_by_name_asc(self) -> None:
@@ -216,7 +217,8 @@ class TestHandleToolsList:
         t = result[0]
         assert isinstance(t.name, str)
         assert isinstance(t.description, str)
-        assert isinstance(t.inputSchema, InputSchema)
+        assert isinstance(t.inputSchema, dict)
+        assert t.inputSchema["type"] == "object"
 
 
 class TestHandleToolsListBuiltinFallback:

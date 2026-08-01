@@ -576,3 +576,73 @@ class TestSyncJobExecutorEdgeCases:
             await executor.run(source_record.id)
 
         assert connector.sync.call_count == 4  # 1 initial + 3 retries
+
+    async def test_run_existing_job_reuses_queued_job(
+        self, db_session: AsyncSession, source_record: KnowledgeSourceRecord
+    ) -> None:
+        connector = _make_connector()
+        registry = _make_registry(connector)
+        executor = SyncJobExecutor(db_session, registry, _FAST_SETTINGS)
+        job_repo = SyncJobRepository(db_session)
+        queued_job = await job_repo.create(
+            source_id=source_record.id,
+            attempt_number=1,
+            is_full_sync=True,
+        )
+        await db_session.commit()
+
+        with (
+            _patch_build_connector(executor, connector),
+            patch("src.knowledge_sources.sync.executor.sync_duration_seconds"),
+            patch("src.knowledge_sources.sync.executor.sync_document_count_delta"),
+            patch("src.knowledge_sources.sync.executor.sync_retries_total"),
+            patch(
+                "src.knowledge_sources.sync.executor.SyncJobExecutor._emit_synced_event",
+                new_callable=AsyncMock,
+            ),
+        ):
+            returned_job_id = await executor.run_existing_job(
+                source_id=source_record.id,
+                job_id=queued_job.id,
+                is_full_sync=True,
+            )
+
+        jobs = await job_repo.list_by_source(source_record.id)
+
+        assert returned_job_id == queued_job.id
+        assert len(jobs) == 1
+        assert jobs[0].id == queued_job.id
+        assert jobs[0].status == SyncJobStatus.SUCCEEDED
+
+    async def test_run_existing_job_marks_failed_when_setup_raises(
+        self, db_session: AsyncSession, source_record: KnowledgeSourceRecord
+    ) -> None:
+        registry = _make_registry(AsyncMock())
+        executor = SyncJobExecutor(db_session, registry, _FAST_SETTINGS)
+        job_repo = SyncJobRepository(db_session)
+        queued_job = await job_repo.create(
+            source_id=source_record.id,
+            attempt_number=1,
+            is_full_sync=True,
+        )
+        await db_session.commit()
+
+        with patch.object(
+            executor,
+            "_build_connector_for_source",
+            new=AsyncMock(side_effect=RuntimeError("bad credential")),
+        ):
+            with pytest.raises(RuntimeError, match="bad credential"):
+                await executor.run_existing_job(
+                    source_id=source_record.id,
+                    job_id=queued_job.id,
+                    is_full_sync=True,
+                )
+
+        job = await job_repo.get(queued_job.id)
+        await db_session.refresh(source_record)
+
+        assert job is not None
+        assert job.status == SyncJobStatus.FAILED
+        assert job.error_message == "bad credential"
+        assert source_record.status == "error"

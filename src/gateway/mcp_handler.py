@@ -21,7 +21,7 @@ async def context_query(
 ) -> dict[str, Any]:
     result = await handle_tool_call(
         request_id=uuid.uuid4(),
-        tool_input=body,
+        tool_input=_merge_request_identity(request, body),
         connector_registry=getattr(request.app.state, "connector_registry", None),
     )
     return result.get("final_response") or result
@@ -53,7 +53,7 @@ async def handle_tool_call(
 
 
 def _build_initial_state(request_id: uuid.UUID, tool_input: dict[str, Any]) -> dict[str, Any]:
-    return {
+    state = {
         "request_id": str(request_id),
         "user_id": str(tool_input.get("user_id") or "anonymous"),
         "username": str(tool_input.get("username") or ""),
@@ -83,3 +83,25 @@ def _build_initial_state(request_id: uuid.UUID, tool_input: dict[str, Any]) -> d
         "model_routing_score": None,
         "final_response": None,
     }
+    if tool_input.get("jwt_claims") is not None:
+        state["jwt_claims"] = tool_input["jwt_claims"]
+    if tool_input.get("tenant_id") is not None:
+        state["tenant_id"] = str(tool_input["tenant_id"])
+    return state
+
+
+def _merge_request_identity(request: Request, tool_input: dict[str, Any]) -> dict[str, Any]:
+    merged = dict(tool_input)
+    claims = getattr(request.state, "jwt_claims", None)
+    if claims is None:
+        return merged
+
+    merged.setdefault("user_id", claims.sub)
+    merged.setdefault("username", claims.preferred_username or "")
+    merged.setdefault("roles", list(claims.roles))
+    merged.setdefault("jwt_claims", claims.model_dump(mode="python"))
+
+    tenant_id = getattr(request.state, "tenant_id", None)
+    if tenant_id is not None:
+        merged.setdefault("tenant_id", tenant_id)
+    return merged

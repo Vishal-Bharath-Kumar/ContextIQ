@@ -11,7 +11,7 @@
   "servers": {
     "contextiq": {
       "type": "http",
-      "url": "http://localhost:8080/mcp/sse",
+      "url": "http://localhost:8000/mcp/sse/",
       "headers": {
         "Authorization": "Bearer ${env:CONTEXTIQ_TOKEN}",
         "Content-Type": "application/json"
@@ -60,12 +60,14 @@
 
 For real-time bidirectional communication:
 
+Note: the default local Docker Compose stack publishes the SSE endpoint on the `api` service. Use this WebSocket option only if you separately expose the WebSocket route.
+
 ```json
 {
   "servers": {
     "contextiq": {
       "type": "websocket",
-      "url": "ws://localhost:8080/mcp/ws",
+      "url": "ws://localhost:8000/mcp/ws",
       "headers": {
         "Authorization": "Bearer ${env:CONTEXTIQ_TOKEN}"
       }
@@ -83,7 +85,7 @@ Work with multiple repositories simultaneously:
   "servers": {
     "contextiq-main": {
       "type": "http",
-      "url": "http://localhost:8080/mcp/sse",
+      "url": "http://localhost:8000/mcp/sse/",
       "headers": {
         "Authorization": "Bearer ${env:CONTEXTIQ_TOKEN}",
         "X-Repository": "main-app",
@@ -92,7 +94,7 @@ Work with multiple repositories simultaneously:
     },
     "contextiq-microservices": {
       "type": "http",
-      "url": "http://localhost:8080/mcp/sse",
+      "url": "http://localhost:8000/mcp/sse/",
       "headers": {
         "Authorization": "Bearer ${env:CONTEXTIQ_TOKEN}",
         "X-Repository": "microservices",
@@ -157,7 +159,7 @@ export CONTEXTIQ_TOKEN="eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9..."
 export CONTEXTIQ_PROD_TOKEN="production-token"
 
 # Optional: Custom endpoint
-export CONTEXTIQ_MCP_URL="http://localhost:8080/mcp/sse"
+export CONTEXTIQ_MCP_URL="http://localhost:8000/mcp/sse/"
 ```
 
 Reload:
@@ -199,7 +201,8 @@ Reload:
 ```bash
 # Test endpoint directly
 curl -H "Authorization: Bearer $CONTEXTIQ_TOKEN" \
-     http://localhost:8080/mcp/sse
+  -H "Accept: text/event-stream" \
+  http://localhost:8000/mcp/sse/
 ```
 
 ### Server Not Appearing in List
@@ -220,7 +223,7 @@ curl -H "Authorization: Bearer $CONTEXTIQ_TOKEN" \
   "servers": {
     "contextiq": {
       "type": "http",
-      "url": "http://localhost:8080/mcp/sse",
+      "url": "http://localhost:8000/mcp/sse/",
       "headers": {
         "Authorization": "Bearer ${env:CONTEXTIQ_TOKEN}"
       },
@@ -237,7 +240,7 @@ curl -H "Authorization: Bearer $CONTEXTIQ_TOKEN" \
   "servers": {
     "contextiq": {
       "type": "http",
-      "url": "http://localhost:8080/mcp/sse",
+      "url": "http://localhost:8000/mcp/sse/",
       "proxy": "http://proxy.example.com:8080",
       "headers": {
         "Authorization": "Bearer ${env:CONTEXTIQ_TOKEN}"
@@ -253,7 +256,7 @@ curl -H "Authorization: Bearer $CONTEXTIQ_TOKEN" \
   "servers": {
     "contextiq": {
       "type": "http",
-      "url": "http://localhost:8080/mcp/sse",
+      "url": "http://localhost:8000/mcp/sse/",
       "headers": {
         "Authorization": "Bearer ${env:CONTEXTIQ_TOKEN}",
         "X-Debug": "true"

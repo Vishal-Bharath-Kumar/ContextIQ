@@ -12,7 +12,7 @@ Create or update `.vscode/mcp.json`:
   "servers": {
     "contextiq": {
       "type": "http",
-      "url": "http://localhost:8080/mcp/sse",
+      "url": "http://localhost:8000/mcp/sse/",
       "headers": {
         "Authorization": "Bearer ${env:CONTEXTIQ_TOKEN}",
         "Content-Type": "application/json"
@@ -63,7 +63,7 @@ For different repositories, create separate `.vscode/mcp.json` files:
   "servers": {
     "contextiq": {
       "type": "http",
-      "url": "http://localhost:8080/mcp/sse",
+      "url": "http://localhost:8000/mcp/sse/",
       "headers": {
         "Authorization": "Bearer ${env:CONTEXTIQ_TOKEN}",
         "X-Repository": "frontend-app",
@@ -80,7 +80,7 @@ For different repositories, create separate `.vscode/mcp.json` files:
   "servers": {
     "contextiq": {
       "type": "http",
-      "url": "http://localhost:8080/mcp/sse",
+      "url": "http://localhost:8000/mcp/sse/",
       "headers": {
         "Authorization": "Bearer ${env:CONTEXTIQ_TOKEN}",
         "X-Repository": "backend-api",
@@ -126,7 +126,7 @@ For VS Code Multi-root Workspaces, create a shared `mcp.json`:
   "servers": {
     "contextiq-frontend": {
       "type": "http",
-      "url": "http://localhost:8080/mcp/sse",
+      "url": "http://localhost:8000/mcp/sse/",
       "headers": {
         "Authorization": "Bearer ${env:CONTEXTIQ_TOKEN}",
         "X-Repository": "frontend"
@@ -134,7 +134,7 @@ For VS Code Multi-root Workspaces, create a shared `mcp.json`:
     },
     "contextiq-backend": {
       "type": "http",
-      "url": "http://localhost:8080/mcp/sse",
+      "url": "http://localhost:8000/mcp/sse/",
       "headers": {
         "Authorization": "Bearer ${env:CONTEXTIQ_TOKEN}",
         "X-Repository": "backend"
@@ -142,7 +142,7 @@ For VS Code Multi-root Workspaces, create a shared `mcp.json`:
     },
     "contextiq-infra": {
       "type": "http",
-      "url": "http://localhost:8080/mcp/sse",
+      "url": "http://localhost:8000/mcp/sse/",
       "headers": {
         "Authorization": "Bearer ${env:CONTEXTIQ_TOKEN}",
         "X-Repository": "infrastructure"
@@ -229,7 +229,8 @@ docker compose ps
 
 # Test endpoint
 curl -H "Authorization: Bearer $CONTEXTIQ_TOKEN" \
-     http://localhost:8080/mcp/sse
+  -H "Accept: text/event-stream" \
+  http://localhost:8000/mcp/sse/
 ```
 
 ### Tools Not Available
@@ -267,7 +268,7 @@ Create `.vscode/tasks.json` to manage ContextIQ:
     {
       "label": "Check ContextIQ MCP",
       "type": "shell",
-      "command": "curl -H 'Authorization: Bearer ${CONTEXTIQ_TOKEN}' http://localhost:8080/mcp/sse",
+      "command": "curl -H 'Authorization: Bearer ${CONTEXTIQ_TOKEN}' -H 'Accept: text/event-stream' http://localhost:8000/mcp/sse/",
       "problemMatcher": []
     }
   ]
@@ -354,13 +355,13 @@ Add to `.vscode/settings.json`:
 ### Network Inspection
 ```bash
 # Monitor MCP requests
-docker compose logs -f gateway | grep MCP
+docker compose logs -f api | grep MCP
 ```
 
 ## Support
 
 For issues:
 1. Check VS Code Output panel
-2. Review ContextIQ gateway logs: `docker compose logs gateway`
+2. Review ContextIQ API logs: `docker compose logs api`
 3. Verify configuration: `cat .vscode/mcp.json | jq .`
 4. Test connection: Run "Check ContextIQ MCP" task

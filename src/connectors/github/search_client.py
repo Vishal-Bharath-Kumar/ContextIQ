@@ -7,9 +7,10 @@ from __future__ import annotations
 
 import asyncio
 import time
+from typing import Any
 
 import httpx
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, field_validator
 
 from src.connectors.github.config import GitHubConnectorConfig
 from src.connectors.github.metrics import (
@@ -33,6 +34,22 @@ class GitHubFileItem(BaseModel):
     html_url: str
     sha: str  # blob SHA
     url: str  # API URL for full content fetch
+
+    @field_validator("repository", mode="before")
+    @classmethod
+    def _normalise_repository(cls, value: Any) -> str:
+        if isinstance(value, str):
+            return value
+        if isinstance(value, dict):
+            full_name = value.get("full_name")
+            if isinstance(full_name, str) and full_name:
+                return full_name
+            owner = value.get("owner") or {}
+            owner_login = owner.get("login") if isinstance(owner, dict) else None
+            repo_name = value.get("name")
+            if isinstance(owner_login, str) and isinstance(repo_name, str):
+                return f"{owner_login}/{repo_name}"
+        raise TypeError("repository must be a string or GitHub repository object")
 
 
 class GitHubSearchClient:
@@ -83,7 +100,7 @@ class GitHubSearchClient:
             "X-GitHub-Api-Version": "2022-11-28",
         }
         attempt = 0
-        async with httpx.AsyncClient(timeout=self._config.request_timeout_s) as client:
+        async with httpx.AsyncClient(timeout=self._config.request_timeout_s, trust_env=False) as client:
             while attempt < _MAX_RETRIES:
                 response = await client.get(url, params=params, headers=headers)
 

@@ -52,32 +52,41 @@ class PolicyBundleLoader:
         poll_interval_s = 2.0
 
         async with httpx.AsyncClient(
-            base_url=self._settings.base_url, timeout=5.0
+            base_url=self._settings.base_url, timeout=5.0, trust_env=False
         ) as client:
             for attempt in range(1, max_attempts + 1):
                 try:
                     resp = await client.get(self._settings.status_path)
-                    resp.raise_for_status()
-                    status = resp.json()
-                    bundle_status = (
-                        status.get("bundles", {}).get(
-                            self._settings.expected_bundle_name, {}
+                    if resp.is_success:
+                        status = resp.json().get("result", resp.json())
+                        bundle_status = (
+                            status.get("bundles", {}).get(
+                                self._settings.expected_bundle_name, {}
+                            )
                         )
-                    )
-                    revision = bundle_status.get("active_revision") or ""
-                    if revision:
-                        info = BundleInfo(
-                            version=revision,
-                            loaded_at=datetime.now(tz=UTC),
-                            source_url=self._settings.base_url,
-                        )
-                        logger.info(
-                            "PolicyBundleLoader: bundle '%s' active at revision=%s",
-                            self._settings.expected_bundle_name,
-                            revision,
-                        )
-                        return info
+                        revision = bundle_status.get("active_revision") or ""
+                        if revision:
+                            info = BundleInfo(
+                                version=revision,
+                                loaded_at=datetime.now(tz=UTC),
+                                source_url=self._settings.base_url,
+                            )
+                            logger.info(
+                                "PolicyBundleLoader: bundle '%s' active at revision=%s",
+                                self._settings.expected_bundle_name,
+                                revision,
+                            )
+                            return info
+                    else:
+                        resp.raise_for_status()
+
+                    local_info = await self._verify_local_policy(client)
+                    if local_info is not None:
+                        return local_info
                 except Exception as exc:
+                    local_info = await self._verify_local_policy(client)
+                    if local_info is not None:
+                        return local_info
                     logger.warning(
                         "PolicyBundleLoader: attempt %d/%d failed: %s",
                         attempt,
@@ -90,3 +99,25 @@ class PolicyBundleLoader:
             f"OPA bundle '{self._settings.expected_bundle_name}' not active after "
             f"{max_attempts} attempts"
         )
+
+    async def _verify_local_policy(
+        self,
+        client: httpx.AsyncClient,
+    ) -> BundleInfo | None:
+        try:
+            resp = await client.get("v1/policies")
+            resp.raise_for_status()
+        except Exception:
+            return None
+
+        for policy in resp.json().get("result", []):
+            raw = str(policy.get("raw") or "")
+            if "package contextiq.authz" not in raw:
+                continue
+            logger.info("PolicyBundleLoader: local inline authz policy detected")
+            return BundleInfo(
+                version="local-inline-policy",
+                loaded_at=datetime.now(tz=UTC),
+                source_url=self._settings.base_url,
+            )
+        return None

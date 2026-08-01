@@ -39,6 +39,11 @@ def _trees_url(repo: str, branch: str) -> str:
     return f"{_BASE_URL}/repos/{repo}/git/trees/{branch}"
 
 
+def _mock_other_branch_404s(repo: str = "owner/repo") -> None:
+    for branch in ("master", "develop", "dev", "feature/develop"):
+        respx.get(_trees_url(repo, branch)).mock(return_value=httpx.Response(404))
+
+
 def _content_url(repo: str, path: str) -> str:
     return f"{_BASE_URL}/repos/{repo}/contents/{path}"
 
@@ -62,6 +67,12 @@ async def _authenticated_connector(config: GitHubConnectorConfig | None = None) 
         connector._token_provider,
         "get_credential",
         new=AsyncMock(return_value=type("Cred", (), {"token": _TOKEN})()),
+    ), patch.object(
+        connector,
+        "health_check",
+        new=AsyncMock(
+            return_value=type("Health", (), {"healthy": True, "message": "ok"})()
+        ),
     ):
         await connector.authenticate()
     return connector
@@ -91,13 +102,14 @@ class TestListRepoFiles:
                 ),
             )
         )
+        _mock_other_branch_404s()
         client = GitHubContentClient(_make_config())
         async with httpx.AsyncClient() as http_client:
             paths = await client.list_repo_files(
                 http_client, "owner/repo", {"Authorization": "Bearer x"}
             )
 
-        assert paths == ["README.md", "src/app.py"]
+        assert paths == ["src/app.py", "README.md"]
 
     @respx.mock
     async def test_falls_back_to_master_branch_on_404(self) -> None:
@@ -105,6 +117,9 @@ class TestListRepoFiles:
         respx.get(_trees_url("owner/repo", "master")).mock(
             return_value=httpx.Response(200, json=_tree_response([("README.md", "blob")]))
         )
+        respx.get(_trees_url("owner/repo", "develop")).mock(return_value=httpx.Response(404))
+        respx.get(_trees_url("owner/repo", "dev")).mock(return_value=httpx.Response(404))
+        respx.get(_trees_url("owner/repo", "feature/develop")).mock(return_value=httpx.Response(404))
         client = GitHubContentClient(_make_config())
         async with httpx.AsyncClient() as http_client:
             paths = await client.list_repo_files(
@@ -119,6 +134,7 @@ class TestListRepoFiles:
         respx.get(_trees_url("owner/repo", "main")).mock(
             return_value=httpx.Response(200, json=_tree_response(many_files))
         )
+        _mock_other_branch_404s()
         client = GitHubContentClient(_make_config())
         async with httpx.AsyncClient() as http_client:
             paths = await client.list_repo_files(
@@ -128,9 +144,86 @@ class TestListRepoFiles:
         assert len(paths) == 3
 
     @respx.mock
+    async def test_prioritizes_src_files_before_github_metadata_when_capped(self) -> None:
+        respx.get(_trees_url("owner/repo", "main")).mock(
+            return_value=httpx.Response(
+                200,
+                json=_tree_response(
+                    [
+                        (".github/instructions/foo.md", "blob"),
+                        (".github/workflows/bar.yml", "blob"),
+                        ("src/app.py", "blob"),
+                        ("src/router.ts", "blob"),
+                    ]
+                ),
+            )
+        )
+        _mock_other_branch_404s()
+        client = GitHubContentClient(_make_config())
+        async with httpx.AsyncClient() as http_client:
+            paths = await client.list_repo_files(
+                http_client, "owner/repo", {"Authorization": "Bearer x"}, max_files=2
+            )
+
+        assert paths == ["src/app.py", "src/router.ts"]
+
+    @respx.mock
+    async def test_deprioritizes_node_modules_before_src_when_capped(self) -> None:
+        respx.get(_trees_url("owner/repo", "main")).mock(
+            return_value=httpx.Response(
+                200,
+                json=_tree_response(
+                    [
+                        ("frontend/app/node_modules/pkg/index.ts", "blob"),
+                        ("src/app.py", "blob"),
+                        ("src/router.ts", "blob"),
+                    ]
+                ),
+            )
+        )
+        _mock_other_branch_404s()
+        client = GitHubContentClient(_make_config())
+        async with httpx.AsyncClient() as http_client:
+            paths = await client.list_repo_files(
+                http_client, "owner/repo", {"Authorization": "Bearer x"}, max_files=2
+            )
+
+        assert paths == ["src/app.py", "src/router.ts"]
+
+    @respx.mock
+    async def test_prioritizes_top_level_backend_src_over_frontend_src_and_tests(self) -> None:
+        respx.get(_trees_url("owner/repo", "main")).mock(
+            return_value=httpx.Response(
+                200,
+                json=_tree_response(
+                    [
+                        ("frontend/admin-portal/src/App.tsx", "blob"),
+                        ("frontend/admin-portal/src/__tests__/ActivatePolicyDialog.test.tsx", "blob"),
+                        ("src/gateway/tools/enterprise/context_tools.py", "blob"),
+                        ("src/agents/nodes/retrieval.py", "blob"),
+                    ]
+                ),
+            )
+        )
+        _mock_other_branch_404s()
+        client = GitHubContentClient(_make_config())
+        async with httpx.AsyncClient() as http_client:
+            paths = await client.list_repo_files(
+                http_client, "owner/repo", {"Authorization": "Bearer x"}, max_files=2
+            )
+
+        assert paths == [
+            "src/agents/nodes/retrieval.py",
+            "src/gateway/tools/enterprise/context_tools.py",
+        ]
+
+    @respx.mock
     async def test_returns_empty_list_when_no_branch_exists(self) -> None:
         respx.get(_trees_url("owner/repo", "main")).mock(return_value=httpx.Response(404))
         respx.get(_trees_url("owner/repo", "master")).mock(return_value=httpx.Response(404))
+        respx.get(_trees_url("owner/repo", "develop")).mock(return_value=httpx.Response(404))
+        respx.get(_trees_url("owner/repo", "dev")).mock(return_value=httpx.Response(404))
+        respx.get(_trees_url("owner/repo", "feature/develop")).mock(return_value=httpx.Response(404))
         client = GitHubContentClient(_make_config())
         async with httpx.AsyncClient() as http_client:
             paths = await client.list_repo_files(
@@ -138,6 +231,41 @@ class TestListRepoFiles:
             )
 
         assert paths == []
+
+    @respx.mock
+    async def test_prefers_branch_with_src_files_over_main(self) -> None:
+        respx.get(_trees_url("owner/repo", "main")).mock(
+            return_value=httpx.Response(
+                200,
+                json=_tree_response(
+                    [
+                        (".github/instructions/foo.md", "blob"),
+                        ("README.md", "blob"),
+                    ]
+                ),
+            )
+        )
+        respx.get(_trees_url("owner/repo", "master")).mock(return_value=httpx.Response(404))
+        respx.get(_trees_url("owner/repo", "develop")).mock(return_value=httpx.Response(404))
+        respx.get(_trees_url("owner/repo", "dev")).mock(return_value=httpx.Response(404))
+        respx.get(_trees_url("owner/repo", "feature/develop")).mock(
+            return_value=httpx.Response(
+                200,
+                json=_tree_response(
+                    [
+                        ("src/app.py", "blob"),
+                        ("src/router.ts", "blob"),
+                    ]
+                ),
+            )
+        )
+        client = GitHubContentClient(_make_config())
+        async with httpx.AsyncClient() as http_client:
+            paths = await client.list_repo_files(
+                http_client, "owner/repo", {"Authorization": "Bearer x"}
+            )
+
+        assert paths == ["src/app.py", "src/router.ts"]
 
 
 # ---------------------------------------------------------------------------
@@ -175,8 +303,12 @@ class TestGetChunks:
         assert len(chunks) == 2
         assert all(c.source_id == _SOURCE_ID for c in chunks)
         assert all(c.tenant_id == _TENANT_ID for c in chunks)
-        assert all(c.document_id.startswith("github:owner/repo:") for c in chunks)
+        assert {c.document_id for c in chunks} == {
+            "github:owner/repo:README.md",
+            "github:owner/repo:src/app.py",
+        }
         assert {c.metadata["file_path"] for c in chunks} == {"README.md", "src/app.py"}
+        assert all(c.metadata["commit_sha"] == "commitabc" for c in chunks)
         assert all(c.text for c in chunks)
         assert all(c.token_count >= 1 for c in chunks)
 
@@ -185,6 +317,7 @@ class TestGetChunks:
         respx.get(_trees_url("owner/repo", "main")).mock(
             return_value=httpx.Response(200, json=_tree_response([("empty.md", "blob")]))
         )
+        _mock_other_branch_404s()
         respx.get(_content_url("owner/repo", "empty.md")).mock(
             return_value=httpx.Response(200, text="   ")
         )
@@ -204,6 +337,10 @@ class TestGetChunks:
         respx.get(_trees_url("owner/good", "main")).mock(
             return_value=httpx.Response(200, json=_tree_response([("README.md", "blob")]))
         )
+        respx.get(_trees_url("owner/good", "master")).mock(return_value=httpx.Response(404))
+        respx.get(_trees_url("owner/good", "develop")).mock(return_value=httpx.Response(404))
+        respx.get(_trees_url("owner/good", "dev")).mock(return_value=httpx.Response(404))
+        respx.get(_trees_url("owner/good", "feature/develop")).mock(return_value=httpx.Response(404))
         respx.get(_content_url("owner/good", "README.md")).mock(
             return_value=httpx.Response(200, text="# Good repo")
         )

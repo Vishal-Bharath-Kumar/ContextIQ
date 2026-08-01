@@ -56,3 +56,12 @@ register_operations_tools(mcp)
 # path resolves to  GET {mcp_path}/sse  after FastAPI's app.mount().
 # ---------------------------------------------------------------------------
 sse_app: StarletteWithLifespan = mcp.http_app(path="/", transport="sse")
+
+# ---------------------------------------------------------------------------
+# Streamable HTTP transport — ASGI app mounted at {mcp_path} in main app.
+# Supports POST requests for modern MCP clients without SSE fallback probing.
+# ---------------------------------------------------------------------------
+streamable_http_app: StarletteWithLifespan = mcp.http_app(
+    path="/",
+    transport="streamable-http",
+)

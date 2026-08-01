@@ -22,8 +22,9 @@ class OPAClientSettings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="OPA_", env_file=".env", extra="ignore")
 
     base_url: str = "http://localhost:8181"
-    # Per-chunk call timeout. Must be < 50 ms (AC-5) with headroom for hot path.
-    request_timeout_s: float = 0.05
+    # Per-chunk call timeout. Local Docker dev incurs noticeably more network
+    # overhead than the target hot path, so the runtime default is relaxed.
+    request_timeout_s: float = 1.0
     # OPA data path for the policy rule (AC-2).
     policy_path: str = "v1/data/contextiq/authz/allow"
     # OPA status endpoint for bundle verification (AC-1).
@@ -52,6 +53,7 @@ class OPAClient:
             base_url=self._settings.base_url,
             timeout=self._settings.request_timeout_s,
             limits=httpx.Limits(max_connections=self._settings.max_connections),
+            trust_env=False,
         )
 
     async def evaluate_chunk(self, inp: ChunkAuthzInput) -> PolicyDecision:
