@@ -77,6 +77,14 @@ async def dev_login(payload: DevLoginRequest) -> DevLoginResponse:
             logger.warning("dev-login: Keycloak token endpoint unreachable: %s", exc)
             raise HTTPException(status_code=503, detail="Auth service unavailable") from exc
 
+    if resp.status_code >= 500:
+        logger.warning(
+            "dev-login: Keycloak token endpoint failed (status=%d, body=%s)",
+            resp.status_code,
+            resp.text[:500],
+        )
+        raise HTTPException(status_code=503, detail="Auth service unavailable")
+
     if resp.status_code != 200:
         logger.info("dev-login: Keycloak rejected credentials (status=%d)", resp.status_code)
         raise HTTPException(status_code=401, detail="Invalid username or password")

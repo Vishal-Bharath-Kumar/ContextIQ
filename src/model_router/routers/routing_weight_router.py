@@ -48,6 +48,29 @@ class RoutingWeightUpdateRequest(BaseModel):
         return self
 
 
+def _to_serialisable_state(obj: object | None) -> dict | None:
+    """Return a JSON-serialisable dict or None for audit logging.
+
+    Accept Pydantic models, plain dicts, or other objects. Falls back to
+    a string representation when conversion isn't possible so audit
+    logging never raises due to non-serialisable inputs.
+    """
+    if obj is None:
+        return None
+    # Pydantic v2 models expose `model_dump()`
+    if hasattr(obj, "model_dump"):
+        try:
+            return obj.model_dump()
+        except Exception:
+            pass
+    if isinstance(obj, dict):
+        return obj
+    try:
+        return dict(obj)
+    except Exception:
+        return {"value": str(obj)}
+
+
 @router.get(
     "",
     response_model=list[RoutingWeightResponse],
@@ -89,14 +112,16 @@ async def update_routing_weights(
             cost_weight=body.cost_weight,
             latency_weight=body.latency_weight,
         ),
-        actor_user_id=audit.actor_user_id,
+        actor_user_id=claims.sub,
     )
+    # Use safe serialisation for audit entries to avoid unexpected 500s
+    # when an object is not directly JSON-serialisable.
     await audit.log(
         action=AdminActionType.MODEL_WEIGHTS_UPDATED,
         resource_type="routing_weight",
         resource_id=intent_type,
-        before_state=before.model_dump(),
-        after_state=body.model_dump(),
+        before_state=_to_serialisable_state(before),
+        after_state=_to_serialisable_state(body),
     )
     model_audit = ModelAuditRepository(session)
     await model_audit.log(

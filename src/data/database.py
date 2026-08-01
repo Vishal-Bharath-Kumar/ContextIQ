@@ -24,6 +24,23 @@ from functools import lru_cache
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
 
 
+def _ssl_connect_arg(env_var: str, *, default: bool = True) -> str | bool:
+    """Return the asyncpg ssl connect arg from a boolean-style env var.
+
+    Local development can opt out of SSL when reusing an older postgres volume
+    that was initialised without TLS. All other environments continue to
+    require SSL by default.
+    """
+    raw_value = os.environ.get(env_var)
+    if raw_value is None:
+        return "require" if default else False
+
+    value = raw_value.strip().lower()
+    if value in {"0", "false", "no", "off", "disable", "disabled"}:
+        return False
+    return "require"
+
+
 @lru_cache(maxsize=1)
 def _primary_engine() -> AsyncEngine:
     url = os.environ["DATABASE_URL"]    # PgBouncer → PostgreSQL primary
@@ -34,7 +51,7 @@ def _primary_engine() -> AsyncEngine:
         pool_pre_ping=True,
         connect_args={
             "statement_cache_size": 0,    # required for PgBouncer transaction mode
-            "ssl": "require",
+            "ssl": _ssl_connect_arg("DATABASE_REQUIRE_SSL"),
         },
     )
 
@@ -50,7 +67,11 @@ def _replica_engine() -> AsyncEngine:
         pool_pre_ping=True,
         connect_args={
             "statement_cache_size": 0,    # PgBouncer transaction mode (TASK-US050-04)
-            "ssl": "require",
+            "ssl": _ssl_connect_arg(
+                "DATABASE_READ_REQUIRE_SSL",
+                default=os.environ.get("DATABASE_REQUIRE_SSL", "true").strip().lower()
+                not in {"0", "false", "no", "off", "disable", "disabled"},
+            ),
         },
     )
 
