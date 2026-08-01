@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import * as Slider from "@radix-ui/react-slider";
 
 import type { RoutingWeightEntry } from "../../services/routingWeightService";
@@ -17,12 +17,16 @@ const SLIDER_CONFIGS: { key: WeightKey; label: string; colour: string }[] = [
 ];
 
 export function IntentWeightCard({ entry }: Props) {
-  const [weights, setWeights] = useState({
+  const initialWeights = {
     quality_weight: entry.quality_weight,
     cost_weight: entry.cost_weight,
     latency_weight: entry.latency_weight,
-  });
-  const { mutate: save, isPending } = useUpdateRoutingWeights();
+  };
+
+  const [weights, setWeights] = useState(initialWeights);
+  const [savedWeights, setSavedWeights] = useState(initialWeights);
+  const mutation = useUpdateRoutingWeights();
+  const isPending = mutation.isPending;
 
   /**
    * Re-normalise: when the user drags slider `key` to `newVal`,
@@ -44,7 +48,21 @@ export function IntentWeightCard({ entry }: Props) {
   };
 
   const handleSave = () =>
-    save({ intentType: entry.intent_type, weights });
+    mutation.mutate(
+      { intentType: entry.intent_type, weights },
+      { onSuccess: () => setSavedWeights(weights) }
+    );
+
+  useEffect(() => {
+    // Reset local state if the parent entry changes.
+    const w = {
+      quality_weight: entry.quality_weight,
+      cost_weight: entry.cost_weight,
+      latency_weight: entry.latency_weight,
+    };
+    setWeights(w);
+    setSavedWeights(w);
+  }, [entry.intent_type, entry.quality_weight, entry.cost_weight, entry.latency_weight]);
 
   return (
     <div className="glass-card p-4">
@@ -52,15 +70,23 @@ export function IntentWeightCard({ entry }: Props) {
         <h3 className="font-medium text-sm capitalize">
           {entry.intent_type.replace(/_/g, " ")}
         </h3>
-        <button
-          type="button"
-          onClick={handleSave}
-          disabled={isPending}
-          className="btn-primary text-xs"
-          aria-label={`Save routing weights for ${entry.intent_type}`}
-        >
-          {isPending ? "Saving…" : "Save"}
-        </button>
+        {(() => {
+          const isDirty =
+            JSON.stringify(weights) !== JSON.stringify(savedWeights);
+          const disabled = isPending || !isDirty;
+          const label = isPending ? "Saving…" : !isDirty ? "Saved" : "Save";
+          return (
+            <button
+              type="button"
+              onClick={handleSave}
+              disabled={disabled}
+              className="btn-primary text-xs"
+              aria-label={`Save routing weights for ${entry.intent_type}`}
+            >
+              {label}
+            </button>
+          );
+        })()}
       </div>
 
       <div className="space-y-4">

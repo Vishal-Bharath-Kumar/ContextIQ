@@ -36,6 +36,10 @@ x-app-env-vars: &app-env-vars
     # in src/data/database.py.
     DATABASE_URL: "postgresql+asyncpg://contextiq:contextiq_dev@postgres:5432/contextiq"
     DATABASE_READ_URL: "postgresql+asyncpg://contextiq:contextiq_dev@postgres:5432/contextiq"
+    # Local development may reuse an older postgres volume that was initialised
+    # without TLS support; disable forced SSL for app traffic in this stack.
+    DATABASE_REQUIRE_SSL: "false"
+    DATABASE_READ_REQUIRE_SSL: "false"
     # ── Redis ────────────────────────────────────────────────────────────────
     REDIS_SENTINEL_HOSTS: "redis-sentinel:26379"
     REDIS_SENTINEL_MASTER: "contextiq-redis"
@@ -137,7 +141,7 @@ services:
   # ── Certificate Generation (one-shot init container) ──────────────────────
   cert-init:
     image: alpine:3.19
-    command: ["sh", "-c", "apk add --no-cache openssl >/dev/null && sh /scripts/gen-certs.sh"]
+    command: ["sh", "-c", "apk add --no-cache openssl >/dev/null && tr -d '\r' < /scripts/gen-certs.sh > /tmp/gen-certs.sh && sh /tmp/gen-certs.sh"]
     volumes:
       - tls-certs:/tls
       - ./docker/certs/gen-certs.sh:/scripts/gen-certs.sh:ro
@@ -478,7 +482,9 @@ services:
     entrypoint: ["python", "-m", "scripts.ci.run_migration"]
     command: []
     environment:
-      DATABASE_URL: "postgresql+asyncpg://contextiq:contextiq_dev@postgres:5432/contextiq?sslmode=require"
+      # Local dev may reuse an existing postgres volume that predates SSL setup.
+      # Keep migrations reachable in that case instead of hard-failing on SSL.
+      DATABASE_URL: "postgresql+asyncpg://contextiq:contextiq_dev@postgres:5432/contextiq"
     restart: "no"
 
   # ── Kafka Topic Bootstrap (one-shot) ──────────────────────────────────────

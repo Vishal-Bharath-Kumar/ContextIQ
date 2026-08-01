@@ -54,6 +54,7 @@ const NAV_ITEMS: NavItem[] = [
     label: "Models",
     icon: <CardStackIcon aria-hidden="true" />,
     roles: [PlatformRole.PLATFORM_ENGINEER, PlatformRole.ADMIN],
+    end: true,
   },
   {
     to: "/models/weights",
