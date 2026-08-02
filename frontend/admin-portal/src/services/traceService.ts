@@ -6,6 +6,19 @@ import type {
   TraceSearchParams,
 } from "../pages/traces/trace.models";
 
+const api = axios.create({
+  baseURL: import.meta.env.VITE_API_BASE_URL ?? "/api",
+});
+
+api.interceptors.request.use((cfg) => {
+  const raw = sessionStorage.getItem("admin_user");
+  if (raw) {
+    const { token } = JSON.parse(raw) as { token: string };
+    cfg.headers.Authorization = `Bearer ${token}`;
+  }
+  return cfg;
+});
+
 export const TRACE_KEYS = {
   list:   (params: TraceSearchParams) => ["traces", params] as const,
   detail: (id: string)                => ["traces", id, "detail"] as const,
@@ -27,7 +40,7 @@ export function useTraces(params: TraceSearchParams) {
       if (params.from) p.set("from", params.from);
       if (params.to)   p.set("to",   params.to);
 
-      const { data } = await axios.get<TraceListResponse>(`/v1/traces?${p.toString()}`);
+      const { data } = await api.get<TraceListResponse>(`/v1/traces?${p.toString()}`);
       return data;
     },
   });
@@ -38,14 +51,34 @@ export function useTraceDetail(id: string) {
   return useQuery({
     queryKey: TRACE_KEYS.detail(id),
     queryFn:  async () => {
-      const { data } = await axios.get<TraceDetailResponse>(`/v1/traces/${encodeURIComponent(id)}`);
+      const { data } = await api.get<TraceDetailResponse>(`/v1/traces/${encodeURIComponent(id)}`);
       return data;
     },
     enabled: !!id,
   });
 }
 
-/** AC-6: Return the export URL for programmatic anchor-download. */
-export function traceExportUrl(id: string): string {
-  return `/v1/traces/${encodeURIComponent(id)}/export`;
+function filenameFromDisposition(value: string | null | undefined, fallbackId: string): string {
+  if (!value) {
+    return `contextiq-trace-${fallbackId}.json`;
+  }
+  const match = /filename="?([^";]+)"?/i.exec(value);
+  return match?.[1] ?? `contextiq-trace-${fallbackId}.json`;
+}
+
+/** AC-6: Download full execution trace with the same authenticated API client as the rest of the portal. */
+export async function downloadTraceExport(id: string): Promise<void> {
+  const response = await api.get<Blob>(`/v1/traces/${encodeURIComponent(id)}/export`, {
+    responseType: "blob",
+  });
+
+  const filename = filenameFromDisposition(response.headers["content-disposition"], id);
+  const objectUrl = window.URL.createObjectURL(response.data);
+  const anchor = document.createElement("a");
+  anchor.href = objectUrl;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  window.URL.revokeObjectURL(objectUrl);
 }

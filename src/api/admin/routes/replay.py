@@ -13,7 +13,7 @@ from typing import Annotated
 from uuid import UUID
 
 import redis.asyncio as aioredis
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -30,6 +30,16 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/v1/traces", tags=["Admin — Replay Explorer"])
 
 AuditorClaims = Annotated[JWTClaims, Depends(require_auditor_or_admin)]
+
+
+def _resolve_tenant_id(request: Request) -> str:
+    tenant_id = getattr(request.state, "tenant_id", None)
+    if tenant_id:
+        return str(tenant_id)
+
+    # Local dev remains single-tenant today; traces written by the MCP/graph
+    # path are stored under the default tenant when no tenant middleware is set.
+    return "default"
 
 
 def _build_service(session: AsyncSession, redis: aioredis.Redis) -> TraceDetailService:
@@ -52,6 +62,7 @@ def _build_service(session: AsyncSession, redis: aioredis.Redis) -> TraceDetailS
     summary="Search execution traces (Replay Explorer list view).",
 )
 async def search_traces(
+    request: Request,
     claims: AuditorClaims,
     session: Annotated[AsyncSession, Depends(get_db)],
     redis: Annotated[aioredis.Redis, Depends(get_redis_client)],
@@ -80,7 +91,7 @@ async def search_traces(
         offset=offset,
     )
     svc = _build_service(session, redis)
-    tenant_id = claims.sub or "default"
+    tenant_id = _resolve_tenant_id(request)
     return await svc.search(tenant_id, query)
 
 
@@ -94,6 +105,7 @@ async def search_traces(
     summary="Retrieve full execution trace detail.",
 )
 async def get_trace_detail(
+    request: Request,
     request_id: UUID,
     claims: AuditorClaims,
     session: Annotated[AsyncSession, Depends(get_db)],
@@ -105,7 +117,7 @@ async def get_trace_detail(
     AC-5: Redis cache satisfies 2 s SLA for traces up to 1 year old.
     """
     svc = _build_service(session, redis)
-    tenant_id = claims.sub or "default"
+    tenant_id = _resolve_tenant_id(request)
     try:
         return await svc.get_detail(tenant_id, request_id)
     except TraceNotFoundInIndexError:
@@ -125,6 +137,7 @@ async def get_trace_detail(
     response_class=StreamingResponse,
 )
 async def export_trace(
+    request: Request,
     request_id: UUID,
     claims: AuditorClaims,
     session: Annotated[AsyncSession, Depends(get_db)],
@@ -135,7 +148,7 @@ async def export_trace(
     Filename: contextiq-trace-{request_id}.json
     """
     svc = _build_service(session, redis)
-    tenant_id = claims.sub or "default"
+    tenant_id = _resolve_tenant_id(request)
     try:
         payload = await svc.get_raw_json(tenant_id, request_id)
     except TraceNotFoundInIndexError:

@@ -315,6 +315,16 @@ class TestSearchTraces:
         called_query = mock_search.call_args[0][1]
         assert called_query.model_selected == "gpt-4o"
 
+    def test_search_defaults_to_default_tenant_when_request_has_no_tenant(
+        self, client_as_auditor: TestClient
+    ) -> None:
+        """Replay search should use the local single-tenant default when no tenant context exists."""
+        with _patch_service_search(_LIST_RESPONSE) as mock_search:
+            resp = client_as_auditor.get("/v1/traces")
+        assert resp.status_code == 200
+        called_tenant = mock_search.call_args[0][0]
+        assert called_tenant == "default"
+
 
 # ---------------------------------------------------------------------------
 # AC-2, AC-3 detail view tests

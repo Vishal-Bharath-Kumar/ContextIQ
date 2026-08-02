@@ -153,13 +153,20 @@ def _assemble_trace(state: AgentState) -> ExecutionTrace:
     # Cast to dict[str, Any] to handle dynamic fields not declared in the TypedDict
     s: dict[str, Any] = cast(dict[str, Any], state)
     request_id = _get_request_id(state)
+    final_response = cast(dict[str, Any], s.get("final_response") or {})
+    usage = cast(dict[str, Any], final_response.get("usage") or {})
     jwt_claims: dict[str, Any] = s.get("jwt_claims") or {}
-    user_id: str = str(jwt_claims.get("sub") or "anonymous")
+    user_id: str = str(s.get("user_id") or jwt_claims.get("sub") or "anonymous")
 
     # retrieved_chunks pre-compression = full ranked_context before compression node
-    pre_chunks = _map_chunks(s.get("ranked_context_pre_compression") or [])
+    pre_chunks = _map_chunks(
+        s.get("ranked_context_pre_compression")
+        or s.get("raw_context")
+        or s.get("ranked_context")
+        or []
+    )
     # retrieved_chunks post-compression = ranked_context after compression node
-    post_chunks = _map_chunks(s.get("ranked_context") or [])
+    post_chunks = _map_chunks(s.get("compressed_context") or s.get("ranked_context") or [])
 
     # Compression delta
     delta: CompressionDelta | None = None
@@ -194,25 +201,38 @@ def _assemble_trace(state: AgentState) -> ExecutionTrace:
     )
 
     # Truncate response to max 500 chars for summary (avoids storing full LLM output in PG index)
-    raw_response: str = str(s.get("response") or "")
+    raw_response: str = str(
+        final_response.get("answer")
+        or s.get("response")
+        or ""
+    )
     response_summary = raw_response[:500] if raw_response else None
+
+    raw_timestamp = s.get("timestamp")
+    if isinstance(raw_timestamp, str) and raw_timestamp:
+        timestamp = datetime.fromisoformat(raw_timestamp.replace("Z", "+00:00"))
+    else:
+        timestamp = datetime.now(tz=UTC)
+
+    raw_intent = s.get("intent_type") or s.get("intent") or "unknown"
+    intent = getattr(raw_intent, "value", raw_intent)
 
     return ExecutionTrace(
         request_id=request_id,
         tenant_id=s.get("tenant_id") or "default",
         user_id=user_id,
-        timestamp=datetime.now(tz=UTC),
+        timestamp=timestamp,
         latency_ms=s.get("total_latency_ms"),
-        prompt=s.get("query") or "",
-        intent=s.get("intent") or "unknown",
+        prompt=s.get("prompt") or s.get("query") or "",
+        intent=str(intent),
         execution_plan=plan_steps,
         retrieved_chunks_pre_compression=pre_chunks,
         retrieved_chunks_post_compression=post_chunks,
         compression_delta=delta,
         governance_decisions=governance,
-        model_selected=s.get("model_selected"),
-        prompt_tokens=s.get("prompt_tokens"),
-        completion_tokens=s.get("completion_tokens"),
+        model_selected=s.get("selected_model") or s.get("model_selected") or final_response.get("selected_model"),
+        prompt_tokens=s.get("prompt_tokens") or usage.get("input_tokens"),
+        completion_tokens=s.get("completion_tokens") or usage.get("output_tokens"),
         response_summary=response_summary,
     )
 

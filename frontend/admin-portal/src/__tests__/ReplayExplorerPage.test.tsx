@@ -53,7 +53,7 @@ const MOCK_ITEMS: TraceListItem[] = [
 ];
 
 const server = setupServer(
-  http.get("/v1/traces", () =>
+  http.get("/api/v1/traces", () =>
     HttpResponse.json({ items: MOCK_ITEMS, total: 2, limit: 25, offset: 0 })
   )
 );
@@ -144,7 +144,7 @@ describe("ReplayExplorerPage", () => {
 
   it("shows empty-state message when the API returns no traces", async () => {
     server.use(
-      http.get("/v1/traces", () =>
+      http.get("/api/v1/traces", () =>
         HttpResponse.json({ items: [], total: 0, limit: 25, offset: 0 })
       )
     );

@@ -19,6 +19,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 import src.audit.trace.writer_node as _mod
+from src.agents.schemas.intent import IntentType
 from src.audit.trace.object_store import TraceWriteResult
 from src.audit.trace.writer_node import (
     _assemble_trace,
@@ -211,6 +212,36 @@ def test_assemble_trace_parses_string_request_id() -> None:
     state = _make_state(request_id=str(fixed_id))
     trace = _assemble_trace(state)
     assert trace.request_id == fixed_id
+
+
+def test_assemble_trace_prefers_current_pipeline_fields() -> None:
+    state = _make_state(
+        user_id="user-current",
+        prompt="Why did context_query return 500?",
+        intent_type=IntentType.DEBUGGING,
+        selected_model="gpt-4.1-mini",
+        query=None,
+        intent=None,
+        model_selected=None,
+        response=None,
+        final_response={
+            "answer": "The request failed before graph serialization completed.",
+            "selected_model": "gpt-4.1-mini",
+            "usage": {"input_tokens": 456, "output_tokens": 123},
+        },
+        timestamp="2026-08-02T10:15:30Z",
+    )
+
+    trace = _assemble_trace(state)
+
+    assert trace.user_id == "user-current"
+    assert trace.prompt == "Why did context_query return 500?"
+    assert trace.intent == "debugging"
+    assert trace.model_selected == "gpt-4.1-mini"
+    assert trace.prompt_tokens == 456
+    assert trace.completion_tokens == 123
+    assert trace.response_summary == "The request failed before graph serialization completed."
+    assert trace.timestamp == datetime(2026, 8, 2, 10, 15, 30, tzinfo=UTC)
 
 
 # ------------------------------------------------------------------ #

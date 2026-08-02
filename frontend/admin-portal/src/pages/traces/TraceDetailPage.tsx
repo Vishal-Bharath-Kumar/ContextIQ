@@ -1,6 +1,7 @@
+import { useState } from "react";
 import type { ReactNode } from "react";
 import { Link, useParams } from "react-router-dom";
-import { useTraceDetail, traceExportUrl } from "../../services/traceService";
+import { downloadTraceExport, useTraceDetail } from "../../services/traceService";
 import type { RetrievedChunkSummary, TimelineStep } from "./trace.models";
 
 // ── Small presentational helpers ─────────────────────────────────────────────
@@ -141,15 +142,24 @@ function SourcesSection({ sources }: { sources: RetrievedChunkSummary[] }) {
 export function TraceDetailPage() {
   const { id = "" } = useParams<{ id: string }>();
   const { data: trace, isLoading, isError } = useTraceDetail(id);
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
 
-  /** AC-6: Programmatic anchor download — no navigation, no server redirect needed. */
-  function handleExport() {
-    const a = document.createElement("a");
-    a.href = traceExportUrl(id);
-    a.download = `contextiq-trace-${id}.json`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
+  /** AC-6: Authenticated export through the same API client used by the rest of the portal. */
+  async function handleExport() {
+    if (!id || isExporting) {
+      return;
+    }
+
+    setExportError(null);
+    setIsExporting(true);
+    try {
+      await downloadTraceExport(id);
+    } catch {
+      setExportError("Failed to export trace. Please try again.");
+    } finally {
+      setIsExporting(false);
+    }
   }
 
   return (
@@ -195,12 +205,19 @@ export function TraceDetailPage() {
               {/* AC-6: Export button */}
               <button
                 onClick={handleExport}
+                disabled={isExporting}
                 className="btn-secondary shrink-0"
                 aria-label="Export trace as JSON file"
               >
-                ↓ Export JSON
+                {isExporting ? "Exporting…" : "↓ Export JSON"}
               </button>
             </div>
+
+            {exportError && (
+              <p role="alert" className="mt-3 text-sm text-red-600">
+                {exportError}
+              </p>
+            )}
 
             <dl className="mt-3 grid grid-cols-2 gap-x-8 gap-y-1 text-sm">
               <MetaRow label="User" value={<span className="font-mono">{trace.user_id}</span>} />
