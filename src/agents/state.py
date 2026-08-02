@@ -98,6 +98,7 @@ class AgentState(TypedDict):
     # ── Model routing output (EP-006) ──────────────────────────────────
     selected_model: str | None
     model_routing_score: float | None
+    fallback_chain: NotRequired[list[str] | None]
     final_response: dict | None
 
     # ── Knowledge Graph expansion output (EP-009) ──────────────────────

@@ -35,6 +35,7 @@ from pydantic import TypeAdapter
 from src.connector_sdk.health_poller import ConnectorHealthPoller
 from src.connector_sdk.registry import ConnectorRegistry
 from src.data.database import primary_session_factory
+from src.data.redis_client import create_redis_client
 from src.gateway.config import settings
 from src.gateway.lifespan import start_cache_invalidation_subscriber, start_entity_consumer, start_indexing_consumer
 from src.gateway.mcp_server import mcp, sse_app
@@ -61,6 +62,8 @@ from src.agents.nodes.retrieval import set_connector_registry
 from src.audit.trace.object_store import TraceObjectStore
 from src.audit.trace.writer_node import set_trace_object_store, set_trace_session_factory
 from src.gateway.tools.clarification_reply import set_graph as set_clarification_graph
+from src.model_router.runtime_services import RoutingRuntimeServices
+from src.observability.langfuse_integration import get_langfuse
 
 if TYPE_CHECKING:
     from src.indexing.consumer import IndexingConsumer
@@ -192,10 +195,20 @@ def create_gateway_app(jwks_client: Any = None) -> FastAPI:
             except Exception:
                 logger.warning("Could not configure trace writer dependencies", exc_info=True)
 
+            routing_runtime = RoutingRuntimeServices(
+                redis=create_redis_client(),
+                session_factory=primary_session_factory(),
+                langfuse=get_langfuse(),
+            )
+            app.state.routing_runtime = routing_runtime
+
             _graph_checkpointer = None
             try:
                 _graph_checkpointer = await get_redis_checkpointer()
-                graph = build_graph(checkpointer=_graph_checkpointer)
+                graph = build_graph(
+                    checkpointer=_graph_checkpointer,
+                    runtime_config={"routing_runtime": routing_runtime},
+                )
                 set_clarification_graph(graph)
                 app.state.agent_graph = graph
                 app.state.agent_graph_checkpointer = _graph_checkpointer
@@ -279,6 +292,8 @@ def create_gateway_app(jwks_client: Any = None) -> FastAPI:
                     )
 
             yield
+
+            await routing_runtime.close()
 
             if _graph_checkpointer is not None:
                 await _graph_checkpointer.aclose()

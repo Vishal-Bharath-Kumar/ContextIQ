@@ -48,6 +48,7 @@ from src.audit.trace.object_store import TraceObjectStore
 from src.audit.trace.writer_node import set_trace_object_store, set_trace_session_factory
 from src.connector_sdk.registry import ConnectorRegistry
 from src.data.database import primary_session_factory
+from src.data.redis_client import create_redis_client
 from src.events.producer import _sasl_kwargs
 from src.governance.opa.health import default_opa_health_status, opa_health_status
 from src.governance.nodes.opa_filter_node import set_opa_client
@@ -58,6 +59,7 @@ from src.knowledge_graph.inference.edge_inference_engine import EdgeInferenceSet
 from src.knowledge_graph.traversal.entity_linker import EntityLinkerSettings
 from src.knowledge_sources.runtime_connectors import apply_runtime_connector_overrides
 from src.llm.ollama_verify import verify_ollama_models_available
+from src.model_router.runtime_services import RoutingRuntimeServices
 
 logger = logging.getLogger(__name__)
 
@@ -68,6 +70,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     logger.info("agent_worker: initialising Redis checkpointer")
     checkpointer = await get_redis_checkpointer()
     app.state.checkpointer = checkpointer
+    routing_runtime = RoutingRuntimeServices(
+        redis=create_redis_client(),
+        session_factory=primary_session_factory(),
+    )
+    app.state.routing_runtime = routing_runtime
 
     app.state.ollama_verification = await verify_ollama_models_available(
         [
@@ -143,12 +150,18 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     state_publisher = StateEventPublisher(producer)
 
     logger.info("agent_worker: compiling LangGraph graph")
-    graph = build_graph(checkpointer=checkpointer, publisher=state_publisher)
+    graph = build_graph(
+        checkpointer=checkpointer,
+        publisher=state_publisher,
+        runtime_config={"routing_runtime": routing_runtime},
+    )
     set_graph(graph)
     logger.info("agent_worker: graph compiled — ready to serve")
     yield
     logger.info("agent_worker: shutdown — stopping Kafka producer")
     await producer.stop()
+    logger.info("agent_worker: shutdown — closing routing runtime Redis client")
+    await routing_runtime.close()
     logger.info("agent_worker: shutdown — closing Redis checkpointer")
     await checkpointer.aclose()
     logger.info("agent_worker: shutdown complete")
