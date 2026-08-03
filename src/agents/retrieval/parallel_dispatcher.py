@@ -204,7 +204,25 @@ class ParallelConnectorDispatcher:
         for src in source_ids:
             connector = self.registry.get(src)
             if connector is None:
-                continue  # not registered — silently skip (health-check excluded it)
+                record_getter = getattr(self.registry, "get_record", None)
+                record = record_getter(src) if callable(record_getter) else None
+                if record is None:
+                    pre_failed.append(
+                        FailedSource(
+                            source_id=src,
+                            error_type="ConnectorUnavailable",
+                            message=f"Connector '{src}' is not registered in the active runtime.",
+                        )
+                    )
+                else:
+                    pre_failed.append(
+                        FailedSource(
+                            source_id=src,
+                            error_type="ConnectorDisabled",
+                            message=f"Connector '{src}' is registered but disabled.",
+                        )
+                    )
+                continue
 
             if self.breaker_registry.is_open(src):
                 pre_failed.append(

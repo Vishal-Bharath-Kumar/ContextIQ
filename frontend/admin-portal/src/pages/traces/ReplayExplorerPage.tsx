@@ -12,7 +12,7 @@ export function ReplayExplorerPage() {
   const [page,     setPage]     = useState(0);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
 
-  const { data, isLoading } = useTraces({
+  const { data, isLoading, isError, error } = useTraces({
     ...filters,
     limit:  pageSize,
     offset: page * pageSize,
@@ -39,6 +39,12 @@ export function ReplayExplorerPage() {
       {isLoading ? (
         <p role="status" aria-live="polite">
           Loading traces…
+        </p>
+      ) : isError ? (
+        <p role="alert" className="text-danger py-8 text-center">
+          {error instanceof Error
+            ? `Could not load execution traces: ${error.message}`
+            : "Could not load execution traces."}
         </p>
       ) : (
         <TraceTable items={items} />

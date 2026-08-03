@@ -1,0 +1,12 @@
+{
+  "servers": {
+    "contextiq": {
+      "type": "http",
+      "url": "http://localhost:8000/mcp/",
+      "headers": {
+        "Authorization": "Bearer ${env:CONTEXTIQ_TOKEN}",
+        "Content-Type": "application/json"
+      }
+    }
+  }
+}

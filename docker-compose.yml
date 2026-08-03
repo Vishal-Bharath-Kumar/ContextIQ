@@ -97,6 +97,7 @@ x-app-env-vars: &app-env-vars
     # Use host.docker.internal to reach Ollama running on the host machine
     OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
     CONTEXTIQ_LLM_MODEL_ID: ${CONTEXTIQ_LLM_MODEL_ID:-ollama/llama3.2}
+    CONTEXTIQ_PREFER_RUNTIME_AVAILABLE_SOURCES: "true"
     ENTITY_LINKER_MODEL_ID: ${ENTITY_LINKER_MODEL_ID:-ollama/llama3.2}
     ENTITY_EXTRACTION_MODEL_ID: ${ENTITY_EXTRACTION_MODEL_ID:-ollama/llama3.2}
     EDGE_INFERENCE_MODEL_ID: ${EDGE_INFERENCE_MODEL_ID:-ollama/llama3.2}
@@ -524,6 +525,10 @@ services:
     env_file: *app-env-file
     environment:
       <<: *app-env-vars
+      CONTEXTIQ_ENTERPRISE_WORKSPACE_ROOT: "/workspace"
+      CONTEXTIQ_ENTERPRISE_DOC_ROOT: "/workspace/docs"
+      CONTEXTIQ_ENTERPRISE_CODE_ROOTS: "/workspace/src,/workspace/tests,/workspace/frontend"
+      CONTEXTIQ_LOCAL_COMPOSE_PATH: "/workspace/docker-compose.yml"
       # Enables POST /auth/dev-login (password-grant against Keycloak) so the
       # Admin Portal can authenticate locally without the full OIDC redirect
       # flow. Real Keycloak-issued JWTs are still returned/validated normally
@@ -545,7 +550,12 @@ services:
       # Overwrite this secret with a real PAT (see docs) instead of changing this path.
       GITHUB_CONNECTOR_VAULT_PATH: "connectors/github/my-org-pat"
     volumes:
-      *app-volumes
+      - tls-certs:/tls:ro
+      - ./src:/workspace/src:ro
+      - ./docs:/workspace/docs:ro
+      - ./tests:/workspace/tests:ro
+      - ./frontend:/workspace/frontend:ro
+      - ./docker-compose.yml:/workspace/docker-compose.yml:ro
     ports:
       - "8000:8000"
     healthcheck:

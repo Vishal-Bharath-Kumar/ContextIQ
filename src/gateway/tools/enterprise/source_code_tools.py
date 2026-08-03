@@ -11,7 +11,15 @@ import logging
 from typing import Any
 
 from fastmcp import FastMCP
-from src.gateway.tools.enterprise._local_tools import CODE_ROOTS, explain_code_file, json_text_response, search_workspace
+from src.gateway.tools.enterprise._local_tools import (
+    CODE_ROOTS,
+    build_error_response,
+    build_tool_response,
+    explain_code_file,
+    json_text_response,
+    search_workspace,
+    workspace_coverage,
+)
 from mcp.types import TextContent
 
 logger = logging.getLogger(__name__)
@@ -62,14 +70,36 @@ def register_source_code_tools(mcp: FastMCP, connector_manager: Any = None) -> N
                 from src.gateway.tools.enterprise._local_tools import _LANGUAGE_SUFFIXES  # noqa: PLC0415
 
                 suffixes = _LANGUAGE_SUFFIXES.get(language.lower())
-            results = {
-                "query": query,
-                "repository": repository or "ContextIQ",
-                "language": language or "all languages",
-                "results": search_workspace(query, roots=CODE_ROOTS, suffixes=suffixes, limit=limit),
-                "total": len(search_workspace(query, roots=CODE_ROOTS, suffixes=suffixes, limit=limit)),
-                "status": "success",
-            }
+            matches = search_workspace(query, roots=CODE_ROOTS, suffixes=suffixes, limit=limit)
+            results = build_tool_response(
+                status="success" if matches else "empty",
+                summary=(
+                    f"Found {len(matches)} code match(es)."
+                    if matches
+                    else "No code matches were found for the supplied query."
+                ),
+                data={
+                    "query": query,
+                    "repository": repository or "ContextIQ",
+                    "language": language or "all languages",
+                    "results": matches,
+                    "total": len(matches),
+                },
+                diagnostics={
+                    "adapter": "workspace_search",
+                    "source_availability": workspace_coverage(roots=CODE_ROOTS, suffixes=suffixes),
+                    "degraded_reasons": [],
+                },
+            )
+            results.update(
+                {
+                    "query": query,
+                    "repository": repository or "ContextIQ",
+                    "language": language or "all languages",
+                    "results": matches,
+                    "total": len(matches),
+                }
+            )
             
             logger.info(
                 "search_code invoked: query=%s, repo=%s, lang=%s",
@@ -82,7 +112,13 @@ def register_source_code_tools(mcp: FastMCP, connector_manager: Any = None) -> N
             
         except Exception as e:
             logger.error("search_code failed: %s", e, exc_info=True)
-            return json_text_response({"error": str(e), "status": "error"})
+            return json_text_response(
+                build_error_response(
+                    summary="Code search failed.",
+                    error=e,
+                    diagnostics={"adapter": "workspace_search"},
+                )
+            )
 
     @mcp.tool()
     async def explain_code(
@@ -113,11 +149,14 @@ def register_source_code_tools(mcp: FastMCP, connector_manager: Any = None) -> N
             Code explanation with architecture context
         """
         try:
-            result = {
-                **explain_code_file(file_path, start_line=start_line, end_line=end_line),
-                "repository": repository,
-                "status": "success",
-            }
+            explanation = explain_code_file(file_path, start_line=start_line, end_line=end_line)
+            result = build_tool_response(
+                status="success",
+                summary="Generated a code explanation from the local workspace file.",
+                data={**explanation, "repository": repository},
+                diagnostics={"adapter": "workspace_file_read", "degraded_reasons": []},
+            )
+            result.update({**explanation, "repository": repository})
             
             logger.info(
                 "explain_code invoked: %s in %s (lines %s-%s)",
@@ -131,7 +170,13 @@ def register_source_code_tools(mcp: FastMCP, connector_manager: Any = None) -> N
             
         except Exception as e:
             logger.error("explain_code failed: %s", e, exc_info=True)
-            return json_text_response({"error": str(e), "status": "error"})
+            return json_text_response(
+                build_error_response(
+                    summary="Code explanation failed.",
+                    error=e,
+                    diagnostics={"adapter": "workspace_file_read", "file_path": file_path},
+                )
+            )
 
     @mcp.tool()
     async def search_repository(
@@ -158,20 +203,40 @@ def register_source_code_tools(mcp: FastMCP, connector_manager: Any = None) -> N
             Repository search results
         """
         try:
-            results = search_workspace(
+            matches = search_workspace(
                 query,
                 roots=CODE_ROOTS,
                 suffixes=None,
                 limit=20,
                 path_filter=path_filter,
             )
-            result = {
-                "repository": repository or "ContextIQ",
-                "query": query,
-                "path_filter": path_filter,
-                "results": results,
-                "status": "success",
-            }
+            result = build_tool_response(
+                status="success" if matches else "empty",
+                summary=(
+                    f"Found {len(matches)} repository match(es)."
+                    if matches
+                    else "No repository matches were found for the supplied query."
+                ),
+                data={
+                    "repository": repository or "ContextIQ",
+                    "query": query,
+                    "path_filter": path_filter,
+                    "results": matches,
+                },
+                diagnostics={
+                    "adapter": "workspace_search",
+                    "source_availability": workspace_coverage(roots=CODE_ROOTS, path_filter=path_filter),
+                    "degraded_reasons": [],
+                },
+            )
+            result.update(
+                {
+                    "repository": repository or "ContextIQ",
+                    "query": query,
+                    "path_filter": path_filter,
+                    "results": matches,
+                }
+            )
             
             logger.info(
                 "search_repository invoked: %s in %s (filter: %s)",
@@ -184,4 +249,10 @@ def register_source_code_tools(mcp: FastMCP, connector_manager: Any = None) -> N
             
         except Exception as e:
             logger.error("search_repository failed: %s", e, exc_info=True)
-            return json_text_response({"error": str(e), "status": "error"})
+            return json_text_response(
+                build_error_response(
+                    summary="Repository search failed.",
+                    error=e,
+                    diagnostics={"adapter": "workspace_search", "path_filter": path_filter},
+                )
+            )

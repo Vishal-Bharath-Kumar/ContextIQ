@@ -66,6 +66,7 @@ class GitHubConnector(BaseConnector):
         self._session = session          # injected for sync; None in fetch-only usage
         self._token_provider = GitHubTokenProvider(self._config)
         self._credential: GitHubCredential | None = None  # set by authenticate()
+        self._anonymous_public_readonly = False
 
     async def authenticate(self) -> None:
         """
@@ -79,9 +80,16 @@ class GitHubConnector(BaseConnector):
         """
         credential = await self._token_provider.get_credential()
         self._credential = credential
+        self._anonymous_public_readonly = False
 
         health = await self.health_check()
         if not health.healthy:
+            if await self._enable_anonymous_public_mode(health.message):
+                logger.warning(
+                    "github_connector_public_readonly_mode_enabled",
+                    extra={"repos": self._config.repos},
+                )
+                return
             self._credential = None
             raise ConnectorAuthError(f"GitHub credential validation failed: {health.message}")
 
@@ -92,6 +100,8 @@ class GitHubConnector(BaseConnector):
         Raises:
             ConnectorAuthError: when ``authenticate()`` has not yet been called.
         """
+        if self._anonymous_public_readonly:
+            return {}
         if self._credential is None:
             raise ConnectorAuthError("authenticate() has not been called")
         return {"Authorization": f"Bearer {self._credential.token}"}
@@ -122,6 +132,15 @@ class GitHubConnector(BaseConnector):
         content_client = GitHubContentClient(self._config)
         auth = self._auth_header()
         branch = query.filters.get("branch", "main")
+
+        if self._anonymous_public_readonly:
+            return await self._fallback_fetch_from_repo_paths(
+                query=query.query,
+                branch=branch,
+                content_client=content_client,
+                auth_header=auth,
+                max_results=query.max_results,
+            )
 
         try:
             items = await search_client.search_code(
@@ -430,6 +449,19 @@ class GitHubConnector(BaseConnector):
         """
         now = datetime.now(tz=UTC)
         try:
+            if self._anonymous_public_readonly:
+                healthy = await self._supports_public_readonly_mode()
+                if healthy:
+                    return HealthStatus(
+                        healthy=True,
+                        message="GitHub public repository access enabled without PAT",
+                        checked_at=now,
+                    )
+                return HealthStatus(
+                    healthy=False,
+                    message="GitHub public repository access no longer available",
+                    checked_at=now,
+                )
             if self._credential is None:
                 return HealthStatus(
                     healthy=False,
@@ -463,6 +495,33 @@ class GitHubConnector(BaseConnector):
                 message=f"{type(exc).__name__}: {str(exc)[:150]}",
                 checked_at=now,
             )
+
+    async def _enable_anonymous_public_mode(self, health_message: str) -> bool:
+        if "HTTP 401" not in health_message:
+            return False
+        if not self._config.repos:
+            return False
+        if not await self._supports_public_readonly_mode():
+            return False
+        self._anonymous_public_readonly = True
+        return True
+
+    async def _supports_public_readonly_mode(self) -> bool:
+        if not self._config.repos:
+            return False
+        async with httpx.AsyncClient(timeout=self._config.request_timeout_s, trust_env=False) as client:
+            headers = {
+                "Accept": "application/vnd.github+json",
+                "X-GitHub-Api-Version": "2022-11-28",
+            }
+            for repo in self._config.repos:
+                resp = await client.get(f"{self._config.base_url}/repos/{repo}", headers=headers)
+                if resp.status_code != 200:
+                    return False
+                payload = resp.json()
+                if payload.get("private") is True:
+                    return False
+        return True
 
 
 def _extract_fallback_keywords(query: str) -> set[str]:

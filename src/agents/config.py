@@ -29,11 +29,13 @@ class AgentSettings(BaseSettings):
     llm_model_id: str = "ollama/llama3.2"
     llm_timeout_s: float = 30.0
     allow_degraded_opa_startup: bool = False
+    prefer_runtime_available_sources: bool = False
 
     def model_post_init(self, __context: object) -> None:
         if self.app_env.lower() == "development":
             object.__setattr__(self, "debug", True)
             object.__setattr__(self, "allow_degraded_opa_startup", True)
+            object.__setattr__(self, "prefer_runtime_available_sources", True)
 
 
 settings = AgentSettings()

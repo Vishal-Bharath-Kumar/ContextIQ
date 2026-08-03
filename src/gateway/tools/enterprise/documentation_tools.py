@@ -11,7 +11,15 @@ import logging
 from typing import Any
 
 from fastmcp import FastMCP
-from src.gateway.tools.enterprise._local_tools import DOC_ROOT, json_text_response, search_workspace, summarize_document_path
+from src.gateway.tools.enterprise._local_tools import (
+    DOC_ROOT,
+    build_error_response,
+    build_tool_response,
+    json_text_response,
+    search_workspace,
+    summarize_document_path,
+    workspace_coverage,
+)
 from mcp.types import TextContent
 
 logger = logging.getLogger(__name__)
@@ -61,14 +69,35 @@ def register_documentation_tools(mcp: FastMCP, knowledge_service: Any = None) ->
             if doc_type:
                 path_filter = f"**/*{doc_type}*.md"
             matches = search_workspace(query, roots=[DOC_ROOT], suffixes={".md"}, limit=limit, path_filter=path_filter)
-            result = {
-                "query": query,
-                "source": source or "workspace-docs",
-                "doc_type": doc_type,
-                "results": matches,
-                "total": len(matches),
-                "status": "success",
-            }
+            result = build_tool_response(
+                status="success" if matches else "empty",
+                summary=(
+                    f"Found {len(matches)} documentation match(es)."
+                    if matches
+                    else "No documentation matches were found for the supplied query."
+                ),
+                data={
+                    "query": query,
+                    "source": source or "workspace-docs",
+                    "doc_type": doc_type,
+                    "results": matches,
+                    "total": len(matches),
+                },
+                diagnostics={
+                    "adapter": "workspace_docs_search",
+                    "source_availability": workspace_coverage(roots=[DOC_ROOT], suffixes={".md"}, path_filter=path_filter),
+                    "degraded_reasons": [],
+                },
+            )
+            result.update(
+                {
+                    "query": query,
+                    "source": source or "workspace-docs",
+                    "doc_type": doc_type,
+                    "results": matches,
+                    "total": len(matches),
+                }
+            )
             
             logger.info(
                 "search_documentation invoked: query=%s, source=%s, type=%s",
@@ -81,7 +110,13 @@ def register_documentation_tools(mcp: FastMCP, knowledge_service: Any = None) ->
             
         except Exception as e:
             logger.error("search_documentation failed: %s", e, exc_info=True)
-            return json_text_response({"error": str(e), "status": "error"})
+            return json_text_response(
+                build_error_response(
+                    summary="Documentation search failed.",
+                    error=e,
+                    diagnostics={"adapter": "workspace_docs_search", "doc_type": doc_type},
+                )
+            )
 
     @mcp.tool()
     async def summarize_document(
@@ -108,7 +143,14 @@ def register_documentation_tools(mcp: FastMCP, knowledge_service: Any = None) ->
             Document summary with metadata
         """
         try:
-            result = {**summarize_document_path(document_id, max_words=max_length), "source": source, "status": "success"}
+            summary = summarize_document_path(document_id, max_words=max_length)
+            result = build_tool_response(
+                status="success",
+                summary="Document summary generated.",
+                data={**summary, "source": source},
+                diagnostics={"adapter": "workspace_document_summary", "degraded_reasons": []},
+            )
+            result.update({**summary, "source": source})
             
             logger.info(
                 "summarize_document invoked: %s from %s",
@@ -120,7 +162,13 @@ def register_documentation_tools(mcp: FastMCP, knowledge_service: Any = None) ->
             
         except Exception as e:
             logger.error("summarize_document failed: %s", e, exc_info=True)
-            return json_text_response({"error": str(e), "status": "error"})
+            return json_text_response(
+                build_error_response(
+                    summary="Document summarization failed.",
+                    error=e,
+                    diagnostics={"adapter": "workspace_document_summary", "document_id": document_id},
+                )
+            )
 
     @mcp.tool()
     async def architecture_search(
@@ -145,19 +193,37 @@ def register_documentation_tools(mcp: FastMCP, knowledge_service: Any = None) ->
             Architecture documentation results
         """
         try:
-            results = search_workspace(
+            primary = search_workspace(
+                query,
+                roots=[DOC_ROOT],
+                suffixes={".md"},
+                limit=10,
+                path_filter="**/architecture/**/*.md",
+            )
+            secondary = search_workspace(
                 query,
                 roots=[DOC_ROOT],
                 suffixes={".md"},
                 limit=10,
                 path_filter="**/*architecture*.md",
             )
-            result = {
-                "query": query,
-                "component": component,
-                "results": results,
-                "status": "success",
-            }
+            fallback = search_workspace(query, roots=[DOC_ROOT], suffixes={".md"}, limit=10) if not (primary or secondary) else []
+            results = _dedupe_results(primary + secondary + fallback, limit=10)
+            result = build_tool_response(
+                status="success" if results else "empty",
+                summary=(
+                    f"Found {len(results)} architecture documentation match(es)."
+                    if results
+                    else "No architecture documentation matches were found for the supplied query."
+                ),
+                data={"query": query, "component": component, "results": results},
+                diagnostics={
+                    "adapter": "workspace_architecture_search",
+                    "source_availability": workspace_coverage(roots=[DOC_ROOT], suffixes={".md"}),
+                    "degraded_reasons": [],
+                },
+            )
+            result.update({"query": query, "component": component, "results": results})
             
             logger.info(
                 "architecture_search invoked: query=%s, component=%s",
@@ -169,4 +235,24 @@ def register_documentation_tools(mcp: FastMCP, knowledge_service: Any = None) ->
             
         except Exception as e:
             logger.error("architecture_search failed: %s", e, exc_info=True)
-            return json_text_response({"error": str(e), "status": "error"})
+            return json_text_response(
+                build_error_response(
+                    summary="Architecture search failed.",
+                    error=e,
+                    diagnostics={"adapter": "workspace_architecture_search", "component": component},
+                )
+            )
+
+
+def _dedupe_results(results: list[dict[str, Any]], *, limit: int) -> list[dict[str, Any]]:
+    deduped: list[dict[str, Any]] = []
+    seen: set[tuple[str, int]] = set()
+    for result in results:
+        key = (str(result.get("path") or ""), int(result.get("line") or 0))
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(result)
+        if len(deduped) >= limit:
+            break
+    return deduped

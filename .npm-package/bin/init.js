@@ -86,10 +86,11 @@ function init() {
   console.log('Next steps:');
   console.log('  1. Review .env.example and create your .env file');
   console.log('  2. Configure Context7 API key in .vscode/mcp.json');
-  console.log('  3. Review and configure MCP servers in .vscode/mcp.json');
-  console.log('  4. Check .github/copilot-instructions.md for Copilot configuration');
-  console.log('  5. Customize .propel/ files for your project');
-  console.log('  6. Install Python dependencies: pip install -r .propel/requirements.txt\n');
+  console.log('  3. If using local ContextIQ MCP, run the setup-contextiq-dev-login VS Code task once');
+  console.log('  4. Review and configure MCP servers in .vscode/mcp.json');
+  console.log('  5. Check .github/copilot-instructions.md for Copilot configuration');
+  console.log('  6. Customize .propel/ files for your project');
+  console.log('  7. Install Python dependencies: pip install -r .propel/requirements.txt\n');
 }
 
 init();

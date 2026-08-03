@@ -1,0 +1,53 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "refresh-contextiq-dev-token",
+      "type": "shell",
+      "command": "python3",
+      "args": [
+        ".propel/tools/refresh_mcp_token_input.py",
+        "--skip-if-missing"
+      ],
+      "runOptions": {
+        "runOn": "folderOpen"
+      },
+      "presentation": {
+        "reveal": "silent",
+        "panel": "dedicated"
+      },
+      "problemMatcher": [],
+      "detail": "Refreshes the ContextIQ MCP bearer token using cached local-dev credentials or environment variables."
+    },
+    {
+      "label": "setup-contextiq-dev-login",
+      "type": "shell",
+      "command": "python3",
+      "args": [
+        ".propel/tools/refresh_mcp_token_input.py",
+        "${input:contextiq-dev-username}",
+        "${input:contextiq-dev-password}"
+      ],
+      "presentation": {
+        "reveal": "silent",
+        "panel": "dedicated"
+      },
+      "problemMatcher": [],
+      "detail": "Prompts once for local dev credentials, stores them for future auto-refresh, and refreshes the ContextIQ MCP bearer token."
+    }
+  ],
+  "inputs": [
+    {
+      "id": "contextiq-dev-username",
+      "type": "promptString",
+      "description": "ContextIQ dev username",
+      "default": "admin"
+    },
+    {
+      "id": "contextiq-dev-password",
+      "type": "promptString",
+      "description": "ContextIQ dev password",
+      "password": true
+    }
+  ]
+}

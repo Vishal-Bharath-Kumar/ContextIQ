@@ -5,7 +5,7 @@ TASK-US007-01 acceptance criteria:
   - one_fails:              one connector raises; others succeed; failed_sources recorded
   - all_fail:               every connector raises; chunks empty; all in failed_sources
   - empty_source_list:      no sources → empty FetchAllResult
-  - inactive_connector:     source absent from registry (get() → None) is silently skipped
+    - inactive_connector:     unavailable sources are surfaced in failed_sources
   - timeout_propagated:     asyncio.TimeoutError from _fetch_one captured as FailedSource
   - retrieval_node_returns: node returns correct state keys populated from FetchAllResult
   - registry_not_set:       retrieval_node raises RuntimeError when registry missing
@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import asyncio
 from datetime import UTC, datetime
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -64,6 +65,7 @@ def _make_registry(source_map: dict[str, object | None]) -> MagicMock:
     """Build a fake ConnectorRegistry whose get() follows source_map."""
     registry = MagicMock()
     registry.get.side_effect = lambda src: source_map.get(src)
+    registry.get_record.side_effect = lambda src: None if src not in source_map else SimpleNamespace(enabled=source_map[src] is not None, instance=source_map[src])
     return registry
 
 
@@ -228,8 +230,7 @@ class TestParallelConnectorDispatcherEmptySourceList:
 
 
 class TestParallelConnectorDispatcherInactiveConnector:
-    async def test_inactive_source_silently_skipped(self) -> None:
-        """Sources whose registry.get() returns None must be skipped without error."""
+    async def test_inactive_source_recorded_as_disabled(self) -> None:
         active = _make_mock_connector([_make_connector_result("x", "data")])
         registry = _make_registry({"active_src": active, "inactive_src": None})
         dispatcher = ParallelConnectorDispatcher(registry, timeout_seconds=5.0)
@@ -241,10 +242,12 @@ class TestParallelConnectorDispatcherInactiveConnector:
         )
 
         assert len(out.chunks) == 1
-        assert out.failed_sources == []
+        assert len(out.failed_sources) == 1
+        assert out.failed_sources[0].source_id == "inactive_src"
+        assert out.failed_sources[0].error_type == "ConnectorDisabled"
         active.fetch.assert_called_once()
 
-    async def test_unknown_source_silently_skipped(self) -> None:
+    async def test_unknown_source_recorded_as_unavailable(self) -> None:
         registry = _make_registry({})
         dispatcher = ParallelConnectorDispatcher(registry, timeout_seconds=5.0)
 
@@ -253,7 +256,9 @@ class TestParallelConnectorDispatcherInactiveConnector:
         )
 
         assert out.chunks == []
-        assert out.failed_sources == []
+        assert len(out.failed_sources) == 1
+        assert out.failed_sources[0].source_id == "nonexistent"
+        assert out.failed_sources[0].error_type == "ConnectorUnavailable"
 
 
 class TestParallelConnectorDispatcherTimeout:
@@ -451,3 +456,50 @@ class TestRetrievalNode:
 
         assert result["raw_context"][0]["metadata"]["file_path"] == "docs/README.md"
         assert result["ranked_context"][0]["metadata"]["file_path"] == "src/main.py"
+
+    async def test_node_uses_workspace_fallback_when_connectors_return_no_chunks(self) -> None:
+        registry = _make_registry({"github": _make_mock_connector([])})
+        set_connector_registry(registry)
+
+        state = _make_state(prompt="ContextIQ architecture workflow")
+
+        with patch(
+            "src.agents.nodes.retrieval.search_workspace",
+            return_value=[
+                {
+                    "path": "docs/architecture/system.md",
+                    "title": "System",
+                    "line": 3,
+                    "snippet": "retrieval ranking compression governance",
+                    "score": 12.0,
+                    "last_modified": "2026-08-03T00:00:00Z",
+                }
+            ],
+        ):
+            result = await retrieval_node(state)
+
+        assert result["raw_context"][0]["source_id"] == "workspace"
+        assert result["ranked_context"][0]["metadata"]["file_path"] == "docs/architecture/system.md"
+        assert result["degraded_sources"][-1]["source_id"] == "workspace"
+
+    async def test_node_prefers_available_runtime_sources(self) -> None:
+        connector = _make_mock_connector([_make_connector_result("code-1", "def create_app(): pass")])
+        registry = _make_registry({"github": connector, "confluence": None, "stackoverflow": None})
+        set_connector_registry(registry)
+
+        state = _make_state(
+            execution_plan=ExecutionPlan(
+                sources=["confluence", "github", "stackoverflow"],
+                token_budget_total=8000,
+                token_budget_per_source={"confluence": 2000, "github": 4000, "stackoverflow": 2000},
+                ranking_strategy=RankingStrategy.SEMANTIC,
+                cache_eligible=False,
+            )
+        )
+
+        with patch.object(retrieval_module.settings, "prefer_runtime_available_sources", True):
+            result = await retrieval_node(state)
+
+        assert len(result["raw_context"]) == 1
+        assert result["raw_context"][0]["source_id"] == "github"
+        assert result["degraded_sources"] == []

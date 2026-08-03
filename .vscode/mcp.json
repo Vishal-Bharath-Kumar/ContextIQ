@@ -4,7 +4,7 @@
       "type": "http",
       "url": "http://localhost:8000/mcp/",
       "headers": {
-        "Authorization": "Bearer ${env:CONTEXTIQ_TOKEN}",
+        "Authorization": "Bearer eyJhbGciOiJSUzI1NiIsInR5cCIgOiAiSldUIiwia2lkIiA6ICItWDBWZVNyTTRnM1k0QURzOWZ2NkQteEVlamZMdjV5eGFKaUZNekpCczQ4In0.eyJleHAiOjE3ODU3NzExOTcsImlhdCI6MTc4NTc2NzU5NywianRpIjoib25ydHJvOjY1Yzg5NDNkLTIzMjUtNzJjYy1jOWFkLTdjOGQwNGI4NTcyZCIsImlzcyI6Imh0dHA6Ly9rZXljbG9hazo4MDgwL2F1dGgvcmVhbG1zL2NvbnRleHRpcSIsInN1YiI6IjcwYzNjZTI4LTA1NmQtNDU3OS1hYjNiLTgzOTJiYWNmZjc5OSIsInR5cCI6IkJlYXJlciIsImF6cCI6ImNvbnRleHRpcS1tY3AtZ2F0ZXdheSIsInNpZCI6IlR3NVJyRUlyWnZ0RXFsblJoNU04aXo5VyIsInJlYWxtX2FjY2VzcyI6eyJyb2xlcyI6WyJwbGF0Zm9ybV9lbmdpbmVlciIsImFkbWluIiwiZGV2ZWxvcGVyIl19LCJzY29wZSI6Im9wZW5pZCBlbWFpbCBwcm9maWxlIiwiZW1haWxfdmVyaWZpZWQiOnRydWUsIm5hbWUiOiJBZG1pbiBVc2VyIiwicHJlZmVycmVkX3VzZXJuYW1lIjoiYWRtaW4iLCJnaXZlbl9uYW1lIjoiQWRtaW4iLCJmYW1pbHlfbmFtZSI6IlVzZXIiLCJlbWFpbCI6ImFkbWluQGNvbnRleHRpcS5sb2NhbCJ9.h8A7DUic8P7VeAtWatPRBWmoCq7-TJnCmosgATSGKULD-KnTy2qfIgyodjx2gqhOaMcWFJkvsqY8bc3v34CRRGJyiCZ_lAa3kpLcgDpZgqYjpccmXeODzkFYy8fORV_gyFsjdYhUMhmXKUHkJf7duddawG2LsY_0RpB7fuvHG0S_z6GDciGfVa83EK3jcc6fTebR5IGi7cQJ18Qe2GIble_MITWmjpauN4HlA2b4wQcsPnNFoUdBvtR-Eio4Vhh_4M8qLBGFj4k-ovoR2Ns754X6G0gTJzuhdsDiu-qN7GLNHlXZFHsKp0-iMOKDMe4SpyuDzkjAJcAcSCewU1ONxA",
         "Content-Type": "application/json"
       }
     },

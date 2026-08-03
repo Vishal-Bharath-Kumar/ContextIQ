@@ -54,6 +54,14 @@ http://localhost:8000/mcp/sse/
 - Protocol: HTTP with streaming responses
 - Use case: Long-polling, one-way streaming
 
+### VS Code Workspace MCP
+```
+http://localhost:8000/mcp/
+```
+- Best for: GitHub Copilot in VS Code workspace `.vscode/mcp.json`
+- Protocol: MCP over HTTP POST
+- Use case: Repo-local ContextIQ integration in another workspace
+
 ### WebSocket
 ```
 ws://localhost:8000/mcp/ws
@@ -88,7 +96,7 @@ ContextIQ supports working with multiple repositories simultaneously using custo
 {
   "contextiq-repo-a": {
     "type": "http",
-      "url": "http://localhost:8000/mcp/sse/",
+         "url": "http://localhost:8000/mcp/",
     "headers": {
       "Authorization": "Bearer ${env:CONTEXTIQ_TOKEN}",
       "X-Repository": "frontend-app",
@@ -143,12 +151,14 @@ Test your MCP connection:
 # Check ContextIQ health
 curl http://localhost:8000/healthz
 
-# Test MCP SSE handshake
+# Test MCP SSE handshake for SSE-based clients
 curl --max-time 5 \
    -H "Authorization: Bearer $CONTEXTIQ_TOKEN" \
    -H "Accept: text/event-stream" \
    http://localhost:8000/mcp/sse/
 ```
+
+For VS Code, copy `examples/contextiq-mcp-starter/` into the target repo, reload the window, and verify the `contextiq` server appears in Copilot Chat without prompting for a client ID.
 
 ## Troubleshooting
 
@@ -197,7 +207,7 @@ docker compose logs -f api
          │
 ┌────────▼────────┐
 │ ContextIQ       │
-│ API + MCP       │ :8000/mcp/sse/ or /mcp/ws
+│ API + MCP       │ :8000/mcp/ or /mcp/sse/ or /mcp/ws
 └────────┬────────┘
          │
     ┌────┴────┬──────────┬──────────┐
@@ -215,7 +225,7 @@ For production deployments:
 1. **Use HTTPS**
    ```json
    {
-     "url": "https://contextiq.example.com/mcp/sse"
+       "url": "https://contextiq.example.com/mcp/"
    }
    ```
 
