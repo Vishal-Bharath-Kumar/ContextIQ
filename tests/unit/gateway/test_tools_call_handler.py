@@ -266,6 +266,50 @@ class TestHandleToolCallBuiltinFallback:
         agent_client.execute.assert_not_called()
         assert result[0].text == '{"source":"builtin"}'
 
+    @pytest.mark.asyncio
+    async def test_builtin_tool_schedules_replay_trace(self) -> None:
+        registry = _make_registry([])
+        agent_client = _make_agent_client()
+        captured: list[object] = []
+
+        def _call_tool_decorator() -> Callable[[object], object]:
+            def _inner(fn: object) -> object:
+                captured.append(fn)
+                return fn
+            return _inner
+
+        builtin_tool = MagicMock()
+        builtin_tool.name = "builtin_search"
+        builtin_tool.description = "Built-in search"
+        builtin_tool.parameters = {
+            "type": "object",
+            "properties": {"query": {"type": "string"}},
+            "required": ["query"],
+        }
+        builtin_tool.run = AsyncMock(
+            return_value=MagicMock(
+                content=[TextContent(type="text", text='{"source":"builtin"}')],
+                structured_content={"source": "builtin"},
+            )
+        )
+
+        mock_mcp = MagicMock()
+        mock_mcp.call_tool = _call_tool_decorator
+        mock_mcp.get_tool = AsyncMock(return_value=builtin_tool)
+
+        register_tools_call_handler(mock_mcp, registry=registry, agent_client=agent_client)
+        handler = captured[0]
+
+        with patch("src.gateway.handlers.tools_call._schedule_builtin_tool_trace") as mock_schedule:
+            await handler("builtin_search", {"query": "hello"})
+
+        mock_schedule.assert_called_once()
+        call = mock_schedule.call_args.kwargs
+        assert call["tool_name"] == "builtin_search"
+        assert call["arguments"] == {"query": "hello"}
+        assert call["user_id"] == "anonymous"
+        assert call["result"][0].text == '{"source":"builtin"}'
+
 
 # ---------------------------------------------------------------------------
 # handle_tool_call — unknown tool
