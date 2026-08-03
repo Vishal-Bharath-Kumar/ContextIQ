@@ -11,7 +11,14 @@ import logging
 from typing import Any
 
 from fastmcp import FastMCP
-from src.gateway.tools.enterprise._local_tools import json_text_response, latest_file_authors, service_graph
+from src.gateway.tools.enterprise._local_tools import (
+    build_error_response,
+    build_tool_response,
+    json_text_response,
+    latest_file_authors,
+    service_graph,
+    service_graph_diagnostics,
+)
 from mcp.types import TextContent
 
 logger = logging.getLogger(__name__)
@@ -52,9 +59,36 @@ def register_knowledge_graph_tools(mcp: FastMCP, graph_service: Any = None) -> N
         """
         try:
             graph = service_graph()
-            info = graph.get(service, {"depends_on": [], "ports": []})
+            graph_diagnostics = service_graph_diagnostics()
+            info = graph.get(service)
+            if not graph:
+                result = build_tool_response(
+                    status="degraded",
+                    summary="Dependency graph metadata is unavailable in this runtime.",
+                    data={"service": service, "depth": depth, "dependencies": {"upstream": [], "downstream": []}, "graph_nodes": 0},
+                    diagnostics=graph_diagnostics,
+                )
+                result.update({"service": service, "depth": depth, "dependencies": {"upstream": [], "downstream": []}, "graph_nodes": 0})
+                return json_text_response(result)
+
+            if info is None:
+                result = build_tool_response(
+                    status="empty",
+                    summary=f"Service '{service}' was not found in the available dependency graph.",
+                    data={
+                        "service": service,
+                        "depth": depth,
+                        "dependencies": {"upstream": [], "downstream": []},
+                        "graph_nodes": len(graph),
+                        "available_services": sorted(graph.keys())[:25],
+                    },
+                    diagnostics=graph_diagnostics,
+                )
+                result.update(result["data"])
+                return json_text_response(result)
+
             downstream = sorted([name for name, data in graph.items() if service in data.get("depends_on", [])])
-            result = {
+            payload = {
                 "service": service,
                 "depth": depth,
                 "dependencies": {
@@ -62,8 +96,14 @@ def register_knowledge_graph_tools(mcp: FastMCP, graph_service: Any = None) -> N
                     "downstream": [{"type": "service", "name": name} for name in downstream],
                 },
                 "graph_nodes": 1 + len(info.get("depends_on", [])) + len(downstream),
-                "status": "success",
             }
+            result = build_tool_response(
+                status="success",
+                summary=f"Resolved dependency graph for '{service}'.",
+                data=payload,
+                diagnostics=graph_diagnostics,
+            )
+            result.update(payload)
             
             logger.info(
                 "dependency_graph invoked: service=%s, depth=%d",
@@ -75,7 +115,13 @@ def register_knowledge_graph_tools(mcp: FastMCP, graph_service: Any = None) -> N
             
         except Exception as e:
             logger.error("dependency_graph failed: %s", e, exc_info=True)
-            return json_text_response({"error": str(e), "status": "error"})
+            return json_text_response(
+                build_error_response(
+                    summary="Dependency graph lookup failed.",
+                    error=e,
+                    diagnostics={"adapter": "docker_compose"},
+                )
+            )
 
     @mcp.tool()
     async def find_owner(
@@ -101,12 +147,17 @@ def register_knowledge_graph_tools(mcp: FastMCP, graph_service: Any = None) -> N
         """
         try:
             owners = latest_file_authors(resource)
-            result = {
-                "resource": resource,
-                "resource_type": resource_type,
-                "owners": owners,
-                "status": "success" if owners else "unresolved",
-            }
+            result = build_tool_response(
+                status="success" if owners else "empty",
+                summary=(
+                    f"Resolved {len(owners)} owner candidate(s)."
+                    if owners
+                    else "No owner candidates were found from repository history."
+                ),
+                data={"resource": resource, "resource_type": resource_type, "owners": owners},
+                diagnostics={"adapter": "git_history", "degraded_reasons": []},
+            )
+            result.update({"resource": resource, "resource_type": resource_type, "owners": owners})
             
             logger.info(
                 "find_owner invoked: resource=%s, type=%s",
@@ -118,7 +169,13 @@ def register_knowledge_graph_tools(mcp: FastMCP, graph_service: Any = None) -> N
             
         except Exception as e:
             logger.error("find_owner failed: %s", e, exc_info=True)
-            return json_text_response({"error": str(e), "status": "error"})
+            return json_text_response(
+                build_error_response(
+                    summary="Owner lookup failed.",
+                    error=e,
+                    diagnostics={"adapter": "git_history"},
+                )
+            )
 
     @mcp.tool()
     async def related_services(
@@ -144,6 +201,32 @@ def register_knowledge_graph_tools(mcp: FastMCP, graph_service: Any = None) -> N
         """
         try:
             graph = service_graph()
+            graph_diagnostics = service_graph_diagnostics()
+            if not graph:
+                result = build_tool_response(
+                    status="degraded",
+                    summary="Related-service graph metadata is unavailable in this runtime.",
+                    data={"service": service, "relationship_type": relationship_type, "related": []},
+                    diagnostics=graph_diagnostics,
+                )
+                result.update({"service": service, "relationship_type": relationship_type, "related": []})
+                return json_text_response(result)
+
+            if service not in graph:
+                result = build_tool_response(
+                    status="empty",
+                    summary=f"Service '{service}' was not found in the available service graph.",
+                    data={
+                        "service": service,
+                        "relationship_type": relationship_type,
+                        "related": [],
+                        "available_services": sorted(graph.keys())[:25],
+                    },
+                    diagnostics=graph_diagnostics,
+                )
+                result.update(result["data"])
+                return json_text_response(result)
+
             base = graph.get(service, {"depends_on": []})
             base_deps = set(base.get("depends_on", []))
             related = []
@@ -157,12 +240,18 @@ def register_knowledge_graph_tools(mcp: FastMCP, graph_service: Any = None) -> N
                     related.append({"service": candidate, "relationship": "upstream_dependency", "confidence": 0.85})
                 elif shared:
                     related.append({"service": candidate, "relationship": "shared_dependency", "confidence": min(0.5 + (0.1 * len(shared)), 0.8), "shared_dependencies": shared})
-            result = {
-                "service": service,
-                "relationship_type": relationship_type,
-                "related": related,
-                "status": "success",
-            }
+            payload = {"service": service, "relationship_type": relationship_type, "related": related}
+            result = build_tool_response(
+                status="success" if related else "empty",
+                summary=(
+                    f"Resolved {len(related)} related service(s)."
+                    if related
+                    else f"No related services were found for '{service}'."
+                ),
+                data=payload,
+                diagnostics=graph_diagnostics,
+            )
+            result.update(payload)
             
             logger.info(
                 "related_services invoked: service=%s, type=%s",
@@ -174,4 +263,10 @@ def register_knowledge_graph_tools(mcp: FastMCP, graph_service: Any = None) -> N
             
         except Exception as e:
             logger.error("related_services failed: %s", e, exc_info=True)
-            return json_text_response({"error": str(e), "status": "error"})
+            return json_text_response(
+                build_error_response(
+                    summary="Related-services lookup failed.",
+                    error=e,
+                    diagnostics={"adapter": "docker_compose"},
+                )
+            )

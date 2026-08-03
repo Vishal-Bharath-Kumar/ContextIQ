@@ -14,7 +14,7 @@ Coverage targets:
 """
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
 import pytest
@@ -280,3 +280,21 @@ class TestGitHubConnector:
                 await connector.authenticate()
 
         assert connector._credential is None
+
+    @pytest.mark.asyncio
+    async def test_authenticate_falls_back_to_public_readonly_mode_for_public_repos(self) -> None:
+        config = _make_config(repos=["owner/repo"])
+        connector = GitHubConnector(config=config)
+        mock_client = _mock_vault_client(token="ghp_invalid")
+
+        with patch("src.connectors.github.auth.hvac.Client", return_value=mock_client), patch(
+            "src.connectors.github.connector.GitHubConnector.health_check",
+            new=AsyncMock(return_value=type("Health", (), {"healthy": False, "message": "GitHub /rate_limit returned HTTP 401"})()),
+        ), patch(
+            "src.connectors.github.connector.GitHubConnector._supports_public_readonly_mode",
+            new=AsyncMock(return_value=True),
+        ):
+            await connector.authenticate()
+
+        assert connector._anonymous_public_readonly is True
+        assert connector._auth_header() == {}

@@ -15,7 +15,7 @@ import respx
 
 from src.connector_sdk.exceptions import ConnectorAuthError
 from src.connector_sdk.schemas.query import ConnectorQuery
-from src.connector_sdk.schemas.result import ConnectorResult
+from src.connector_sdk.schemas.result import ConnectorResult, ResultMetadata
 from src.connectors.github.config import GitHubConnectorConfig
 from src.connectors.github.connector import GitHubConnector
 from src.connectors.github.content_client import GitHubContentClient
@@ -226,6 +226,32 @@ class TestFetchTimeout:
         with patch.object(connector, "_fetch_inner", side_effect=_slow_inner):
             with pytest.raises(asyncio.TimeoutError):
                 await connector.fetch(ConnectorQuery(query="slow"))
+
+
+class TestFetchAnonymousPublicFallback:
+    async def test_uses_repo_tree_fallback_when_public_readonly_mode_enabled(self) -> None:
+        connector = GitHubConnector(_make_config())
+        connector._anonymous_public_readonly = True
+
+        with patch.object(
+            connector,
+            "_fallback_fetch_from_repo_paths",
+            new=AsyncMock(return_value=[
+                ConnectorResult(
+                    source_id="github:owner/repo:blobsha0001",
+                    content="fallback content",
+                    metadata=ResultMetadata(source_url="https://github.com/owner/repo"),
+                    fetched_at=datetime.now(tz=UTC),
+                )
+            ]),
+        ) as fallback_mock, patch(
+            "src.connectors.github.connector.GitHubSearchClient.search_code",
+            new=AsyncMock(side_effect=AssertionError("search_code should not run in anonymous mode")),
+        ):
+            results = await connector.fetch(ConnectorQuery(query="content", max_results=5))
+
+        assert len(results) == 1
+        fallback_mock.assert_awaited_once()
 
 
 # ---------------------------------------------------------------------------

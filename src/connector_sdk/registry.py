@@ -104,6 +104,10 @@ class ConnectorRegistry:
         record = self._records.get(connector_id)
         return record.instance if (record and record.enabled) else None
 
+    def get_record(self, connector_id: str) -> ConnectorRecord | None:
+        """Return the raw registry record for *connector_id*, including disabled entries."""
+        return self._records.get(connector_id)
+
     def register(
         self,
         connector_id: str,

@@ -80,10 +80,12 @@ async def opa_filter_node(state: AgentState) -> dict:
 
         if not ranked_context:
             return {
-                **state,
                 "opa_decisions": [],
                 "opa_denied_count": 0,
                 "opa_bundle_version": _get_bundle_version(state),
+                "execution_trace": state.get("execution_trace") or [],
+                "status": state.get("status"),
+                "current_node": "opa_filter",
             }
 
         inputs = [
@@ -162,11 +164,13 @@ async def opa_filter_node(state: AgentState) -> dict:
             )
 
         return {
-            **state,
             "ranked_context": allowed_chunks,
             "opa_decisions": list(filter_result.decisions),
             "opa_denied_count": filter_result.denial_count,
             "opa_bundle_version": bundle_version,
+            "execution_trace": state.get("execution_trace") or [],
+            "status": state.get("status"),
+            "current_node": "opa_filter",
         }
 
 

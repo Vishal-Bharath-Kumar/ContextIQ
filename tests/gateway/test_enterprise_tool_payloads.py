@@ -106,7 +106,7 @@ class TestContextToolPayloads:
                     "type": "context_package",
                     "prompt": prompt,
                     "intent": "debugging",
-                    "context": [],
+                    "context": [{"source_id": "github", "path": "src/auth.py", "content": "def login(): ..."}],
                     "governance": {"summary": {"audit_log": {"user": "user-123"}}},
                     "degraded_sources": [],
                 },
@@ -126,6 +126,179 @@ class TestContextToolPayloads:
         assert payload["mode"] == "pipeline"
         assert payload["context"]["governance"]["summary"]["audit_log"]["user"] == "user-123"
 
+    async def test_generate_context_workspace_fallback_masks_secrets_and_populates_metrics(self) -> None:
+        mcp = FastMCP("test-context")
+        register_context_tools(mcp)
+
+        candidate_models = [
+            {
+                "model_id": "gpt-4o-mini",
+                "latency_tier": "fast",
+                "capabilities": ["chat"],
+                "context_window": 32000,
+                "cost_per_1k_tokens": 0.5,
+            },
+            {
+                "model_id": "ollama/llama3.2",
+                "latency_tier": "medium",
+                "capabilities": ["chat", "code"],
+                "context_window": 128000,
+                "cost_per_1k_tokens": 0.0,
+            },
+        ]
+        secret_value = "ghp_1234567890abcdefghijklmnopqrstuvABCDE1"
+        matches = [
+            {
+                "path": "src/api/auth.py",
+                "title": "auth",
+                "line": 14,
+                "snippet": f'Authorization: Bearer {secret_value} password="TopSecret123!"',
+                "score": 14.2,
+            }
+        ]
+
+        with (
+            patch("src.gateway.tools.enterprise.context_tools._try_pipeline_context", AsyncMock(return_value=None)),
+            patch("src.gateway.tools.enterprise.context_tools.search_workspace", return_value=matches),
+            patch("src.gateway.tools.enterprise.context_tools._candidate_models", AsyncMock(return_value=candidate_models)),
+        ):
+            payload = await _invoke_tool(
+                mcp,
+                "generate_context",
+                {
+                    "prompt": "For the current workspace repository, identify the main services/components and describe the end-to-end workflow.",
+                    "max_tokens": 1024,
+                    "compression_level": "high",
+                },
+            )
+
+        assert payload["status"] == "success"
+        assert payload["mode"] == "workspace_fallback"
+        assert payload["routing"]["selected_model"] == "ollama/llama3.2"
+        assert payload["compression"]["tokens_before"] is not None
+        assert payload["compression"]["tokens_after"] is not None
+        assert secret_value not in json.dumps(payload)
+        assert payload["governance"]["redacted"] is True
+        assert payload["governance"]["masking_counts"]
+
+    async def test_generate_context_pipeline_backfills_routing_and_compression_metadata(self) -> None:
+        mcp = FastMCP("test-context")
+        register_context_tools(mcp)
+
+        candidate_models = [
+            {
+                "model_id": "gpt-4o-mini",
+                "latency_tier": "fast",
+                "capabilities": ["chat"],
+                "context_window": 32000,
+                "cost_per_1k_tokens": 0.5,
+            },
+            {
+                "model_id": "ollama/llama3.2",
+                "latency_tier": "medium",
+                "capabilities": ["chat", "code"],
+                "context_window": 128000,
+                "cost_per_1k_tokens": 0.0,
+            },
+        ]
+        fake_pipeline = {
+            "status": "complete",
+            "intent_type": "architecture",
+            "selected_model": "gpt-4o-mini",
+            "model_routing_score": 0.0,
+            "ranked_context": [
+                {
+                    "source_id": "github",
+                    "path": "src/main.py",
+                    "content": "create_app wires FastAPI routers, auth middleware, and the MCP mounts.",
+                },
+                {
+                    "source_id": "docs",
+                    "path": "docs/api/architecture/overview.md",
+                    "content": "Architecture overview covering retrieval, ranking, compression, and governance.",
+                },
+            ],
+            "final_response": {
+                "type": "context_package",
+                "intent": "architecture",
+                "context": [
+                    {
+                        "source_id": "github",
+                        "path": "src/main.py",
+                        "content": "create_app wires FastAPI routers, auth middleware, and the MCP mounts.",
+                    }
+                ],
+                "degraded_sources": [],
+            },
+        }
+
+        with (
+            patch("src.gateway.tools.enterprise.context_tools._try_pipeline_context", AsyncMock(return_value=fake_pipeline)),
+            patch("src.gateway.tools.enterprise.context_tools._candidate_models", AsyncMock(return_value=candidate_models)),
+        ):
+            payload = await _invoke_tool(
+                mcp,
+                "generate_context",
+                {
+                    "prompt": "For the current workspace repository, identify the main services/components and describe the end-to-end workflow.",
+                    "max_tokens": 2048,
+                    "compression_level": "medium",
+                },
+            )
+
+        assert payload["status"] == "success"
+        assert payload["mode"] == "pipeline"
+        assert payload["routing"]["selected_model"] == "ollama/llama3.2"
+        assert payload["compression"]["tokens_before"] is not None
+        assert payload["compression"]["tokens_after"] is not None
+        assert payload["tokens_before_compression"] is not None
+        assert payload["tokens_after_compression"] is not None
+
+    async def test_generate_context_falls_back_when_pipeline_returns_degraded_empty_context(self) -> None:
+        mcp = FastMCP("test-context")
+        register_context_tools(mcp)
+
+        candidate_models = [
+            {
+                "model_id": "ollama/llama3.2",
+                "latency_tier": "medium",
+                "capabilities": ["chat", "code"],
+                "context_window": 128000,
+                "cost_per_1k_tokens": 0.0,
+            }
+        ]
+        fake_pipeline = {
+            "status": "complete",
+            "intent_type": "architecture",
+            "selected_model": "gpt-4o-mini",
+            "model_routing_score": 0.0,
+            "degraded_sources": [{"source_id": "github", "error_type": "ConnectorAuthError", "message": "401"}],
+            "final_response": {
+                "type": "context_package",
+                "intent": "architecture",
+                "context": [],
+                "degraded_sources": [{"source_id": "github", "error_type": "ConnectorAuthError", "message": "401"}],
+            },
+        }
+        fallback_matches = [
+            {"path": "docs/architecture/system.md", "title": "System", "line": 3, "snippet": "retrieval ranking compression governance", "score": 12.0}
+        ]
+
+        with (
+            patch("src.gateway.tools.enterprise.context_tools._try_pipeline_context", AsyncMock(return_value=fake_pipeline)),
+            patch("src.gateway.tools.enterprise.context_tools.search_workspace", return_value=fallback_matches),
+            patch("src.gateway.tools.enterprise.context_tools._candidate_models", AsyncMock(return_value=candidate_models)),
+        ):
+            payload = await _invoke_tool(
+                mcp,
+                "generate_context",
+                {"prompt": "ContextIQ architecture", "max_tokens": 1024, "compression_level": "medium"},
+            )
+
+        assert payload["status"] == "success"
+        assert payload["mode"] == "workspace_fallback"
+        assert payload["context"]["context"][0]["path"] == "docs/architecture/system.md"
+
 
 @pytest.mark.asyncio
 class TestSourceCodeToolPayloads:
@@ -142,6 +315,20 @@ class TestSourceCodeToolPayloads:
         assert payload["status"] == "success"
         assert payload["results"][0]["path"] == "src/main.py"
         assert payload["total"] == 1
+
+    async def test_search_code_empty_returns_diagnostics(self) -> None:
+        mcp = FastMCP("test-source")
+        register_source_code_tools(mcp)
+
+        with patch(
+            "src.gateway.tools.enterprise.source_code_tools.search_workspace",
+            return_value=[],
+        ):
+            payload = await _invoke_tool(mcp, "search_code", {"query": "nonexistent symbol", "limit": 5})
+
+        assert payload["status"] == "empty"
+        assert payload["diagnostics"]["adapter"] == "workspace_search"
+        assert "source_availability" in payload["diagnostics"]
 
     async def test_explain_code_returns_summary_fields(self) -> None:
         mcp = FastMCP("test-source")
@@ -232,6 +419,44 @@ class TestKnowledgeGraphToolPayloads:
         assert payload["dependencies"]["upstream"][0]["name"] == "postgres"
         assert payload["dependencies"]["downstream"][0]["name"] == "admin-portal"
 
+    async def test_dependency_graph_degrades_without_graph_metadata(self) -> None:
+        mcp = FastMCP("test-kg")
+        register_knowledge_graph_tools(mcp)
+
+        with (
+            patch("src.gateway.tools.enterprise.knowledge_graph_tools.service_graph", return_value={}),
+            patch(
+                "src.gateway.tools.enterprise.knowledge_graph_tools.service_graph_diagnostics",
+                return_value={
+                    "adapter": "docker_compose",
+                    "source_available": False,
+                    "compose_path": None,
+                    "degraded_reasons": ["No docker-compose metadata was available in the runtime environment."],
+                },
+            ),
+        ):
+            payload = await _invoke_tool(mcp, "dependency_graph", {"service": "ContextIQ", "depth": 2})
+
+        assert payload["status"] == "degraded"
+        assert payload["diagnostics"]["source_available"] is False
+
+    async def test_related_services_returns_structured_empty_when_service_missing(self) -> None:
+        mcp = FastMCP("test-kg")
+        register_knowledge_graph_tools(mcp)
+
+        graph = {"api": {"depends_on": ["postgres"]}, "postgres": {"depends_on": []}}
+        with (
+            patch("src.gateway.tools.enterprise.knowledge_graph_tools.service_graph", return_value=graph),
+            patch(
+                "src.gateway.tools.enterprise.knowledge_graph_tools.service_graph_diagnostics",
+                return_value={"adapter": "docker_compose", "source_available": True, "compose_path": "/tmp/docker-compose.yml", "degraded_reasons": []},
+            ),
+        ):
+            payload = await _invoke_tool(mcp, "related_services", {"service": "ContextIQ"})
+
+        assert payload["status"] == "empty"
+        assert payload["related"] == []
+
     async def test_find_owner_returns_owner_list(self) -> None:
         mcp = FastMCP("test-kg")
         register_knowledge_graph_tools(mcp)
@@ -273,3 +498,19 @@ class TestOperationsToolPayloads:
 
         assert payload["status"] == "success"
         assert payload["health"][0]["service"] == "api"
+
+    async def test_service_health_returns_structured_empty_for_unknown_service(self) -> None:
+        mcp = FastMCP("test-ops")
+        register_operations_tools(mcp)
+
+        with (
+            patch("src.gateway.tools.enterprise.operations_tools.service_graph", return_value={"api": {"depends_on": [], "ports": []}}),
+            patch(
+                "src.gateway.tools.enterprise.operations_tools.service_graph_diagnostics",
+                return_value={"adapter": "docker_compose", "source_available": True, "compose_path": "/tmp/docker-compose.yml", "degraded_reasons": []},
+            ),
+        ):
+            payload = await _invoke_tool(mcp, "service_health", {"service": "ContextIQ"})
+
+        assert payload["status"] == "empty"
+        assert payload["health"] == []

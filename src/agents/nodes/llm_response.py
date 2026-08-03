@@ -26,6 +26,13 @@ async def llm_response_node(state: AgentState) -> AgentState:
     ]
     base_response = dict(state.get("final_response") or {})
 
+    if str(state.get("tool_name") or "") == "generate_context":
+        return {
+            "final_response": base_response,
+            "current_node": "llm_response_agent",
+            "status": ExecutionStatus.COMPLETE,
+        }
+
     if runtime_services is None or not selected_model or not fallback_chain_ids:
         return {
             "final_response": base_response,
@@ -37,13 +44,30 @@ async def llm_response_node(state: AgentState) -> AgentState:
         model_ids=fallback_chain_ids,
         intent_type=str(state.get("intent_type") or "general"),
     )
-    latency_tier = await _resolve_latency_tier(runtime_services, selected_model)
-    invocation = await runtime_services.fallback_invoker.invoke(
-        fallback_chain=chain,
-        messages=_build_messages(state),
-        token_budget=_response_token_budget(state),
-        latency_tier=latency_tier,
-    )
+    try:
+        latency_tier = await _resolve_latency_tier(runtime_services, selected_model)
+        invocation = await runtime_services.fallback_invoker.invoke(
+            fallback_chain=chain,
+            messages=_build_messages(state),
+            token_budget=_response_token_budget(state),
+            latency_tier=latency_tier,
+        )
+    except Exception as exc:
+        degraded = list(base_response.get("degraded_sources") or [])
+        degraded.append(
+            {
+                "source_id": "llm-response",
+                "error_type": type(exc).__name__,
+                "message": str(exc),
+            }
+        )
+        base_response["degraded_sources"] = degraded
+        base_response["invocation_error"] = str(exc)
+        return {
+            "final_response": base_response,
+            "current_node": "llm_response_agent",
+            "status": ExecutionStatus.COMPLETE,
+        }
 
     if isinstance(invocation, InvocationFailure):
         degraded = list(base_response.get("degraded_sources") or [])

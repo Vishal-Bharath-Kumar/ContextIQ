@@ -194,17 +194,24 @@ async def routing_node(
 
         # Langfuse event — skipped entirely when langfuse is None
         if langfuse is not None:
-            langfuse.event(
-                name="model_routing_decision",
-                input={"intent_type": intent_type},
-                output={"model_id": selected_model_id, "score": routing_score},
-                metadata={
+            event_payload = {
+                "name": "model_routing_decision",
+                "input": {"intent_type": intent_type},
+                "output": {"model_id": selected_model_id, "score": routing_score},
+                "metadata": {
                     "routing_reason": routing_reason,
                     "latency_ms": latency_ms,
                     "used_fallback": selection is None,
                 },
-                session_id=state.get("session_id"),  # type: ignore[typeddict-item]
-            )
+                "session_id": state.get("session_id"),  # type: ignore[typeddict-item]
+            }
+            try:
+                if hasattr(langfuse, "event"):
+                    langfuse.event(**event_payload)
+                elif hasattr(langfuse, "create_event"):
+                    langfuse.create_event(**event_payload)
+            except Exception:
+                pass
 
     return {
         "selected_model_id": selected_model_id,
