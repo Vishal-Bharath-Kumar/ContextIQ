@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<title>POL-002 — Policy Editor · ContextIQ Wireframe</title>
+<link rel="stylesheet" href="_wireframe-base.css">
+<style>
+.editor-layout {
+  display: grid;
+  grid-template-columns: 260px 1fr 300px;
+  gap: 0;
+  height: calc(100vh - 56px - 48px - 60px);
+  border: 1px solid var(--neutral-800);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.editor-meta {
+  background: var(--neutral-900);
+  border-right: 1px solid var(--neutral-800);
+  padding: 16px;
+  overflow-y: auto;
+}
+.editor-code {
+  background: oklch(0.08 0.008 260);
+  overflow: auto;
+  position: relative;
+}
+.editor-lint {
+  background: var(--neutral-900);
+  border-left: 1px solid var(--neutral-800);
+  overflow-y: auto;
+}
+.line-num { color: var(--neutral-700); user-select: none; padding-right: 12px; text-align: right; min-width: 28px; display: inline-block; }
+.editor-line { display: flex; padding: 1px 0; line-height: 1.6; }
+.editor-line:hover { background: oklch(0.12 0.008 260); }
+.editor-line.error-line { background: oklch(0.15 0.08 25); }
+.kw { color: var(--brand-blue-400); }
+.str { color: var(--success-400); }
+.fn { color: oklch(0.72 0.17 65); }
+.cmt { color: var(--neutral-600); font-style: italic; }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-logo"><div class="topbar-logo-icon">C</div>ContextIQ</div>
+  <div class="topbar-sep"></div>
+  <nav class="topbar-breadcrumb"><a>Policies</a> <span>›</span> pii-redaction</nav>
+  <div class="topbar-actions"><div class="topbar-search">🔍 Search</div><button class="topbar-icon-btn">🔔</button></div>
+</header>
+
+<nav class="sidebar" aria-label="Main navigation">
+  <div class="sidebar-nav">
+    <a class="nav-item"><span class="icon">⊞</span>Dashboard</a>
+    <div class="nav-section">Data Sources</div>
+    <a class="nav-item"><span class="icon">⬡</span>Connectors</a><a class="nav-item"><span class="icon">🗄</span>Knowledge Sources</a>
+    <div class="nav-section">Governance</div>
+    <a class="nav-item active" aria-current="page"><span class="icon">🛡</span>Policies</a>
+    <div class="nav-section">Observability</div>
+    <a class="nav-item"><span class="icon">▶</span>Replay Explorer</a><a class="nav-item"><span class="icon">📋</span>Audit Log</a><a class="nav-item"><span class="icon">📊</span>Observability</a>
+    <div class="nav-section">Platform</div><a class="nav-item"><span class="icon">👥</span>Users</a><a class="nav-item"><span class="icon">💻</span>Models</a><a class="nav-item"><span class="icon">⚙</span>Settings</a>
+  </div>
+  <div class="sidebar-user"><div class="user-avatar">CS</div><div class="user-info"><div class="user-name">Carol Sec</div><div class="user-role">Security Officer</div></div></div>
+</nav>
+
+<main class="main-content" role="main" style="padding-bottom:0">
+  <!-- Header bar -->
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;flex-wrap:wrap">
+    <input class="input-wf" value="pii-redaction" style="font-size:16px;font-weight:600;width:220px">
+    <select class="select-wf"><option>global</option><option>connector</option><option>model</option></select>
+    <span class="badge badge-neutral mono" style="font-size:10px">v3</span>
+    <span class="badge badge-success">● Active</span>
+    <div style="margin-left:auto;font-size:12px;color:var(--neutral-600)">Last saved: 2m ago</div>
+  </div>
+
+  <!-- 3-column editor layout -->
+  <div class="editor-layout">
+    <!-- Metadata sidebar -->
+    <div class="editor-meta">
+      <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:var(--neutral-600);margin-bottom:10px">Policy Metadata</div>
+      <div class="form-group">
+        <label class="form-label">Description</label>
+        <textarea class="input-wf" rows="3" style="width:100%;resize:none;font-size:12px">Blocks requests containing personally identifiable information in the text field.</textarea>
+      </div>
+      <div class="form-group">
+        <div class="form-label">Status</div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <div class="toggle on"></div>
+          <span style="font-size:12px;color:var(--success-400)">Active</span>
+        </div>
+      </div>
+      <div class="separator"></div>
+      <div style="font-size:12px;color:var(--neutral-600)">
+        <div style="display:flex;justify-content:space-between;margin-bottom:6px"><span>Author</span><span style="color:var(--neutral-400)">carol@co.com</span></div>
+        <div style="display:flex;justify-content:space-between;margin-bottom:6px"><span>Created</span><span style="color:var(--neutral-400)">2026-07-01</span></div>
+        <div style="display:flex;justify-content:space-between"><span>Modified</span><span style="color:var(--neutral-400)">today</span></div>
+      </div>
+      <div class="separator"></div>
+      <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:var(--neutral-600);margin-bottom:8px">Last Simulation</div>
+      <div style="font-size:12px;margin-bottom:4px;color:var(--neutral-400)">2026-07-14 14:10</div>
+      <span class="badge badge-danger">DENY</span>
+      <div style="font-size:11px;color:var(--neutral-600);margin-top:4px">Matched: input.text ⊇ "SSN"</div>
+      <div style="margin-top:12px"><a style="font-size:12px;color:var(--brand-blue-400);cursor:pointer">→ Open Simulation</a></div>
+    </div>
+
+    <!-- Monaco editor -->
+    <div class="editor-code" aria-label="Policy editor" role="region">
+      <div style="display:flex;height:100%">
+        <!-- Gutter -->
+        <div style="padding:6px 0;background:oklch(0.08 0.008 260);border-right:1px solid var(--neutral-800);flex-shrink:0">
+          <pre style="font-family:'IBM Plex Mono',monospace;font-size:12px;line-height:1.6;padding:0 6px;color:var(--neutral-700)">
+ 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13</pre>
+        </div>
+        <!-- Code -->
+        <div style="flex:1;padding:6px 12px;overflow:auto">
+          <pre style="font-family:'IBM Plex Mono',monospace;font-size:12px;line-height:1.6;margin:0;white-space:pre"><span class="kw">package</span> contextiq.policies
+
+<span class="kw">default</span> allow <span class="kw">=</span> <span class="kw">false</span>
+
+<span class="fn">allow</span> <span class="kw">{</span>
+    <span class="kw">not</span> <span class="fn">contains</span>(input.text, <span class="str">"SSN"</span>)
+    <span class="kw">not</span> <span class="fn">contains</span>(input.text, <span class="str">"DOB"</span>)
+    <span class="kw">not</span> <span class="fn">contains</span>(input.text, <span class="str">"credit_card"</span>)
+<span class="kw">}</span>
+
+<span class="cmt"># Deny rule fires when PII patterns detected</span>
+deny_reason <span class="kw">=</span> msg <span class="kw">{</span>
+    <span class="fn">contains</span>(input.text, <span class="str">"SSN"</span>)
+</pre>
+        </div>
+      </div>
+    </div>
+
+    <!-- Lint panel -->
+    <div class="editor-lint">
+      <div style="padding:10px 12px;border-bottom:1px solid var(--neutral-800);display:flex;align-items:center;gap:8px">
+        <span style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:var(--neutral-600)">Diagnostics</span>
+        <span class="badge badge-danger" style="font-size:10px;margin-left:auto">1 error</span>
+        <span class="badge badge-warning" style="font-size:10px">1 warning</span>
+      </div>
+      <div style="padding:10px 12px">
+        <div style="border-left:3px solid var(--danger-600);padding:6px 8px;margin-bottom:8px;font-size:12px">
+          <div style="color:var(--danger-400);margin-bottom:2px">Line 13 — syntax error</div>
+          <div style="color:var(--neutral-500)">unexpected end of module</div>
+        </div>
+        <div style="border-left:3px solid var(--warning-600);padding:6px 8px;font-size:12px">
+          <div style="color:var(--warning-400);margin-bottom:2px">Line 11 — warning</div>
+          <div style="color:var(--neutral-500)">unused rule: deny_reason</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Sticky footer actions -->
+  <div style="position:sticky;bottom:0;background:var(--neutral-900);border-top:1px solid var(--neutral-800);padding:12px 0;display:flex;align-items:center;gap:8px">
+    <button class="btn btn-ghost btn-sm">Discard changes</button>
+    <div style="margin-left:auto;display:flex;gap:8px">
+      <button class="btn btn-secondary btn-sm">→ Test in Simulation</button>
+      <button class="btn btn-secondary btn-sm">Save Draft</button>
+      <button class="btn btn-primary btn-sm">Activate</button>
+    </div>
+  </div>
+</main>
+
+<aside class="annotation-panel">
+  <div class="ann-screen-id">POL-002</div>
+  <div class="ann-route">Route: /policies/:id</div>
+  <div class="ann-guard">Guard: SECURITY_OFFICER, ADMIN</div>
+  <div class="ann-divider"></div>
+  <div class="ann-section">Components</div>
+  <div class="ann-item"><div class="ann-component">&lt;MonacoEditor language="rego"&gt;</div><div class="ann-note">IBM Plex Mono · real-time OPA WASM lint · gutter error markers</div></div>
+  <div class="ann-item"><div class="ann-component">&lt;LintPanel&gt;</div><div class="ann-note">Errors + warnings · click to navigate to line</div></div>
+  <div class="ann-item"><div class="ann-component">&lt;Toggle&gt; Status</div><div class="ann-note">Active/Draft toggle · Activate shows ConfirmationModal</div></div>
+  <div class="ann-item"><div class="ann-component">&lt;ConfirmationModal&gt;</div><div class="ann-note">"Activate policy v{n}? Previous version archived."</div></div>
+  <div class="ann-divider"></div>
+  <div class="ann-section">Layout</div>
+  <div class="ann-note">3-col: 260px meta · flex editor · 300px lint panel · Sticky footer actions</div>
+  <div class="ann-divider"></div>
+  <div class="ann-section">States</div>
+  <span class="state-chip">new (blank)</span>
+  <span class="state-chip">editing</span>
+  <span class="state-chip">lint error</span>
+  <span class="state-chip">saving</span>
+  <span class="state-chip">activated</span>
+</aside>
+
+</body>
+</html>

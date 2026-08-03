@@ -1,0 +1,13 @@
+# AC-1: at least one Keycloak pod must remain available during voluntary
+# disruptions (node drains, cluster upgrades).  With minReplicas=2 in the HPA,
+# minAvailable=1 means one pod may be evicted while the second stays running.
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: keycloak-pdb
+  namespace: keycloak
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: keycloak

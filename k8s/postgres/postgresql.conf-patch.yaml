@@ -1,0 +1,20 @@
+# ConfigMap patch to apply postgresql.conf settings that enforce TLS 1.3.
+# Mount as /etc/postgresql/postgresql.conf.d/tls.conf in the PostgreSQL Pod.
+# PostgreSQL 15 reads all *.conf files from conf.d automatically.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-tls-config
+  namespace: contextiq-data
+  labels:
+    app.kubernetes.io/part-of:    contextiq
+    app.kubernetes.io/component:  postgres
+data:
+  tls.conf: |
+    # AC-4: Enforce TLS 1.3 minimum for PostgreSQL client connections
+    ssl                      = on
+    ssl_min_protocol_version = 'TLSv1.3'
+    ssl_max_protocol_version = 'TLSv1.3'
+    ssl_cert_file            = '/etc/ssl/certs/tls.crt'
+    ssl_key_file             = '/etc/ssl/private/tls.key'
+    ssl_ca_file              = '/etc/ssl/certs/ca.crt'

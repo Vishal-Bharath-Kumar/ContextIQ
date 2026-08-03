@@ -1,0 +1,21 @@
+# .trivyignore — Trivy CVE suppression list
+#
+# FORMAT (one entry per line):
+#   CVE-YYYY-NNNNN  # exp:YYYY-MM-DD; <justification referencing the US/control that mitigates>
+#
+# RULES (enforced by scripts/ci/check_trivy_results.py in the trivy-scan job):
+#   1. Every active entry (non-blank, non-comment-only line) MUST have an
+#      exp:YYYY-MM-DD tag.  Entries without an expiry fail the build.
+#   2. Maximum suppression window is 90 days from the date of addition.
+#   3. Expired entries fail the build — they must be reviewed, extended (if
+#      the upstream fix is still unavailable), or removed.
+#   4. Each entry MUST reference a justification (e.g. "no fix upstream;
+#      mitigated by <control>" or "false-positive; <reason>").
+#
+# ADDING A NEW SUPPRESSION:
+#   CVE-YYYY-NNNNN  # exp:YYYY-MM-DD; <justification>
+#
+# Example (replace with real CVEs as they arise):
+#   CVE-2024-00001  # exp:2026-10-01; no upstream fix available; mitigated by US-048 mTLS network isolation
+#
+# Currently no active suppressions.

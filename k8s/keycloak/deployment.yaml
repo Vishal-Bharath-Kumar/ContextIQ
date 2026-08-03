@@ -1,0 +1,153 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: keycloak
+  namespace: keycloak
+  labels:
+    app: keycloak
+    app.kubernetes.io/version: "24"
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: keycloak
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0   # AC-1: zero-downtime during rolling update
+      maxSurge: 1
+  template:
+    metadata:
+      labels:
+        app: keycloak
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port:   "9000"
+        prometheus.io/path:   "/metrics"
+    spec:
+      terminationGracePeriodSeconds: 60
+      affinity:
+        # AC-1: spread replicas across distinct nodes for HA
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app: keycloak
+              topologyKey: kubernetes.io/hostname
+      containers:
+        - name: keycloak
+          image: quay.io/keycloak/keycloak:24
+          args:
+            - start
+            - --optimized
+          env:
+            # ── Database (PostgreSQL EP-DATA-001) ───────────────────────────
+            - name: KC_DB
+              value: postgres
+            - name: KC_DB_URL
+              value: jdbc:postgresql://postgres-service.postgres.svc.cluster.local:5432/keycloak
+            - name: KC_DB_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: keycloak-db-credentials
+                  key: KC_DB_USERNAME
+            - name: KC_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: keycloak-db-credentials
+                  key: KC_DB_PASSWORD
+
+            # ── Initial admin user (required on first startup) ──────────────
+            # BUG FIX: without KEYCLOAK_ADMIN / KEYCLOAK_ADMIN_PASSWORD,
+            # Keycloak 24.x creates no admin user and bootstrap_realm.py
+            # cannot authenticate to create the contextiq realm.
+            - name: KEYCLOAK_ADMIN
+              valueFrom:
+                secretKeyRef:
+                  name: keycloak-db-credentials
+                  key: KEYCLOAK_ADMIN
+            - name: KEYCLOAK_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: keycloak-db-credentials
+                  key: KEYCLOAK_ADMIN_PASSWORD
+
+            # ── Hostname — must match the Ingress host ──────────────────────
+            - name: KC_HOSTNAME
+              value: "contextiq.internal"
+            - name: KC_HOSTNAME_PATH
+              value: "/auth"
+            - name: KC_HTTP_RELATIVE_PATH
+              value: "/auth"
+
+            # ── HA: distributed Infinispan cache ────────────────────────────
+            # KC_CACHE_STACK=kubernetes uses jgroups DNS-based discovery.
+            # jgroups.dns.query must point to the headless Service so that
+            # the DNS A-record returns individual pod IPs (not the ClusterIP
+            # VIP) — required for the Infinispan cluster to form correctly.
+            - name: KC_CACHE
+              value: ispn
+            - name: KC_CACHE_STACK
+              value: kubernetes
+            - name: jgroups.dns.query
+              value: "keycloak-headless.keycloak.svc.cluster.local"
+
+            # ── Observability ───────────────────────────────────────────────
+            - name: KC_LOG_LEVEL
+              value: INFO
+            - name: KC_HEALTH_ENABLED
+              value: "true"
+            - name: KC_METRICS_ENABLED
+              value: "true"
+
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+            - name: management
+              containerPort: 9000
+              protocol: TCP
+            - name: jgroups
+              containerPort: 7800
+              protocol: TCP
+
+          readinessProbe:
+            httpGet:
+              # BUG FIX: KC_HTTP_RELATIVE_PATH applies to port 8080 only.
+              # The management port (9000) always serves health endpoints at
+              # /health/* — never /auth/health/*.  Using /auth/health/ready
+              # on port 9000 returns 404 and causes rolling updates to stall.
+              path: /health/ready
+              port: 9000
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            failureThreshold: 3
+
+          livenessProbe:
+            httpGet:
+              path: /health/live   # management port — no /auth prefix (see readinessProbe note)
+              port: 9000
+            initialDelaySeconds: 60
+            periodSeconds: 30
+            failureThreshold: 5
+
+          resources:
+            requests:
+              cpu:    "500m"
+              memory: "1Gi"
+            limits:
+              cpu:    "2"
+              memory: "2Gi"
+
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem:   false   # Keycloak requires writable /tmp
+            runAsNonRoot:             true
+            runAsUser:                1000
+            capabilities:
+              drop: ["ALL"]
+
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault

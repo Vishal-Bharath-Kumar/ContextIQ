@@ -1,0 +1,41 @@
+# .github/environments/production.yml
+# Reference documentation for the GitHub Actions 'production' environment.
+#
+# IMPORTANT: GitHub environment protection rules CANNOT be set via files in
+# the repository — they must be configured by a repository admin in the
+# GitHub UI (or via the GitHub API / Terraform).  This file documents the
+# expected configuration so it can be reviewed, audited, and recreated.
+#
+# ===== SETUP INSTRUCTIONS (repo admin) =====================================
+#
+# 1. Navigate to: Settings → Environments → New environment
+# 2. Name: production
+# 3. Apply the settings below.
+#
+# ===== EXPECTED CONFIGURATION ===============================================
+#
+# Required reviewers:
+#   - Team: platform-engineering   (minimum 1 reviewer from this team)
+#   - Team: security-team          (optional second reviewer for high-risk changes)
+#
+# Prevent self-review: enabled
+#   (the person who merged the PR cannot also approve their own production deploy)
+#
+# Wait timer: 0 minutes
+#   (human approval is the gate; no additional fixed delay needed)
+#
+# Deployment branches:
+#   - Selected branches: main   (only the main branch can trigger production deploys)
+#
+# Environment secrets (scoped to this environment — separate from staging):
+#   ARGOCD_AUTH_TOKEN   ArgoCD API token with write access to contextiq-production
+#                       (use a dedicated token with narrower scope than the staging token)
+#   GITOPS_DEPLOY_KEY   SSH deploy key with write access to the GitOps repository
+#
+# ===== VERIFICATION =========================================================
+#
+# After setup, verify the environment is configured correctly by running:
+#   pytest tests/ci/test_pipeline_validation.py::TestAC6_ProductionApprovalGate -v
+#
+# Or via the GitHub API:
+#   gh api repos/{owner}/{repo}/environments/production | jq .protection_rules

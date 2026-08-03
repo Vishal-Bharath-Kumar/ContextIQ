@@ -1,0 +1,16 @@
+# Kustomize strategic merge patch — sets storageClassName on Qdrant PVC.
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: qdrant
+  namespace: contextiq-data
+spec:
+  volumeClaimTemplates:
+    - metadata:
+        name: qdrant-storage
+      spec:
+        storageClassName: contextiq-encrypted-gp3
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 50Gi

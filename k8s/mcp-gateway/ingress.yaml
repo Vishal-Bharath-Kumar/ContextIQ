@@ -1,0 +1,25 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name:      mcp-gateway
+  namespace: contextiq-gateway
+  annotations:
+    cert-manager.io/cluster-issuer:            "letsencrypt-prod"
+    cert-manager.io/renew-before:              "720h"
+    nginx.ingress.kubernetes.io/ssl-redirect:  "true"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - api.contextiq.io
+      secretName: mcp-gateway-tls
+  rules:
+    - host: api.contextiq.io
+      http:
+        paths:
+          - path:     /
+            pathType: Prefix
+            backend:
+              service:
+                name: mcp-gateway
+                port: { number: 8000 }

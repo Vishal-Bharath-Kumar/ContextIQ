@@ -1,12 +1,27 @@
 {
+  "inputs": [
+    {
+      "id": "contextiq-token-v2",
+      "type": "promptString",
+      "description": "ContextIQ bearer token (paste access_token from /auth/dev-login)",
+      "password": true
+    }
+  ],
   "servers": {
-    "propel-sdlc": {
+    "contextiq": {
       "type": "http",
-      "url": "<propel-mcp-url>/mcp"
+      "url": "http://localhost:8000/mcp/",
+      "headers": {
+        "Authorization": "Bearer ${input:contextiq-token-v2}",
+        "Content-Type": "application/json"
+      }
     },
     "sequential-thinking": {
       "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-sequential-thinking@latest"]
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-sequential-thinking@latest"
+      ]
     },
     "context7": {
       "type": "http",
@@ -31,10 +46,6 @@
       "command": "npx",
       "env": {},
       "type": "stdio"
-    },
-    "figma": {
-       "url": "https://mcp.figma.com/mcp",
-       "type": "http"
-     }
+    }
   }
 }

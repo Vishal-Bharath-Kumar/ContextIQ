@@ -1,0 +1,5 @@
+apiVersion: v2
+name: contextiq-common
+description: Shared Helm library for ContextIQ services
+type: library
+version: 0.1.0

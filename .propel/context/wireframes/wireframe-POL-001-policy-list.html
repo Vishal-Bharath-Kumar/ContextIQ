@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<title>POL-001 — Policy List · ContextIQ Wireframe</title>
+<link rel="stylesheet" href="_wireframe-base.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="topbar-logo"><div class="topbar-logo-icon">C</div>ContextIQ</div>
+  <div class="topbar-sep"></div>
+  <nav class="topbar-breadcrumb">Policies</nav>
+  <div class="topbar-actions"><div class="topbar-search">🔍 Search</div><button class="topbar-icon-btn">🔔</button></div>
+</header>
+<nav class="sidebar" aria-label="Main navigation">
+  <div class="sidebar-nav">
+    <a class="nav-item"><span class="icon">⊞</span>Dashboard</a>
+    <div class="nav-section">Data Sources</div>
+    <a class="nav-item"><span class="icon">⬡</span>Connectors</a><a class="nav-item"><span class="icon">🗄</span>Knowledge Sources</a>
+    <div class="nav-section">Governance</div>
+    <a class="nav-item active" aria-current="page"><span class="icon">🛡</span>Policies</a>
+    <div class="nav-section">Observability</div>
+    <a class="nav-item"><span class="icon">▶</span>Replay Explorer</a><a class="nav-item"><span class="icon">📋</span>Audit Log</a><a class="nav-item"><span class="icon">📊</span>Observability</a>
+    <div class="nav-section">Platform</div><a class="nav-item"><span class="icon">👥</span>Users</a><a class="nav-item"><span class="icon">💻</span>Models</a><a class="nav-item"><span class="icon">⚙</span>Settings</a>
+  </div>
+  <div class="sidebar-user"><div class="user-avatar">CS</div><div class="user-info"><div class="user-name">Carol Sec</div><div class="user-role">Security Officer</div></div></div>
+</nav>
+<main class="main-content" role="main">
+  <div class="page-header">
+    <div><div class="page-title">Policies</div></div>
+    <button class="btn btn-primary">+ New Policy</button>
+  </div>
+  <div class="filter-bar">
+    <input class="input-wf" style="width:220px" placeholder="🔍  Filter by name…">
+    <select class="select-wf"><option>All Status</option><option>Active</option><option>Draft</option><option>Archived</option></select>
+    <select class="select-wf"><option>All Scopes</option><option>global</option><option>connector</option><option>model</option></select>
+  </div>
+  <div class="table-wrapper">
+    <table class="table-wf" aria-label="Policies">
+      <thead><tr><th style="width:36px"><input type="checkbox" style="accent-color:var(--brand-blue-500)"></th><th>Name</th><th>Version</th><th>Scope</th><th>Status</th><th>Author</th><th>Last Modified</th><th>Actions</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><input type="checkbox" style="accent-color:var(--brand-blue-500)"></td>
+          <td><a style="color:var(--brand-blue-400);cursor:pointer">pii-redaction</a></td>
+          <td class="mono tabular text-muted">v3</td>
+          <td><span class="badge badge-neutral">global</span></td>
+          <td><span class="badge badge-success">● Active</span></td>
+          <td>carol@co.com</td>
+          <td class="text-muted">today</td>
+          <td style="display:flex;gap:4px"><button class="btn btn-ghost btn-sm btn-icon">✏</button><button class="btn btn-ghost btn-sm btn-icon">⋯</button></td>
+        </tr>
+        <tr style="background:var(--brand-blue-900)">
+          <td><input type="checkbox" checked style="accent-color:var(--brand-blue-500)"></td>
+          <td><a style="color:var(--brand-blue-400);cursor:pointer">rate-limiter</a></td>
+          <td class="mono tabular text-muted">v1</td>
+          <td><span class="badge badge-neutral">connector</span></td>
+          <td><span class="badge badge-neutral">○ Draft</span></td>
+          <td>carol@co.com</td>
+          <td class="text-muted">yesterday</td>
+          <td style="display:flex;gap:4px"><button class="btn btn-ghost btn-sm btn-icon">✏</button><button class="btn btn-ghost btn-sm btn-icon">⋯</button></td>
+        </tr>
+        <tr>
+          <td><input type="checkbox" style="accent-color:var(--brand-blue-500)"></td>
+          <td><a style="color:var(--brand-blue-400);cursor:pointer">output-filter</a></td>
+          <td class="mono tabular text-muted">v5</td>
+          <td><span class="badge badge-neutral">model</span></td>
+          <td><span class="badge badge-success">● Active</span></td>
+          <td>alice@co.com</td>
+          <td class="text-muted">3 days ago</td>
+          <td style="display:flex;gap:4px"><button class="btn btn-ghost btn-sm btn-icon">✏</button><button class="btn btn-ghost btn-sm btn-icon">⋯</button></td>
+        </tr>
+        <tr>
+          <td><input type="checkbox" style="accent-color:var(--brand-blue-500)"></td>
+          <td><a style="color:var(--neutral-600);cursor:pointer;text-decoration:line-through">old-classifier</a></td>
+          <td class="mono tabular text-muted">v2</td>
+          <td><span class="badge badge-neutral">global</span></td>
+          <td><span class="badge" style="background:var(--neutral-850);color:var(--neutral-600)">Archived</span></td>
+          <td class="text-muted">alice@co.com</td>
+          <td class="text-muted">2 wks ago</td>
+          <td style="display:flex;gap:4px"><button class="btn btn-ghost btn-sm btn-icon">✏</button><button class="btn btn-ghost btn-sm btn-icon">⋯</button></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Bulk action bar (sticky, shown when rows selected) -->
+  <div style="position:sticky;bottom:0;background:var(--brand-blue-700);border-top:1px solid var(--brand-blue-600);padding:10px 16px;display:flex;align-items:center;gap:12px;border-radius:0 0 6px 6px;margin-top:-1px">
+    <span style="font-size:13px;font-weight:500;color:white">1 policy selected</span>
+    <div style="margin-left:auto;display:flex;gap:8px">
+      <button class="btn btn-sm" style="background:white;color:var(--brand-blue-700)">Activate</button>
+      <button class="btn btn-sm" style="background:transparent;color:white;border:1px solid rgba(255,255,255,0.4)">Archive</button>
+      <button class="btn btn-sm" style="background:var(--danger-600);color:white">Delete</button>
+    </div>
+  </div>
+</main>
+<aside class="annotation-panel">
+  <div class="ann-screen-id">POL-001</div>
+  <div class="ann-route">Route: /policies</div>
+  <div class="ann-guard">Guard: SECURITY_OFFICER, ADMIN</div>
+  <div class="ann-divider"></div>
+  <div class="ann-section">Components</div>
+  <div class="ann-item"><div class="ann-component">&lt;Checkbox&gt;</div><div class="ann-note">Row selection · enables bulk actions bar</div></div>
+  <div class="ann-item"><div class="ann-component">&lt;BulkActionBar&gt;</div><div class="ann-note">Sticky bottom · brand-blue-700 bg · appears when ≥1 row selected</div></div>
+  <div class="ann-item"><div class="ann-component">&lt;StatusBadge&gt;</div><div class="ann-note">Active=success · Draft=neutral · Archived=muted+strikethrough</div></div>
+</aside>
+</body>
+</html>

@@ -1,0 +1,58 @@
+# helm/contextiq/values-staging.yaml
+# Staging environment overrides for the ContextIQ umbrella chart.
+#
+# IMAGE TAGS are managed by CI — do not edit the `tag:` fields manually.
+# They are updated on every merge to main by scripts/ci/update_image_tags.sh
+# (invoked by .github/workflows/deploy.yml).
+#
+# SETUP: Replace YOUR_GITHUB_ORG in each repository: field with the actual
+# GitHub organisation or username that owns the GHCR packages.
+
+global:
+  imageRegistry: registry.contextiq.internal
+  environment: staging
+
+mcp-gateway:
+  replicaCount: 2
+  image:
+    repository: ghcr.io/YOUR_GITHUB_ORG/contextiq-api
+    tag: "PLACEHOLDER"    # replaced by CI with full git SHA on every main-branch merge
+  hpa:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 5
+  env:
+    LOG_LEVEL: INFO
+
+agent-worker:
+  replicaCount: 2
+  image:
+    repository: ghcr.io/YOUR_GITHUB_ORG/contextiq-agent-worker
+    tag: "PLACEHOLDER"
+  hpa:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 8
+  env:
+    LOG_LEVEL: INFO
+
+indexing-service:
+  replicaCount: 2
+  image:
+    repository: ghcr.io/YOUR_GITHUB_ORG/contextiq-indexing
+    tag: "PLACEHOLDER"
+
+admin-portal:
+  replicaCount: 2
+  image:
+    # admin-portal uses the same base API image as mcp-gateway
+    repository: ghcr.io/YOUR_GITHUB_ORG/contextiq-api
+    tag: "PLACEHOLDER"
+
+keycloak:
+  replicaCount: 2
+
+jaeger:
+  replicaCount: 1
+  env:
+    SPAN_STORAGE_TYPE: elasticsearch

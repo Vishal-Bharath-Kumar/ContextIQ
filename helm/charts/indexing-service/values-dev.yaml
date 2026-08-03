@@ -1,0 +1,6 @@
+hpa:
+  enabled: false    # single pod in dev — no auto-scaling overhead
+vault:
+  enabled: false
+env:
+  LOG_LEVEL: DEBUG

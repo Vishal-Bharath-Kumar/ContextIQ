@@ -1,0 +1,16 @@
+# Kustomize strategic merge patch — sets storageClassName on MinIO PVC.
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: minio
+  namespace: contextiq-infra
+spec:
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        storageClassName: contextiq-encrypted-gp3
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 500Gi

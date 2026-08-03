@@ -1,0 +1,12 @@
+apiVersion: v2
+name: vault
+description: >
+  ContextIQ Vault wrapper — HA Raft cluster with AWS KMS auto-unseal and
+  Vault Agent Injector for per-pod sidecar credential injection.
+type: application
+version: 0.1.0
+appVersion: "1.16.2"
+dependencies:
+  - name: vault
+    version: "0.28.1"
+    repository: "https://helm.releases.hashicorp.com"

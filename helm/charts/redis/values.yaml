@@ -1,0 +1,102 @@
+redis:
+  image:
+    tag: "7.2.5-debian-12-r0"    # pinned for reproducibility
+
+  # AC-4: Sentinel HA — 1 primary + 2 replicas, Sentinel monitors for automatic failover
+  architecture: replication
+
+  auth:
+    enabled: true
+    # AC-6: password is NOT hard-coded; Vault Agent provides it at runtime
+    existingSecret:            ""
+    existingSecretPasswordKey: ""
+    password:                  "PLACEHOLDER"    # overwritten by Vault-injected env var
+
+  sentinel:
+    enabled:               true
+    masterSet:             contextiq-redis    # sentinel group name used in application URLs
+    quorum:                2                  # 2 of 3 sentinels must agree to trigger failover
+    downAfterMilliseconds: 5000               # declare primary down after 5 s
+    failoverTimeout:       10000              # attempt failover within 10 s (AC-4)
+    parallelSyncs:         1
+
+  # AC-4: keyspace notifications and performance tuning
+  commonConfiguration: |
+    notify-keyspace-events KEA
+    hz 15
+    loglevel notice
+    save ""
+    appendonly yes
+    appendfsync everysec
+    tls-port 6379
+    port 0
+
+  master:
+    resources:
+      requests: { cpu: "500m",  memory: "1Gi" }
+      limits:   { cpu: "2",     memory: "4Gi" }
+    persistence:
+      enabled:      true
+      storageClass: contextiq-encrypted-gp3    # TASK-US048-04: encrypted PVC
+      size:         20Gi
+
+    # AC-6: Vault Agent injects Redis password into the primary pod
+    podAnnotations:
+      vault.hashicorp.com/agent-inject:                "true"
+      vault.hashicorp.com/role:                        "mcp-gateway"
+      vault.hashicorp.com/agent-pre-populate-only:     "true"    # init-only; password is static
+      vault.hashicorp.com/agent-inject-secret-redis:   "database/redis/creds/mcp-gateway"
+      vault.hashicorp.com/agent-inject-template-redis: |
+        {{- with secret "database/redis/creds/mcp-gateway" -}}
+        export REDIS_PASSWORD="{{ .Data.password }}"
+        export REDIS_ACL_USERNAME="{{ .Data.username }}"
+        {{- end }}
+
+  replica:
+    replicaCount: 2    # AC-4: 1 primary + 2 replicas
+
+    resources:
+      requests: { cpu: "250m",  memory: "1Gi" }
+      limits:   { cpu: "1",     memory: "2Gi" }
+
+    # AC-4: spread replicas across distinct K8s nodes for fault isolation
+    affinity:
+      podAntiAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchLabels:
+                app.kubernetes.io/name:      redis
+                app.kubernetes.io/component: replica
+            topologyKey: kubernetes.io/hostname
+
+    podAnnotations:
+      vault.hashicorp.com/agent-inject:                "true"
+      vault.hashicorp.com/role:                        "mcp-gateway"
+      vault.hashicorp.com/agent-pre-populate-only:     "true"
+      vault.hashicorp.com/agent-inject-secret-redis:   "database/redis/creds/mcp-gateway"
+      vault.hashicorp.com/agent-inject-template-redis: |
+        {{- with secret "database/redis/creds/mcp-gateway" -}}
+        export REDIS_PASSWORD="{{ .Data.password }}"
+        {{- end }}
+
+    persistence:
+      enabled:      true
+      storageClass: contextiq-encrypted-gp3
+      size:         20Gi
+
+  # PDB: keep 2 of 3 Redis pods (primary + at least 1 replica) always available
+  podDisruptionBudget:
+    enabled:      true
+    minAvailable: 2
+
+  # AC-7: Prometheus redis-exporter sidecar
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled:   true
+      namespace: contextiq-observability
+      labels:
+        app.kubernetes.io/part-of: contextiq
+    resources:
+      requests: { cpu: "50m",  memory: "64Mi" }
+      limits:   { cpu: "100m", memory: "128Mi" }

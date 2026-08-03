@@ -1,0 +1,33 @@
+{
+  "$schema": "https://schema.modelcontextprotocol.io/client/config.json",
+  "mcpServers": {
+    "contextiq": {
+      "type": "http",
+      "url": "http://localhost:8000/mcp/",
+      "description": "ContextIQ Enterprise MCP Server - Provides access to enterprise knowledge sources, retrieval, and agent capabilities",
+      "headers": {
+        "Authorization": "Bearer ${env:CONTEXTIQ_TOKEN}",
+        "Content-Type": "application/json"
+      },
+      "capabilities": {
+        "tools": true,
+        "resources": true,
+        "prompts": false
+      }
+    },
+    "contextiq-production": {
+      "type": "http",
+      "url": "https://contextiq.example.com/mcp/",
+      "description": "ContextIQ Production Environment",
+      "headers": {
+        "Authorization": "Bearer ${env:CONTEXTIQ_PROD_TOKEN}",
+        "Content-Type": "application/json"
+      },
+      "capabilities": {
+        "tools": true,
+        "resources": true,
+        "prompts": false
+      }
+    }
+  }
+}

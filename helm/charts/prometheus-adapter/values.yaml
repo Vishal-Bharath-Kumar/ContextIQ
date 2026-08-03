@@ -1,0 +1,58 @@
+prometheus:
+  # In-cluster Prometheus URL (deployed in contextiq-observability by TASK-US045-02)
+  url:  http://prometheus.contextiq-observability.svc.cluster.local
+  port: 9090
+
+# How often the adapter re-lists metric names from Prometheus
+metricsRelistInterval: 30s
+
+logLevel: 0    # 0 = errors only; set to 4 in staging for debugging
+
+replicas: 2    # HA — two adapter replicas so a single pod restart cannot gap HPA reads
+
+resources:
+  requests:
+    cpu:    "100m"
+    memory: "128Mi"
+  limits:
+    cpu:    "500m"
+    memory: "256Mi"
+
+# AC-2: Custom metric rules exposed on custom.metrics.k8s.io/v1beta1.
+#
+# Rule anatomy:
+#   seriesQuery  — PromQL selector to match the series that carry the metric
+#   resources    — maps Prometheus labels to Kubernetes resource dimensions
+#     overrides  — explicit label → {resource, group} mappings
+#   name         — the custom metric name as it appears on custom.metrics.k8s.io
+#   metricsQuery — PromQL expression evaluated when the HPA requests the value;
+#                  <<.LabelMatchers>> is replaced by the HPA's namespace/pod selectors
+rules:
+  custom:
+    # contextiq_active_requests — used by agent-worker HPA (AC-2, TASK-US046-03)
+    # Per-pod Gauge incremented/decremented by MetricsMiddleware (US-036 TASK-US036-01).
+    # Summed per pod so HPA gets a per-replica load figure, enabling predictable scale-up.
+    - seriesQuery: >
+        contextiq_active_requests{namespace!="",pod!=""}
+      resources:
+        overrides:
+          namespace: { resource: namespace }
+          pod:       { resource: pod }
+      name:
+        matches: "contextiq_active_requests"
+        as:      "contextiq_active_requests"    # exact name queried by agent-worker HPA
+      metricsQuery: >
+        sum(contextiq_active_requests{<<.LabelMatchers>>}) by (pod)
+
+    # contextiq_requests_per_second — not consumed by HPA; available for dashboards
+    - seriesQuery: >
+        contextiq_requests_total{namespace!="",pod!=""}
+      resources:
+        overrides:
+          namespace: { resource: namespace }
+          pod:       { resource: pod }
+      name:
+        matches: "contextiq_requests_total"
+        as:      "contextiq_requests_per_second"
+      metricsQuery: >
+        rate(contextiq_requests_total{<<.LabelMatchers>>}[2m])

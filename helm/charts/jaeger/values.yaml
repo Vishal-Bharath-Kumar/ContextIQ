@@ -1,0 +1,70 @@
+replicaCount: 2
+
+image:
+  repository: jaegertracing/all-in-one
+  pullPolicy: IfNotPresent
+  tag: "1.57.0"
+
+namespace: contextiq-observability
+
+service:
+  type: ClusterIP
+  port: 16686
+  targetPort: 16686
+
+ingress:
+  enabled: false
+  className: nginx
+  host: jaeger.contextiq.internal
+  path: /
+
+resources:
+  requests:
+    cpu: "250m"
+    memory: "512Mi"
+  limits:
+    cpu: "1"
+    memory: "2Gi"
+
+readinessProbe:
+  httpGet:
+    path: /
+    port: 14269
+  initialDelaySeconds: 10
+  periodSeconds: 10
+  failureThreshold: 3
+
+livenessProbe:
+  httpGet:
+    path: /
+    port: 14269
+  initialDelaySeconds: 30
+  periodSeconds: 30
+  failureThreshold: 5
+
+hpa:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 3
+  targetCPUUtilizationPercentage: 70
+
+pdb:
+  enabled: true
+  minAvailable: 1
+
+podSecurityContext:
+  runAsNonRoot: true
+  seccompProfile:
+    type: RuntimeDefault
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+  runAsUser: 1000
+  capabilities:
+    drop: ["ALL"]
+
+env:
+  COLLECTOR_OTLP_ENABLED: "true"
+  SPAN_STORAGE_TYPE: "memory"

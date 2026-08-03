@@ -1,0 +1,20 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: contextiq-knowledge-agent
+  namespace: contextiq
+  labels:
+    prometheus: contextiq
+spec:
+  selector:
+    matchLabels:
+      app: contextiq-knowledge-agent
+  namespaceSelector:
+    matchNames:
+      - contextiq
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 15s
+      scrapeTimeout: 10s
+      honorLabels: false

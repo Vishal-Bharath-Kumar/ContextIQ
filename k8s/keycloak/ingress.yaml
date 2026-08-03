@@ -1,0 +1,25 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: keycloak
+  namespace: keycloak
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /auth/$2
+    nginx.ingress.kubernetes.io/proxy-buffer-size: "128k"   # Keycloak large headers
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
+    # The Admin Console at /auth/admin is protected by Keycloak's own session
+    # checks — non-admin sessions are redirected to login by Keycloak itself (AC-5).
+    # No additional nginx auth_request annotation is needed.
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: contextiq.internal
+      http:
+        paths:
+          - path: /auth(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: keycloak
+                port:
+                  name: http

@@ -1,0 +1,37 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: vault
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: contextiq
+  # Multi-source: upstream Helm chart + custom values from git (ArgoCD 2.6+)
+  sources:
+    # Source 1: upstream HashiCorp vault Helm chart
+    - repoURL:        https://helm.releases.hashicorp.com
+      chart:          vault
+      targetRevision: "0.28.1"
+      helm:
+        valueFiles:
+          - $values/helm/charts/vault/values.yaml
+          - $values/helm/charts/vault/values-prod.yaml
+    # Source 2: git repo supplying the custom values files (referenced as $values above)
+    - repoURL:        https://github.com/your-org/contextiq.git
+      targetRevision: HEAD
+      ref:            values
+  destination:
+    server:    https://kubernetes.default.svc
+    namespace: contextiq-security
+  syncPolicy:
+    automated:
+      prune:    false    # Vault StatefulSet and PVCs must never be deleted automatically
+      selfHeal: true
+    syncOptions:
+      - ApplyOutOfSyncOnly=true
+  ignoreDifferences:
+    - group: apps
+      kind:  StatefulSet
+      jsonPointers:
+        - /spec/replicas   # ignore HPA-driven replica drift

@@ -1,0 +1,84 @@
+---
+# ServiceAccount used by the backup CronJob pod.
+# Vault Agent binds the 'postgres-backup' Kubernetes auth role (TASK-US047-02)
+# to this ServiceAccount so it can retrieve MinIO and PostgreSQL credentials.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: postgres-backup
+  namespace: contextiq-data
+  labels:
+    app.kubernetes.io/part-of:    contextiq
+    app.kubernetes.io/component:  postgres-backup
+---
+# AC-1: Daily backup at 01:00 UTC using pg_basebackup, archived to MinIO.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: postgres-backup
+  namespace: contextiq-data
+spec:
+  schedule:          "0 1 * * *"    # 01:00 UTC daily
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit:     3
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      template:
+        metadata:
+          annotations:
+            # Vault Agent provides MinIO and PostgreSQL credentials at runtime
+            vault.hashicorp.com/agent-inject:                    "true"
+            vault.hashicorp.com/role:                            "postgres-backup"
+            vault.hashicorp.com/agent-inject-secret-minio:       "secret/data/contextiq/minio/backup"
+            vault.hashicorp.com/agent-inject-template-minio: |
+              {{- with secret "secret/data/contextiq/minio/backup" }}
+              export MINIO_ACCESS_KEY="{{ .Data.data.access_key }}"
+              export MINIO_SECRET_KEY="{{ .Data.data.secret_key }}"
+              {{- end }}
+            vault.hashicorp.com/agent-inject-secret-postgres:    "secret/data/contextiq/postgres/admin"
+            vault.hashicorp.com/agent-inject-template-postgres: |
+              {{- with secret "secret/data/contextiq/postgres/admin" }}
+              export PGPASSWORD="{{ .Data.data.password }}"
+              {{- end }}
+        spec:
+          restartPolicy: OnFailure
+          serviceAccountName: postgres-backup
+          containers:
+            - name: backup
+              image: bitnami/postgresql:15.7.0-debian-12-r0
+              command: ["/bin/bash", "-c"]
+              args:
+                - |
+                  set -euo pipefail
+
+                  # Source Vault-injected credentials
+                  . /vault/secrets/postgres.env
+                  . /vault/secrets/minio.env
+
+                  TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+                  BACKUP_DIR="/tmp/pgbackup_${TIMESTAMP}"
+                  BACKUP_FILE="/tmp/pg_backup_${TIMESTAMP}.tar.gz"
+
+                  echo "=== Starting PostgreSQL backup: $TIMESTAMP ==="
+                  pg_basebackup \
+                    -h postgresql.contextiq-data.svc.cluster.local \
+                    -U postgres \
+                    -D "$BACKUP_DIR" \
+                    -Ft -z -Xs -P \
+                    --checkpoint=fast
+
+                  tar -czf "$BACKUP_FILE" -C /tmp "pgbackup_${TIMESTAMP}"
+
+                  echo "=== Uploading to MinIO ==="
+                  mc alias set minio \
+                    http://minio.contextiq-infra.svc.cluster.local:9000 \
+                    "$MINIO_ACCESS_KEY" "$MINIO_SECRET_KEY" --api s3v4
+                  mc cp "$BACKUP_FILE" "minio/contextiq-postgres-backups/daily/${TIMESTAMP}.tar.gz"
+
+                  echo "=== Backup complete: daily/${TIMESTAMP}.tar.gz ==="
+                  rm -rf "$BACKUP_FILE" "$BACKUP_DIR"
+              resources:
+                requests: { cpu: "500m", memory: "512Mi" }
+                limits:   { cpu: "2",    memory: "1Gi"  }

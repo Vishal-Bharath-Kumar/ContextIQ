@@ -1,0 +1,82 @@
+opensearch:
+  image:
+    tag: "2.14.0"    # pinned for reproducibility
+
+  # AC-3: 3-node cluster — all nodes master-eligible data nodes
+  replicas: 3
+
+  roles:
+    - master
+    - data
+    - ingest
+
+  config:
+    opensearch.yml: |
+      cluster.name: contextiq-opensearch
+      # AC-3: minimum 2 master-eligible nodes required for quorum (2 of 3)
+      cluster.initial_master_nodes:
+        - contextiq-opensearch-0
+        - contextiq-opensearch-1
+        - contextiq-opensearch-2
+      node.max_local_storage_nodes: 1
+
+      # Security: OpenSearch Security plugin — TLS for both transport and HTTP
+      plugins.security.ssl.transport.pemcert_filepath:          tls/tls.crt
+      plugins.security.ssl.transport.pemkey_filepath:           tls/tls.key
+      plugins.security.ssl.transport.pemtrustedcas_filepath:    tls/ca.crt
+      plugins.security.ssl.http.enabled:                        true
+      plugins.security.ssl.http.pemcert_filepath:               tls/tls.crt
+      plugins.security.ssl.http.pemkey_filepath:                tls/tls.key
+      plugins.security.ssl.http.pemtrustedcas_filepath:         tls/ca.crt
+      plugins.security.allow_default_init_securityindex:        true
+      plugins.security.authcz.admin_dn:
+        - "CN=opensearch-admin,O=ContextIQ"
+      plugins.security.nodes_dn:
+        - "CN=opensearch-node,O=ContextIQ"
+
+  javaOpts: "-Xmx2g -Xms2g"
+
+  resources:
+    requests: { cpu: "500m",  memory: "4Gi" }
+    limits:   { cpu: "2",     memory: "8Gi" }
+
+  # Encrypted PVC (TASK-US048-04)
+  persistence:
+    enabled:      true
+    storageClass: contextiq-encrypted-gp3
+    size:         50Gi
+
+  # AC-6: Vault Agent init-container injects admin credentials before OpenSearch starts
+  podAnnotations:
+    vault.hashicorp.com/agent-inject:                      "true"
+    vault.hashicorp.com/role:                              "indexing-service"
+    vault.hashicorp.com/agent-pre-populate-only:           "true"    # init-only; credentials are static
+    vault.hashicorp.com/agent-inject-secret-opensearch:    "secret/data/contextiq/opensearch/admin"
+    vault.hashicorp.com/agent-inject-template-opensearch: |
+      {{- with secret "secret/data/contextiq/opensearch/admin" -}}
+      export OPENSEARCH_INITIAL_ADMIN_PASSWORD="{{ .Data.data.password }}"
+      export OPENSEARCH_PASSWORD="{{ .Data.data.password }}"
+      {{- end }}
+
+  # AC-3: spread nodes across distinct K8s nodes for fault isolation
+  affinity:
+    podAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        - labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: opensearch
+          topologyKey: kubernetes.io/hostname
+
+  # PDB: tolerate 1 of 3 nodes down (cluster retains quorum with 2 of 3)
+  podDisruptionBudget:
+    enabled:        true
+    maxUnavailable: 1
+
+  # AC-7: Prometheus metrics via opensearch-exporter sidecar
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled:   true
+      namespace: contextiq-observability
+      labels:
+        app.kubernetes.io/part-of: contextiq

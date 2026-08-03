@@ -1,0 +1,202 @@
+name: PR Checks
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+
+# Cancel in-progress runs for the same PR to avoid queueing stale builds
+concurrency:
+  group: pr-checks-${{ github.head_ref }}
+  cancel-in-progress: true
+
+# NOTE: UV_CACHE_DIR is intentionally NOT set at the workflow level.
+# The github context (github.workspace) is not available in top-level env: blocks.
+# Cache management is delegated to astral-sh/setup-uv with enable-cache: true
+# inside the .github/actions/python-setup composite action.
+env:
+  PYTHON_VERSION: "3.11"
+
+jobs:
+  # -----------------------------------------------------------------------
+  # Job 1: Lint (ruff)
+  # AC-1: ruff lint — blocks PR merge on any violation (AC-3)
+  # -----------------------------------------------------------------------
+  lint:
+    name: Lint (ruff)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5    # AC-7: lint must complete in < 5 min
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # NOTE: composite action must be in .github/actions/DIRNAME/, not .github/workflows/
+      - name: Set up Python + uv
+        uses: ./.github/actions/python-setup
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          install-groups: dev
+
+      # Restore ruff cache to skip unchanged files
+      - name: Cache ruff
+        uses: actions/cache@v4
+        with:
+          path: .ruff_cache
+          key:          ruff-${{ runner.os }}-${{ hashFiles('pyproject.toml') }}-${{ github.sha }}
+          restore-keys: ruff-${{ runner.os }}-${{ hashFiles('pyproject.toml') }}-
+
+      - name: Run ruff lint
+        run: uv run ruff check . --output-format=github    # GitHub-annotated output
+
+      - name: Run ruff format check
+        run: uv run ruff format --check .
+
+  # -----------------------------------------------------------------------
+  # Job 2: Type-check (mypy)
+  # AC-1: mypy strict mode — blocks PR merge on type errors (AC-3)
+  # -----------------------------------------------------------------------
+  typecheck:
+    name: Type-check (mypy)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 6    # AC-7
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python + uv
+        uses: ./.github/actions/python-setup
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          install-groups: dev
+
+      # mypy cache: dramatically speeds up re-checks on unchanged modules
+      - name: Cache mypy
+        uses: actions/cache@v4
+        with:
+          path: .mypy_cache
+          key:          mypy-${{ runner.os }}-${{ env.PYTHON_VERSION }}-${{ hashFiles('pyproject.toml') }}-${{ github.sha }}
+          restore-keys: mypy-${{ runner.os }}-${{ env.PYTHON_VERSION }}-${{ hashFiles('pyproject.toml') }}-
+
+      - name: Run mypy
+        run: uv run mypy src/ --strict --ignore-missing-imports
+
+  # -----------------------------------------------------------------------
+  # Job 3: Tests (pytest — unit + integration)
+  # AC-1: pytest — blocks PR merge on any failure (AC-3)
+  # -----------------------------------------------------------------------
+  test:
+    name: Test (pytest)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8    # AC-7: test job must complete in < 8 min
+
+    services:
+      # Lightweight test database — avoids needing a full cluster
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER:     testuser
+          POSTGRES_PASSWORD: testpass
+          POSTGRES_DB:       contextiq_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd="pg_isready -U testuser"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=5
+
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=5s
+          --health-retries=5
+
+    env:
+      DATABASE_URL:            "postgresql+asyncpg://testuser:testpass@localhost:5432/contextiq_test"
+      REDIS_URL:               "redis://localhost:6379/0"
+      ENVIRONMENT:             "test"
+      # Skip Vault/Keycloak/Kafka in unit test runs — mocked via pytest fixtures
+      SKIP_EXTERNAL_SERVICES:  "true"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python + uv
+        uses: ./.github/actions/python-setup
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          install-groups: dev
+
+      - name: Run Alembic migrations (test DB)
+        run: uv run alembic upgrade head
+
+      - name: Run unit tests
+        # AC-7: -n auto parallelises tests across all available cores
+        run: |
+          uv run pytest tests/unit/ \
+            -n auto \
+            --tb=short \
+            --junitxml=test-results/unit.xml \
+            --cov=src \
+            --cov-report=xml:coverage.xml \
+            --cov-fail-under=80
+
+      - name: Run integration tests
+        run: |
+          uv run pytest tests/integration/ \
+            -n 4 \
+            --tb=short \
+            --junitxml=test-results/integration.xml \
+            -m "not destructive"
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name:           test-results
+          path:           test-results/
+          retention-days: 7
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name:           coverage-report
+          path:           coverage.xml
+          retention-days: 7
+
+      # Annotate PR with test results (shows failures inline)
+      - name: Publish test results
+        if: always()
+        uses: EnricoMi/publish-unit-test-result-action@v2
+        with:
+          files: test-results/**/*.xml
+
+  # -----------------------------------------------------------------------
+  # Job 4: Build Docker Images (multi-arch, push to GHCR)
+  # TASK-US049-03: reusable workflow in build.yml
+  # -----------------------------------------------------------------------
+  build:
+    name: Build Docker Images
+    uses: ./.github/workflows/build.yml
+    with:
+      push: true    # push PR-tagged image so Trivy (TASK-US049-02) can pull it
+    permissions:
+      contents: read
+      packages: write
+
+  # -----------------------------------------------------------------------
+  # Job 5: Security Scans (Trivy + OWASP Dependency-Check)
+  # TASK-US049-02: activated now that the build job exists
+  # -----------------------------------------------------------------------
+  security-scans:
+    name: Security Scans
+    needs: build    # wait for the image to be pushed
+    uses: ./.github/workflows/security-scans.yml
+    with:
+      image-ref:        ghcr.io/${{ github.repository }}/contextiq-api:${{ github.sha }}
+      fail-on-severity: HIGH
+    permissions:
+      security-events: write
+      packages:        read
+    secrets: inherit    # forwards NVD_API_KEY and all other secrets

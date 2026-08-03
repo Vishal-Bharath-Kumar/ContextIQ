@@ -1,0 +1,56 @@
+# AC-5: Prometheus-compatible JMX Exporter rules for key Kafka broker metrics.
+# Mounted as a ConfigMap sidecar on each broker pod.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name:      kafka-jmx-config
+  namespace: contextiq-data
+data:
+  jmx-kafka-prometheus.yml: |
+    startDelaySeconds: 30
+    ssl: false
+    lowercaseOutputName: true
+    lowercaseOutputLabelNames: true
+
+    rules:
+      # --- Under-replicated partitions (AC-5: alert threshold > 0) ---
+      # NOTE: This pattern has no capture group so the label reference $1 is removed.
+      - pattern: "kafka.server<type=ReplicaManager, name=UnderReplicatedPartitions><>Value"
+        name:    kafka_server_replicamanager_underreplicatedpartitions
+
+      # --- Consumer lag (AC-5: key operational metric) ---
+      - pattern: "kafka.consumer<type=consumer-fetch-manager-metrics, client-id=(.+)><>records-lag-max"
+        name:    kafka_consumer_fetch_manager_records_lag_max
+        labels:  { client_id: "$1" }
+
+      # --- Broker bytes in/out per topic (throughput) ---
+      - pattern: "kafka.server<type=BrokerTopicMetrics, name=BytesInPerSec, topic=(.+)><>OneMinuteRate"
+        name:    kafka_server_brokertopicmetrics_bytesin_rate
+        labels:  { topic: "$1" }
+      - pattern: "kafka.server<type=BrokerTopicMetrics, name=BytesOutPerSec, topic=(.+)><>OneMinuteRate"
+        name:    kafka_server_brokertopicmetrics_bytesout_rate
+        labels:  { topic: "$1" }
+
+      # --- Messages in per second per topic ---
+      - pattern: "kafka.server<type=BrokerTopicMetrics, name=MessagesInPerSec, topic=(.+)><>OneMinuteRate"
+        name:    kafka_server_brokertopicmetrics_messagesin_rate
+        labels:  { topic: "$1" }
+
+      # --- Request rate per request type ---
+      - pattern: "kafka.network<type=RequestMetrics, name=RequestsPerSec, request=(.+)><>OneMinuteRate"
+        name:    kafka_network_requestmetrics_requestspersec_rate
+        labels:  { request: "$1" }
+
+      # --- ISR shrink/expand (leading indicator for replication health) ---
+      - pattern: "kafka.server<type=ReplicaManager, name=IsrShrinksPerSec><>OneMinuteRate"
+        name:    kafka_server_replicamanager_isrshrinks_rate
+      - pattern: "kafka.server<type=ReplicaManager, name=IsrExpandsPerSec><>OneMinuteRate"
+        name:    kafka_server_replicamanager_isrexpands_rate
+
+      # --- Active controller count (should be exactly 1 cluster-wide) ---
+      - pattern: "kafka.controller<type=KafkaController, name=ActiveControllerCount><>Value"
+        name:    kafka_controller_kafkacontroller_activecontrollercount
+
+      # --- Offline partitions (should be 0 at all times) ---
+      - pattern: "kafka.controller<type=KafkaController, name=OfflinePartitionsCount><>Value"
+        name:    kafka_controller_kafkacontroller_offlinepartitionscount

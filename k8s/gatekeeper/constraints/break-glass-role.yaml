@@ -1,0 +1,37 @@
+---
+# Emergency access ServiceAccount for SRE team.
+# Usage is automatically captured in the Kubernetes audit log.
+# Requires manual approval and incident ticket before kubectl exec use.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: sre-break-glass
+  namespace: contextiq-infra
+  annotations:
+    contextiq.io/break-glass:          "true"
+    contextiq.io/approver-required:    "true"
+    contextiq.io/runbook:              "https://wiki.contextiq.io/runbooks/break-glass-exec"
+---
+# ClusterRole: minimal permissions — only exec/port-forward on pods
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: sre-break-glass-exec
+rules:
+  - apiGroups: [""]
+    resources: ["pods/exec", "pods/portforward"]
+    verbs:     ["create", "get"]
+---
+# Binding scoped to break-glass SA only — not granted to any human user directly
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: sre-break-glass-exec
+subjects:
+  - kind:      ServiceAccount
+    name:      sre-break-glass
+    namespace: contextiq-infra
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind:     ClusterRole
+  name:     sre-break-glass-exec

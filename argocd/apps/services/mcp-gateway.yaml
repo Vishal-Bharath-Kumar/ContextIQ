@@ -1,0 +1,33 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: mcp-gateway
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: contextiq
+  source:
+    repoURL:        https://github.com/your-org/contextiq.git
+    targetRevision: HEAD
+    path:           helm/charts/mcp-gateway
+    helm:
+      valueFiles:
+        - values.yaml
+        - values-prod.yaml   # AC-2: environment-specific overrides
+  destination:
+    server:    https://kubernetes.default.svc
+    namespace: contextiq-gateway
+  syncPolicy:
+    automated:
+      prune:    true
+      selfHeal: true
+    syncOptions:
+      - ApplyOutOfSyncOnly=true
+  # AC-6: ArgoCD waits for all pods to be healthy before marking sync complete.
+  # Ignore HPA-driven replica count drift so ArgoCD does not fight the autoscaler.
+  ignoreDifferences:
+    - group: apps
+      kind:  Deployment
+      jsonPointers:
+        - /spec/replicas

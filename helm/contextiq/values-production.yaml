@@ -1,0 +1,69 @@
+# helm/contextiq/values-production.yaml
+# Production environment overrides for the ContextIQ umbrella chart.
+#
+# IMAGE TAGS are managed by CI — do not edit the `tag:` fields manually.
+# They are updated by scripts/ci/update_image_tags.sh after manual approval
+# in the promote-to-production GitHub Actions job.
+#
+# BUG FIX (spec): the spec used snake_case keys (mcp_gateway, agent_worker)
+# which don't match the chart's hyphenated keys.  Fixed to hyphenated form.
+#
+# BUG FIX (spec): the spec defined mcp_gateway: twice — once for image settings
+# and once for resource overrides.  Duplicate YAML keys cause the second block
+# to silently override the first (image block lost).  Fixed by merging all
+# mcp-gateway properties into a single key.
+#
+# SETUP: Replace YOUR_GITHUB_ORG with the actual GitHub org or username.
+
+mcp-gateway:
+  replicaCount: 3    # higher baseline than staging
+  image:
+    repository: ghcr.io/YOUR_GITHUB_ORG/contextiq-api
+    tag: "PLACEHOLDER"    # replaced by CI with full git SHA after promotion approval
+  resources:
+    requests:
+      cpu:    "1"
+      memory: "2Gi"
+    limits:
+      cpu:    "4"
+      memory: "8Gi"
+
+agent-worker:
+  replicaCount: 3
+  image:
+    repository: ghcr.io/YOUR_GITHUB_ORG/contextiq-agent-worker
+    tag: "PLACEHOLDER"
+  resources:
+    requests:
+      cpu:    "500m"
+      memory: "1Gi"
+    limits:
+      cpu:    "2"
+      memory: "4Gi"
+
+indexing-service:
+  replicaCount: 2
+  image:
+    repository: ghcr.io/YOUR_GITHUB_ORG/contextiq-indexing
+    tag: "PLACEHOLDER"
+  resources:
+    requests:
+      cpu:    "500m"
+      memory: "1Gi"
+    limits:
+      cpu:    "2"
+      memory: "4Gi"
+
+admin-portal:
+  replicaCount: 2
+  image:
+    # admin-portal uses the same base API image as mcp-gateway
+    repository: ghcr.io/YOUR_GITHUB_ORG/contextiq-api
+    tag: "PLACEHOLDER"
+  resources:
+    requests:
+      cpu:    "250m"
+      memory: "512Mi"
+    limits:
+      cpu:    "1"
+      memory: "2Gi"

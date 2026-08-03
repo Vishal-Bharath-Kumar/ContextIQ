@@ -1,0 +1,16 @@
+{
+  "Rules": [
+    {
+      "ID": "postgres-backup-daily-30d-retention",
+      "Status": "Enabled",
+      "Filter": { "Prefix": "daily/" },
+      "Expiration": { "Days": 30 }
+    },
+    {
+      "ID": "postgres-backup-weekly-180d",
+      "Status": "Enabled",
+      "Filter": { "Prefix": "weekly/" },
+      "Expiration": { "Days": 180 }
+    }
+  ]
+}

@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<title>REPLAY-002 — Trace Timeline · ContextIQ Wireframe</title>
+<link rel="stylesheet" href="_wireframe-base.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="topbar-logo"><div class="topbar-logo-icon">C</div>ContextIQ</div>
+  <div class="topbar-sep"></div>
+  <nav class="topbar-breadcrumb"><a>Replay Explorer</a> <span>›</span> trace-abc-002</nav>
+  <div class="topbar-actions"><div class="topbar-search">🔍 Search</div><button class="topbar-icon-btn">🔔</button></div>
+</header>
+<nav class="sidebar" aria-label="Main navigation">
+  <div class="sidebar-nav">
+    <a class="nav-item"><span class="icon">⊞</span>Dashboard</a>
+    <div class="nav-section">Data Sources</div>
+    <a class="nav-item"><span class="icon">⬡</span>Connectors</a><a class="nav-item"><span class="icon">🗄</span>Knowledge Sources</a>
+    <div class="nav-section">Governance</div><a class="nav-item"><span class="icon">🛡</span>Policies</a>
+    <div class="nav-section">Observability</div>
+    <a class="nav-item active" aria-current="page"><span class="icon">▶</span>Replay Explorer</a>
+    <a class="nav-item"><span class="icon">📋</span>Audit Log</a><a class="nav-item"><span class="icon">📊</span>Observability</a>
+    <div class="nav-section">Platform</div><a class="nav-item"><span class="icon">👥</span>Users</a><a class="nav-item"><span class="icon">💻</span>Models</a><a class="nav-item"><span class="icon">⚙</span>Settings</a>
+  </div>
+  <div class="sidebar-user"><div class="user-avatar">DA</div><div class="user-info"><div class="user-name">Dave Auditor</div><div class="user-role">Auditor</div></div></div>
+</nav>
+<main class="main-content" role="main">
+  <!-- Status hero (sticky sub-header) -->
+  <div style="background:var(--danger-900);border:1px solid oklch(0.28 0.12 25);border-radius:6px;padding:12px 16px;margin-bottom:20px;display:flex;align-items:center;gap:16px">
+    <span class="badge badge-danger" style="font-size:13px;padding:4px 12px">✗ DENIED</span>
+    <div>
+      <div style="font-size:13px;font-weight:600;color:var(--neutral-200)" class="mono">trace-abc-002</div>
+      <div style="font-size:12px;color:var(--neutral-500)">Model: gpt-4o · Session: sess-xyz · Duration: 1,240ms</div>
+    </div>
+    <div style="margin-left:auto;display:flex;gap:8px">
+      <button class="btn btn-secondary btn-sm">Export JSON</button>
+    </div>
+  </div>
+
+  <!-- Timeline card -->
+  <div class="card mb-6">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+      <div class="card-title" style="margin-bottom:0">Phase Timeline</div>
+      <div style="font-size:11px;color:var(--neutral-600)">0ms ──────────────────────────────── 1,240ms</div>
+    </div>
+
+    <div class="gantt" role="table" aria-label="Agent phase timeline">
+      <div class="gantt-row">
+        <div class="gantt-label">PLAN</div>
+        <div class="gantt-track" title="PLAN: 0–42ms · ALLOW" tabindex="0" role="row" aria-label="PLAN phase, 42ms, ALLOW">
+          <div class="gantt-bar phase-normal" style="left:0;width:3.4%">42ms</div>
+        </div>
+      </div>
+      <div class="gantt-row">
+        <div class="gantt-label">RETRIEVE</div>
+        <div class="gantt-track" title="RETRIEVE: 42–352ms · ALLOW" tabindex="0" role="row" aria-label="RETRIEVE phase, 310ms, ALLOW">
+          <div class="gantt-bar phase-normal" style="left:3.4%;width:25%">310ms</div>
+        </div>
+      </div>
+      <div class="gantt-row">
+        <div class="gantt-label">REASON</div>
+        <div class="gantt-track" title="REASON: 352–632ms · ALLOW" tabindex="0" role="row" aria-label="REASON phase, 280ms, ALLOW">
+          <div class="gantt-bar phase-normal" style="left:28.4%;width:22.6%">280ms</div>
+        </div>
+      </div>
+      <div class="gantt-row">
+        <div class="gantt-label" style="color:var(--danger-400)">GENERATE ✗</div>
+        <div class="gantt-track" title="GENERATE: 632–1226ms · DENY" tabindex="0" role="row" aria-label="GENERATE phase, 594ms, DENY - click to inspect">
+          <div class="gantt-bar phase-deny" style="left:51%;width:47.9%">594ms — DENY ✗</div>
+        </div>
+      </div>
+      <div class="gantt-row">
+        <div class="gantt-label">EVAL</div>
+        <div class="gantt-track" title="EVAL: 1226–1240ms · ALLOW" tabindex="0" role="row" aria-label="EVAL phase, 14ms, ALLOW">
+          <div class="gantt-bar phase-normal" style="left:98.9%;width:1.1%;font-size:9px;padding:0 2px">14ms</div>
+        </div>
+      </div>
+    </div>
+
+    <div style="font-size:11px;color:var(--neutral-600);margin-top:10px;text-align:center">
+      Click any phase bar to open the Phase Detail drawer ↗
+    </div>
+  </div>
+
+  <!-- Phase summary table -->
+  <div class="table-wrapper">
+    <div style="padding:10px 12px;border-bottom:1px solid var(--neutral-800);font-size:13px;font-weight:600;color:var(--neutral-300)">Phase Summary</div>
+    <table class="table-wf" aria-label="Phase summary">
+      <thead><tr><th>Phase</th><th>Latency</th><th>Tokens In</th><th>Tokens Out</th><th>Policy Result</th></tr></thead>
+      <tbody>
+        <tr><td>PLAN</td><td class="mono tabular">42ms</td><td class="mono tabular">128</td><td class="mono tabular">64</td><td><span class="badge badge-success">ALLOW</span></td></tr>
+        <tr><td>RETRIEVE</td><td class="mono tabular">310ms</td><td class="mono tabular">512</td><td class="mono tabular">256</td><td><span class="badge badge-success">ALLOW</span></td></tr>
+        <tr><td>REASON</td><td class="mono tabular">280ms</td><td class="mono tabular">768</td><td class="mono tabular">384</td><td><span class="badge badge-success">ALLOW</span></td></tr>
+        <tr style="background:var(--danger-900)"><td style="color:var(--danger-400)">GENERATE</td><td class="mono tabular" style="color:var(--danger-400)">594ms</td><td class="mono tabular">1,024</td><td class="mono tabular" style="color:var(--neutral-600)">—</td><td><span class="badge badge-danger">DENY ✗</span></td></tr>
+        <tr><td>EVAL</td><td class="mono tabular">14ms</td><td class="mono tabular">32</td><td class="mono tabular">16</td><td><span class="badge badge-success">ALLOW</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+</main>
+<aside class="annotation-panel">
+  <div class="ann-screen-id">REPLAY-002</div>
+  <div class="ann-route">Route: /traces/:id</div>
+  <div class="ann-guard">Guard: AUDITOR, DEVOPS_SRE, SECURITY_OFFICER, ADMIN</div>
+  <div class="ann-divider"></div>
+  <div class="ann-section">Components</div>
+  <div class="ann-item"><div class="ann-component">&lt;TraceStatusHero&gt;</div><div class="ann-note">Sticky sub-header · red=DENIED, green=PASS, amber=WARN</div></div>
+  <div class="ann-item"><div class="ann-component">&lt;GanttTimeline&gt;</div><div class="ann-note">Horizontal phase bars · click to open REPLAY-003 drawer · tabindex="0" + Enter on each bar</div></div>
+  <div class="ann-item"><div class="ann-component">&lt;PhaseTable&gt;</div><div class="ann-note">Sortable by latency · DENY row: danger-900 bg</div></div>
+  <div class="ann-divider"></div>
+  <div class="ann-section">Phase Bar Colors</div>
+  <div class="ann-note">Normal: brand-blue-600<br>DENY: danger-600<br>Selected: brand-blue-700 + 2px outline</div>
+  <div class="ann-divider"></div>
+  <div class="ann-section">A11y</div>
+  <div class="ann-note">Timeline: role="table" · each bar: role="row" aria-label="[phase], [ms], [status]" · tabindex="0"</div>
+</aside>
+</body>
+</html>

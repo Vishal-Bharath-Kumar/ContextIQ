@@ -1,0 +1,67 @@
+kafka-connect:
+  image:
+    # Version-align with the Kafka broker image (TASK-US052-01)
+    tag: "3.7.1-debian-12-r0"
+
+  # AC-4: distributed mode, 2 replicas for HA
+  replicaCount: 2
+
+  # Bootstrap server — points at the Kafka StatefulSet headless service
+  externalKafka:
+    brokers: "kafka.contextiq-data.svc.cluster.local:9092"
+
+  # Kafka Connect distributed mode configuration.
+  # NOTE: Bitnami chart schema requires a key=value block string, not a YAML map.
+  configuration: |
+    group.id=contextiq-connect
+    config.storage.topic=_connect-configs
+    offset.storage.topic=_connect-offsets
+    status.storage.topic=_connect-status
+    config.storage.replication.factor=3
+    offset.storage.replication.factor=3
+    status.storage.replication.factor=3
+    offset.storage.partitions=25
+    key.converter=org.apache.kafka.connect.json.JsonConverter
+    value.converter=org.apache.kafka.connect.json.JsonConverter
+    key.converter.schemas.enable=false
+    value.converter.schemas.enable=false
+    # SCRAM-SHA-512 for Connect → broker connections
+    security.protocol=SASL_SSL
+    sasl.mechanism=SCRAM-SHA-512
+    producer.security.protocol=SASL_SSL
+    producer.sasl.mechanism=SCRAM-SHA-512
+    consumer.security.protocol=SASL_SSL
+    consumer.sasl.mechanism=SCRAM-SHA-512
+
+  # Vault Agent injects SASL credentials at pod startup (AC-4)
+  podAnnotations:
+    vault.hashicorp.com/agent-inject:                      "true"
+    vault.hashicorp.com/role:                              "mcp-gateway"
+    vault.hashicorp.com/agent-pre-populate-only:           "true"
+    # Annotation suffix must match the desired filename under /vault/secrets/
+    vault.hashicorp.com/agent-inject-secret-kafka.env:     "secret/data/contextiq/kafka/clients/mcp-gateway"
+    vault.hashicorp.com/agent-inject-template-kafka.env: |
+      {{- with secret "secret/data/contextiq/kafka/clients/mcp-gateway" -}}
+      export KAFKA_CONNECT_SASL_USERNAME="{{ .Data.data.username }}"
+      export KAFKA_CONNECT_SASL_PASSWORD="{{ .Data.data.password }}"
+      {{- end }}
+
+  # REST API for connector lifecycle management (not exposed externally)
+  service:
+    type:       ClusterIP
+    port:       8083
+    targetPort: 8083
+
+  # AC-5: expose JMX metrics port so the JMX Exporter sidecar can connect
+  jmx:
+    enabled: true
+    port:    9999    # raw JMX port; JMX Exporter HTTP metrics served on 9308
+
+  resources:
+    requests: { cpu: "500m", memory: "1Gi" }
+    limits:   { cpu: "2",    memory: "4Gi" }
+
+  # REST listener NetworkPolicy — only allow calls from within contextiq-data
+  networkPolicy:
+    enabled:       true
+    allowExternal: false

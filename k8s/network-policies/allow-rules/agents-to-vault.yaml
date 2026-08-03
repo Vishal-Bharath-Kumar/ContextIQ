@@ -1,0 +1,26 @@
+# Allow Vault Agent sidecars in all contextiq namespaces to reach the Vault API.
+# Without this rule, the default-deny egress policy on each namespace blocks
+# the sidecar's HTTPS call to Vault on port 8200, preventing credential injection.
+# Uses a label expression to match all contextiq source namespaces automatically.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-agents-to-vault
+  namespace: contextiq-security
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: vault
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/part-of
+                operator: In
+                values:
+                  - contextiq
+      ports:
+        - protocol: TCP
+          port: 8200   # Vault API (HTTPS)

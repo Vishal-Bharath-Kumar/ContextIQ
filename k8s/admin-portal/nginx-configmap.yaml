@@ -1,0 +1,35 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: admin-portal-nginx-config
+  namespace: contextiq
+data:
+  default.conf: |
+    server {
+      listen 80;
+      root   /usr/share/nginx/html;
+      index  index.html;
+
+      # Security headers (OWASP)
+      add_header X-Content-Type-Options  "nosniff"    always;
+      add_header X-Frame-Options         "DENY"        always;
+      add_header Referrer-Policy         "strict-origin-when-cross-origin" always;
+      add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'" always;
+
+      # SPA fallback — all routes served as index.html (React Router handles routing)
+      location / {
+        try_files $uri $uri/ /index.html;
+      }
+
+      # Cache static assets aggressively; HTML must not be cached
+      location ~* \.(js|css|png|svg|woff2)$ {
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+      }
+
+      # Health probe endpoint for readiness/liveness checks
+      location /healthz {
+        return 200 "ok";
+        add_header Content-Type text/plain;
+      }
+    }

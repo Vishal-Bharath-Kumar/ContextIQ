@@ -1,0 +1,106 @@
+kafka:
+  image:
+    tag: "3.7.1-debian-12-r0"    # pinned for reproducibility
+
+  # AC-1: KRaft mode — no ZooKeeper dependency
+  kraft:
+    enabled: true
+
+  # AC-1: 3 combined controller+broker nodes
+  controller:
+    replicaCount:   3
+    controllerOnly: false    # combined mode: each pod acts as both controller and broker
+    minId:          0
+
+    # Kafka broker/controller configuration.
+    # NOTE: Bitnami chart schema requires a key=value block string, not a YAML map.
+    configuration: |
+      # Replication factor for internal/system topics
+      default.replication.factor=3
+      offsets.topic.replication.factor=3
+      transaction.state.log.replication.factor=3
+      transaction.state.log.min.isr=2
+      # Durability: require acks from at least 2 in-sync replicas before acknowledging writes
+      min.insync.replicas=2
+
+      # Log retention defaults (overridden per-topic during creation)
+      log.retention.hours=168
+      log.segment.bytes=1073741824
+      log.cleanup.policy=delete
+
+      # Network and I/O threads
+      num.network.threads=8
+      num.io.threads=16
+      socket.send.buffer.bytes=102400
+      socket.receive.buffer.bytes=102400
+      socket.request.max.bytes=104857600
+      num.partitions=6
+
+      # SCRAM-SHA-512 inter-broker authentication over TLS
+      sasl.mechanism.inter.broker.protocol=SCRAM-SHA-512
+      sasl.enabled.mechanisms=SCRAM-SHA-512
+      security.inter.broker.protocol=SASL_SSL
+      listeners=SASL_SSL://:9092,CONTROLLER://:9093
+      advertised.listeners=SASL_SSL://:9092
+
+    # Encrypted PVC per broker (TASK-US048-04)
+    persistence:
+      enabled:      true
+      storageClass: contextiq-encrypted-gp3
+      size:         100Gi
+
+    resources:
+      requests: { cpu: "1",    memory: "4Gi" }
+      limits:   { cpu: "4",    memory: "8Gi"  }
+
+    # AC-1: spread brokers across distinct K8s nodes for fault isolation
+    affinity:
+      podAntiAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchLabels:
+                app.kubernetes.io/name:      kafka
+                app.kubernetes.io/component: controller
+            topologyKey: kubernetes.io/hostname
+
+    # Vault Agent injects SASL inter-broker credentials at pod startup (AC-1)
+    podAnnotations:
+      vault.hashicorp.com/agent-inject:                 "true"
+      vault.hashicorp.com/role:                         "mcp-gateway"
+      vault.hashicorp.com/agent-pre-populate-only:      "true"
+      vault.hashicorp.com/agent-inject-secret-kafka.env:    "secret/data/contextiq/kafka/broker"
+      vault.hashicorp.com/agent-inject-template-kafka.env: |
+        {{- with secret "secret/data/contextiq/kafka/broker" -}}
+        export KAFKA_INTER_BROKER_USER="{{ .Data.data.username }}"
+        export KAFKA_INTER_BROKER_PASSWORD="{{ .Data.data.password }}"
+        {{- end }}
+
+  # JVM heap: 4 GB (50% of 8 GB node limit)
+  heapOpts: "-Xmx4G -Xms4G"
+
+  # AC-1: PDB — tolerate 1 broker failure while maintaining 2-of-3 KRaft quorum
+  podDisruptionBudget:
+    enabled:      true
+    minAvailable: 2
+
+  # TLS for client connections (cert-manager Certificate, TASK-US048-01)
+  # NOTE: Bitnami chart schema uses a single secret name string, not a list.
+  tls:
+    enabled:        true
+    existingSecret: kafka-tls    # Secret must contain tls.crt, tls.key, ca.crt
+
+  # SASL client users.
+  # NOTE: Bitnami chart schema expects a flat list of usernames under sasl.client.users.
+  # Passwords are injected at runtime via Vault (zero-credential design); the chart
+  # requires the list for SCRAM credential initialisation — actual passwords come from
+  # the Vault-injected env vars consumed by the broker startup script.
+  sasl:
+    enabledMechanisms:      SCRAM-SHA-512
+    interBrokerMechanism:   SCRAM-SHA-512
+    client:
+      users:
+        - mcp-gateway
+        - indexing-service
+        - agent-worker
+        - admin-api
+      passwords: ""    # overwritten by Vault Agent at runtime

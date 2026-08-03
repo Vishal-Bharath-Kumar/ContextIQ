@@ -1,0 +1,8 @@
+neo4j:
+  resources:
+    requests: { cpu: "2",  memory: "16Gi" }
+    limits:   { cpu: "8",  memory: "32Gi" }
+  volumes:
+    volumeClaimTemplates:
+      data:
+        storage: 200Gi

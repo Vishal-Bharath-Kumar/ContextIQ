@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SHELL-001 — App Shell · ContextIQ Wireframe</title>
+<link rel="stylesheet" href="_wireframe-base.css">
+</head>
+<body>
+
+<!-- TOPBAR -->
+<header class="topbar">
+  <div class="topbar-logo">
+    <div class="topbar-logo-icon">C</div>
+    ContextIQ
+  </div>
+  <div class="topbar-sep"></div>
+  <nav class="topbar-breadcrumb" aria-label="Breadcrumb">
+    Dashboard
+  </nav>
+  <div class="topbar-actions">
+    <div class="topbar-search">🔍 Search <span style="margin-left:auto;font-size:10px;opacity:0.5">⌘K</span></div>
+    <button class="topbar-icon-btn" title="Notifications">🔔</button>
+    <button class="topbar-icon-btn" title="Toggle theme">☀️</button>
+  </div>
+</header>
+
+<!-- SIDEBAR -->
+<nav class="sidebar" aria-label="Main navigation">
+  <div class="sidebar-nav">
+    <a class="nav-item active" aria-current="page">
+      <span class="icon">⊞</span> Dashboard
+    </a>
+
+    <div class="nav-section">Data Sources</div>
+    <a class="nav-item">
+      <span class="icon">⬡</span> Connectors
+    </a>
+    <a class="nav-item">
+      <span class="icon">🗄</span> Knowledge Sources
+    </a>
+
+    <div class="nav-section">Governance</div>
+    <a class="nav-item">
+      <span class="icon">🛡</span> Policies
+    </a>
+
+    <div class="nav-section">Observability</div>
+    <a class="nav-item">
+      <span class="icon">▶</span> Replay Explorer
+    </a>
+    <a class="nav-item">
+      <span class="icon">📋</span> Audit Log
+    </a>
+    <a class="nav-item">
+      <span class="icon">📊</span> Observability
+    </a>
+
+    <div class="nav-section">Platform</div>
+    <a class="nav-item">
+      <span class="icon">👥</span> Users
+    </a>
+    <a class="nav-item">
+      <span class="icon">💻</span> Models
+    </a>
+    <a class="nav-item">
+      <span class="icon">⚙</span> Settings
+    </a>
+  </div>
+  <div class="sidebar-user">
+    <div class="user-avatar">AA</div>
+    <div class="user-info">
+      <div class="user-name">Alice Admin</div>
+      <div class="user-role">Admin</div>
+    </div>
+    <span style="color:var(--neutral-600);font-size:12px;">⌄</span>
+  </div>
+</nav>
+
+<!-- MAIN CONTENT (shell spec overview) -->
+<main class="main-content" id="main-content" role="main" tabindex="-1">
+  <div class="page-header">
+    <div>
+      <div class="page-title">App Shell — SHELL-001</div>
+      <div class="page-description" style="margin-top:4px">Persistent layout wrapping all authenticated routes</div>
+    </div>
+  </div>
+
+  <div class="grid-2 mb-6">
+    <div class="card">
+      <div class="card-title">Topbar Specification</div>
+      <table style="width:100%;font-size:12px;border-collapse:collapse">
+        <tr><td style="padding:4px 0;color:var(--neutral-500);width:120px">Height</td><td>56px · <span class="mono">position: fixed; top: 0; z-index: 40</span></td></tr>
+        <tr><td style="padding:4px 0;color:var(--neutral-500)">Background</td><td><span class="mono">neutral-900</span></td></tr>
+        <tr><td style="padding:4px 0;color:var(--neutral-500)">Border</td><td><span class="mono">border-bottom: 1px solid neutral-800</span></td></tr>
+        <tr><td style="padding:4px 0;color:var(--neutral-500)">Search</td><td>320px · <span class="mono">⌘K</span> shortcut · opens CommandPalette</td></tr>
+      </table>
+    </div>
+    <div class="card">
+      <div class="card-title">Sidebar Specification</div>
+      <table style="width:100%;font-size:12px;border-collapse:collapse">
+        <tr><td style="padding:4px 0;color:var(--neutral-500);width:120px">Width</td><td>220px (expanded) · 56px (icon-only at ≤ 1024px)</td></tr>
+        <tr><td style="padding:4px 0;color:var(--neutral-500)">Background</td><td><span class="mono">neutral-900</span></td></tr>
+        <tr><td style="padding:4px 0;color:var(--neutral-500)">Position</td><td><span class="mono">sticky; top: 56px; height: calc(100vh - 56px)</span></td></tr>
+        <tr><td style="padding:4px 0;color:var(--neutral-500)">Active item</td><td>2px left border <span class="mono">brand-blue-500</span> · <span class="mono">surface-accent</span> bg</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <div class="grid-2 mb-6">
+    <div class="card">
+      <div class="card-title">Nav Item States</div>
+      <div style="display:flex;flex-direction:column;gap:4px">
+        <a class="nav-item" style="position:relative;border-radius:4px">
+          <span class="icon">⊞</span> default — neutral-400 text
+        </a>
+        <a class="nav-item" style="position:relative;border-radius:4px;background:var(--neutral-850);color:var(--neutral-200)">
+          <span class="icon">⬡</span> hover — neutral-200 text
+        </a>
+        <a class="nav-item active" style="position:relative;border-radius:4px">
+          <span class="icon">🛡</span> active — brand-blue-400 · surface-accent
+        </a>
+        <a class="nav-item" style="position:relative;border-radius:4px;outline:2px solid var(--brand-blue-500);outline-offset:2px">
+          <span class="icon">📋</span> focus-visible — 2px focus ring
+        </a>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">Main Content Area</div>
+      <table style="width:100%;font-size:12px;border-collapse:collapse">
+        <tr><td style="padding:4px 0;color:var(--neutral-500);width:120px">Background</td><td><span class="mono">neutral-950</span></td></tr>
+        <tr><td style="padding:4px 0;color:var(--neutral-500)">Padding</td><td><span class="mono">space-8 (32px)</span> horizontal · <span class="mono">space-12 (48px)</span> top</td></tr>
+        <tr><td style="padding:4px 0;color:var(--neutral-500)">Margin</td><td>left: 220px · top: 56px</td></tr>
+        <tr><td style="padding:4px 0;color:var(--neutral-500)">role</td><td><span class="mono">role="main"</span> landmark</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Responsive Breakpoints</div>
+    <table class="table-wf">
+      <thead><tr><th>Breakpoint</th><th>Min-width</th><th>Sidebar</th><th>Content</th></tr></thead>
+      <tbody>
+        <tr><td>2xl</td><td>1536px</td><td>220px fixed</td><td>4-column grid</td></tr>
+        <tr><td style="color:var(--brand-blue-400)">xl (target)</td><td style="color:var(--brand-blue-400)">1280px</td><td style="color:var(--brand-blue-400)">220px fixed</td><td style="color:var(--brand-blue-400)">4-column grid</td></tr>
+        <tr><td>lg</td><td>1024px</td><td>Icon-only 56px</td><td>3-column grid</td></tr>
+        <tr><td>md</td><td>768px</td><td>Hidden (hamburger)</td><td>2-column grid</td></tr>
+        <tr><td>sm / xs</td><td>&lt; 768px</td><td>Hidden (hamburger)</td><td>1-column</td></tr>
+      </tbody>
+    </table>
+  </div>
+</main>
+
+<!-- ANNOTATION PANEL -->
+<aside class="annotation-panel">
+  <div class="ann-screen-id">SHELL-001</div>
+  <div class="ann-route">(global layout)</div>
+  <div class="ann-guard">Guard: any authenticated</div>
+  <div class="ann-divider"></div>
+
+  <div class="ann-section">Components</div>
+  <div class="ann-item"><div class="ann-component">&lt;TopBar&gt;</div><div class="ann-note">56px · sticky · z-40 · breadcrumb + search + actions</div></div>
+  <div class="ann-item"><div class="ann-component">&lt;SideNav&gt;</div><div class="ann-note">220px → 56px collapse · role="navigation"</div></div>
+  <div class="ann-item"><div class="ann-component">&lt;NavItem&gt;</div><div class="ann-note">Icon + label · aria-current="page" on active</div></div>
+  <div class="ann-item"><div class="ann-component">&lt;NavSectionLabel&gt;</div><div class="ann-note">All-caps group header · role="group"</div></div>
+  <div class="ann-item"><div class="ann-component">&lt;UserChip&gt;</div><div class="ann-note">Avatar + name + role · profile menu trigger</div></div>
+  <div class="ann-item"><div class="ann-component">&lt;GlobalSearch&gt;</div><div class="ann-note">⌘K shortcut · opens CommandPalette</div></div>
+  <div class="ann-divider"></div>
+
+  <div class="ann-section">A11y Contract</div>
+  <div class="ann-note">• Skip-to-main first focusable<br>• nav aria-label="Main navigation"<br>• main role="main"<br>• Active: aria-current="page"<br>• Role-hidden items not rendered</div>
+</aside>
+
+</body>
+</html>

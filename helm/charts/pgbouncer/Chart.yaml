@@ -1,0 +1,9 @@
+apiVersion: v2
+name:        pgbouncer
+description: PgBouncer connection pooler for ContextIQ PostgreSQL
+type:        application
+version:     0.1.0
+dependencies:
+  - name:       pgbouncer
+    version:    "1.0.4"    # pinned Bitnami chart version; update after testing
+    repository: https://charts.bitnami.com/bitnami

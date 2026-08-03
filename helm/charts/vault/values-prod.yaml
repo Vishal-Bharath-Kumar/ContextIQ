@@ -1,0 +1,25 @@
+# Production overrides — full HA, stricter resource bounds
+server:
+  ha:
+    replicas: 3
+
+  dataStorage:
+    size: "20Gi"
+
+  resources:
+    requests:
+      cpu:    "1"
+      memory: "2Gi"
+    limits:
+      cpu:    "4"
+      memory: "8Gi"
+
+injector:
+  replicas: 2
+  resources:
+    requests:
+      cpu:    "500m"
+      memory: "512Mi"
+    limits:
+      cpu:    "1"
+      memory: "1Gi"

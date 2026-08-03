@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<title>OBS-001 — Observability Dashboard · ContextIQ Wireframe</title>
+<link rel="stylesheet" href="_wireframe-base.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="topbar-logo"><div class="topbar-logo-icon">C</div>ContextIQ</div>
+  <div class="topbar-sep"></div>
+  <nav class="topbar-breadcrumb">Observability</nav>
+  <div class="topbar-actions"><div class="topbar-search">🔍 Search</div><button class="topbar-icon-btn">🔔</button></div>
+</header>
+<nav class="sidebar" aria-label="Main navigation">
+  <div class="sidebar-nav">
+    <a class="nav-item"><span class="icon">⊞</span>Dashboard</a>
+    <div class="nav-section">Data Sources</div><a class="nav-item"><span class="icon">⬡</span>Connectors</a><a class="nav-item"><span class="icon">🗄</span>Knowledge Sources</a>
+    <div class="nav-section">Governance</div><a class="nav-item"><span class="icon">🛡</span>Policies</a>
+    <div class="nav-section">Observability</div><a class="nav-item"><span class="icon">▶</span>Replay Explorer</a><a class="nav-item"><span class="icon">📋</span>Audit Log</a>
+    <a class="nav-item active" aria-current="page"><span class="icon">📊</span>Observability</a>
+    <div class="nav-section">Platform</div><a class="nav-item"><span class="icon">👥</span>Users</a><a class="nav-item"><span class="icon">💻</span>Models</a><a class="nav-item"><span class="icon">⚙</span>Settings</a>
+  </div>
+  <div class="sidebar-user"><div class="user-avatar">DS</div><div class="user-info"><div class="user-name">Dan SRE</div><div class="user-role">DevOps SRE</div></div></div>
+</nav>
+<main class="main-content" role="main">
+  <div class="page-header">
+    <div class="page-title">Observability</div>
+    <select class="select-wf" aria-label="Time range" style="width:140px"><option>Last 1 hour</option><option selected>Last 24 hours</option><option>Last 7 days</option><option>Last 30 days</option></select>
+  </div>
+
+  <!-- Tab bar -->
+  <div class="tabs-bar" role="tablist" aria-label="Observability views" style="margin-bottom:20px">
+    <div class="tab active" role="tab" aria-selected="true">Overview</div>
+    <div class="tab" role="tab">AI Operations</div>
+    <div class="tab" role="tab">Connectors</div>
+    <div class="tab" role="tab">Governance</div>
+    <div class="tab" role="tab">Alerts</div>
+  </div>
+
+  <!-- KPI stat bar -->
+  <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:20px">
+    <div class="stat-card">
+      <div class="stat-label">Total Requests (24h)</div>
+      <div class="stat-value">14,823</div>
+      <div style="font-size:11px;color:var(--success-400);margin-top:2px">↑ 12% vs yesterday</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">p50 Latency</div>
+      <div class="stat-value">210ms</div>
+      <div style="font-size:11px;color:var(--success-400);margin-top:2px">↓ 8ms vs yesterday</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">p95 Latency</div>
+      <div class="stat-value">840ms</div>
+      <div style="font-size:11px;color:var(--warning-400);margin-top:2px">↑ 30ms vs yesterday</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Error Rate</div>
+      <div class="stat-value" style="color:var(--warning-400)">1.4%</div>
+      <div style="font-size:11px;color:var(--warning-400);margin-top:2px">↑ 0.3% vs yesterday</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Policy DENY Rate</div>
+      <div class="stat-value" style="color:var(--danger-400)">3.2%</div>
+      <div style="font-size:11px;color:var(--neutral-600);margin-top:2px">Same as yesterday</div>
+    </div>
+  </div>
+
+  <div class="grid-2" style="gap:16px;margin-bottom:16px">
+    <!-- Latency chart -->
+    <div class="card">
+      <div class="card-title">Request Latency — p50 / p95 (24h)</div>
+      <div class="chart-placeholder" style="height:180px;background:var(--neutral-850);border-radius:4px;display:flex;align-items:flex-end;padding:12px;gap:2px;position:relative">
+        <div style="position:absolute;top:8px;left:12px;font-size:10px;color:var(--neutral-600)">ms</div>
+        <!-- Fake sparkline bars -->
+        <div style="display:flex;align-items:flex-end;gap:2px;width:100%;height:100%">
+          <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:1px;height:100%">
+            <div style="width:100%;background:var(--brand-blue-500);opacity:0.8;height:30%"></div>
+            <div style="width:100%;background:var(--brand-blue-700);opacity:0.5;height:55%"></div>
+          </div>
+          <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:1px;height:100%">
+            <div style="width:100%;background:var(--brand-blue-500);opacity:0.8;height:35%"></div>
+            <div style="width:100%;background:var(--brand-blue-700);opacity:0.5;height:65%"></div>
+          </div>
+          <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:1px;height:100%">
+            <div style="width:100%;background:var(--brand-blue-500);opacity:0.8;height:28%"></div>
+            <div style="width:100%;background:var(--brand-blue-700);opacity:0.5;height:50%"></div>
+          </div>
+          <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:1px;height:100%">
+            <div style="width:100%;background:var(--brand-blue-500);opacity:0.8;height:40%"></div>
+            <div style="width:100%;background:var(--brand-blue-700);opacity:0.5;height:72%"></div>
+          </div>
+          <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:1px;height:100%">
+            <div style="width:100%;background:var(--brand-blue-500);opacity:0.8;height:32%"></div>
+            <div style="width:100%;background:var(--brand-blue-700);opacity:0.5;height:58%"></div>
+          </div>
+          <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:1px;height:100%">
+            <div style="width:100%;background:var(--warning-500);opacity:0.9;height:42%"></div>
+            <div style="width:100%;background:var(--warning-700);opacity:0.6;height:80%"></div>
+          </div>
+        </div>
+        <div style="position:absolute;bottom:4px;right:12px;display:flex;gap:10px;font-size:10px">
+          <span style="display:flex;align-items:center;gap:4px"><span style="background:var(--brand-blue-500);width:10px;height:3px;border-radius:1px;display:inline-block"></span>p50</span>
+          <span style="display:flex;align-items:center;gap:4px"><span style="background:var(--brand-blue-700);width:10px;height:3px;border-radius:1px;display:inline-block"></span>p95</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Error rate panel -->
+    <div class="card">
+      <div class="card-title">Error Rate (24h)</div>
+      <div class="chart-placeholder" style="height:180px;background:var(--neutral-850);border-radius:4px;display:flex;align-items:flex-end;padding:12px;gap:2px">
+        <div style="display:flex;align-items:flex-end;gap:4px;width:100%;height:100%">
+          <div style="flex:1;background:var(--warning-700);opacity:0.8;height:8%"></div>
+          <div style="flex:1;background:var(--warning-700);opacity:0.8;height:6%"></div>
+          <div style="flex:1;background:var(--warning-700);opacity:0.8;height:10%"></div>
+          <div style="flex:1;background:var(--warning-700);opacity:0.8;height:7%"></div>
+          <div style="flex:1;background:var(--warning-700);opacity:0.8;height:9%"></div>
+          <div style="flex:1;background:var(--danger-600);opacity:0.9;height:18%"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Model usage -->
+  <div class="card">
+    <div class="card-title">Model Usage Distribution (24h)</div>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <div style="display:flex;align-items:center;gap:12px">
+        <div style="min-width:160px;font-size:13px">GPT-4o</div>
+        <div class="progress-track" style="flex:1"><div class="progress-fill" style="width:60%"></div></div>
+        <span class="tabular" style="font-size:12px;min-width:44px;text-align:right">8,894 req</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px">
+        <div style="min-width:160px;font-size:13px">Claude 3.5 Sonnet</div>
+        <div class="progress-track" style="flex:1"><div class="progress-fill" style="width:35%"></div></div>
+        <span class="tabular" style="font-size:12px;min-width:44px;text-align:right">5,188 req</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px">
+        <div style="min-width:160px;font-size:13px">Gemini 1.5 Pro</div>
+        <div class="progress-track" style="flex:1"><div class="progress-fill" style="width:5%"></div></div>
+        <span class="tabular" style="font-size:12px;min-width:44px;text-align:right">741 req</span>
+      </div>
+    </div>
+  </div>
+</main>
+<aside class="annotation-panel">
+  <div class="ann-screen-id">OBS-001</div>
+  <div class="ann-route">Route: /observability</div>
+  <div class="ann-guard">Guard: DEVOPS_SRE, MANAGER, ADMIN</div>
+  <div class="ann-divider"></div>
+  <div class="ann-section">Components</div>
+  <div class="ann-item"><div class="ann-component">&lt;Tabs&gt;</div><div class="ann-note">Overview | AI Operations | Connectors | Governance | Alerts</div></div>
+  <div class="ann-item"><div class="ann-component">&lt;TimeRangeSelector&gt;</div><div class="ann-note">1h | 24h | 7d | 30d · updates all panels</div></div>
+  <div class="ann-item"><div class="ann-component">&lt;StatCard&gt; × 5</div><div class="ann-note">KPI tile row · delta vs previous period</div></div>
+  <div class="ann-item"><div class="ann-component">&lt;LatencyChart&gt;</div><div class="ann-note">Recharts bar · p50=blue-500 p95=blue-700 · warning spike highlight</div></div>
+  <div class="ann-item"><div class="ann-component">&lt;ErrorRateChart&gt;</div><div class="ann-note">Recharts bar · danger-600 for spike above threshold</div></div>
+  <div class="ann-item"><div class="ann-component">&lt;ModelUsageList&gt;</div><div class="ann-note">progress bars → real-time via SSE</div></div>
+  <div class="ann-divider"></div>
+  <div class="ann-section">States</div>
+  <span class="state-chip">loading (skeleton)</span>
+  <span class="state-chip">no data</span>
+  <span class="state-chip">spike alert</span>
+</aside>
+</body>
+</html>

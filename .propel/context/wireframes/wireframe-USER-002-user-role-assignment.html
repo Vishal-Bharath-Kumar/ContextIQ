@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<title>USER-002 — Role Assignment · ContextIQ Wireframe</title>
+<link rel="stylesheet" href="_wireframe-base.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="topbar-logo"><div class="topbar-logo-icon">C</div>ContextIQ</div>
+  <div class="topbar-sep"></div>
+  <nav class="topbar-breadcrumb"><a>Users</a> <span>›</span> Bob PE</nav>
+  <div class="topbar-actions"><div class="topbar-search">🔍 Search</div><button class="topbar-icon-btn">🔔</button></div>
+</header>
+<nav class="sidebar" aria-label="Main navigation">
+  <div class="sidebar-nav">
+    <a class="nav-item"><span class="icon">⊞</span>Dashboard</a>
+    <div class="nav-section">Data Sources</div><a class="nav-item"><span class="icon">⬡</span>Connectors</a><a class="nav-item"><span class="icon">🗄</span>Knowledge Sources</a>
+    <div class="nav-section">Governance</div><a class="nav-item"><span class="icon">🛡</span>Policies</a>
+    <div class="nav-section">Observability</div><a class="nav-item"><span class="icon">▶</span>Replay Explorer</a><a class="nav-item"><span class="icon">📋</span>Audit Log</a><a class="nav-item"><span class="icon">📊</span>Observability</a>
+    <div class="nav-section">Platform</div>
+    <a class="nav-item active" aria-current="page"><span class="icon">👥</span>Users</a>
+    <a class="nav-item"><span class="icon">💻</span>Models</a><a class="nav-item"><span class="icon">⚙</span>Settings</a>
+  </div>
+  <div class="sidebar-user"><div class="user-avatar">AA</div><div class="user-info"><div class="user-name">Alice Admin</div><div class="user-role">Admin</div></div></div>
+</nav>
+<main class="main-content" style="opacity:0.3;pointer-events:none"></main>
+<div class="drawer-overlay"></div>
+<div class="drawer" role="dialog" aria-labelledby="user-role-title">
+  <div class="drawer-header">
+    <div class="drawer-title" id="user-role-title">Role Assignment</div>
+    <button class="btn btn-ghost btn-icon">×</button>
+  </div>
+  <div class="drawer-body">
+    <!-- User summary -->
+    <div style="display:flex;align-items:center;gap:12px;padding:12px;background:var(--neutral-850);border-radius:6px;margin-bottom:20px">
+      <div class="user-avatar" style="width:40px;height:40px;font-size:16px;background:var(--success-900);color:var(--success-400)">BP</div>
+      <div>
+        <div style="font-size:14px;font-weight:600">Bob PE</div>
+        <div style="font-size:12px;color:var(--neutral-500)">bob@company.com</div>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label required">Assigned Role</label>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <!-- Radio options as styled rows -->
+        <label style="display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border:1px solid var(--brand-blue-500);border-radius:6px;background:var(--brand-blue-900);cursor:pointer">
+          <input type="radio" name="role" checked style="accent-color:var(--brand-blue-500);margin-top:2px">
+          <div>
+            <div style="font-size:13px;font-weight:600;color:var(--brand-blue-400)">PLATFORM_ENGINEER</div>
+            <div style="font-size:11px;color:var(--neutral-600);margin-top:2px">Manage connectors, knowledge sources, and models</div>
+          </div>
+        </label>
+        <label style="display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border:1px solid var(--neutral-700);border-radius:6px;cursor:pointer">
+          <input type="radio" name="role" style="accent-color:var(--brand-blue-500);margin-top:2px">
+          <div>
+            <div style="font-size:13px;font-weight:600;color:var(--neutral-300)">DEVELOPER</div>
+            <div style="font-size:11px;color:var(--neutral-600);margin-top:2px">Read-only access to dashboard</div>
+          </div>
+        </label>
+        <label style="display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border:1px solid var(--neutral-700);border-radius:6px;cursor:pointer">
+          <input type="radio" name="role" style="accent-color:var(--brand-blue-500);margin-top:2px">
+          <div>
+            <div style="font-size:13px;font-weight:600;color:var(--neutral-300)">DEVOPS_SRE</div>
+            <div style="font-size:11px;color:var(--neutral-600);margin-top:2px">Replay explorer, audit log, observability</div>
+          </div>
+        </label>
+      </div>
+    </div>
+
+    <!-- Permission preview -->
+    <div style="margin-top:16px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:var(--neutral-600);margin-bottom:8px">Access Preview — PLATFORM_ENGINEER</div>
+    <div style="font-size:12px;display:flex;flex-direction:column;gap:5px">
+      <div style="color:var(--success-400)">✓ Connectors</div>
+      <div style="color:var(--success-400)">✓ Knowledge Sources</div>
+      <div style="color:var(--success-400)">✓ Models</div>
+      <div style="color:var(--neutral-600)">✕ Policies <span style="font-size:10px">(requires SECURITY_OFFICER)</span></div>
+      <div style="color:var(--neutral-600)">✕ Users <span style="font-size:10px">(requires ADMIN)</span></div>
+      <div style="color:var(--neutral-600)">✕ Audit Log <span style="font-size:10px">(requires AUDITOR)</span></div>
+    </div>
+
+    <!-- Warning on change -->
+    <div class="alert alert-warning" style="margin-top:16px;margin-bottom:0;font-size:12px">
+      ⚠ Saving will immediately change this user's access permissions.
+    </div>
+  </div>
+  <div class="drawer-footer">
+    <button class="btn btn-ghost">Cancel</button>
+    <button class="btn btn-primary">Save Role</button>
+  </div>
+</div>
+<aside class="annotation-panel">
+  <div class="ann-screen-id">USER-002</div>
+  <div class="ann-route">Drawer from USER-001 row click</div>
+  <div class="ann-guard">Guard: ADMIN</div>
+  <div class="ann-divider"></div>
+  <div class="ann-section">Components</div>
+  <div class="ann-item"><div class="ann-component">&lt;Drawer width={400}&gt;</div><div class="ann-note">focus trap · Escape closes</div></div>
+  <div class="ann-item"><div class="ann-component">&lt;RadioGroup variant="tile"&gt;</div><div class="ann-note">One role per user · permission list per option</div></div>
+  <div class="ann-item"><div class="ann-component">&lt;Alert variant="warning"&gt;</div><div class="ann-note">Shown when role differs from current</div></div>
+  <div class="ann-divider"></div>
+  <div class="ann-section">Immediate Effect</div>
+  <div class="ann-note">Role change takes effect immediately on save — no confirmation modal needed (shown via inline warning)</div>
+</aside>
+</body>
+</html>

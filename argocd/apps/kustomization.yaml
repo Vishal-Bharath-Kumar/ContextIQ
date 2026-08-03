@@ -1,0 +1,27 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../projects/contextiq-project.yaml
+  - root-app.yaml
+  - services/mcp-gateway.yaml
+  - services/agent-worker.yaml
+  - services/admin-portal.yaml
+  - services/keycloak.yaml
+  - services/jaeger.yaml
+  - services/opa.yaml
+  - services/vault.yaml
+  - services/cert-manager.yaml
+  - services/istio-base.yaml
+  - services/istiod.yaml
+  - services/postgresql.yaml
+  - services/pgbouncer.yaml
+  - services/prometheus-adapter.yaml
+  - services/indexing-service.yaml
+  - services/qdrant.yaml
+  - services/neo4j.yaml
+  - services/opensearch.yaml
+  - services/redis.yaml
+  - services/minio.yaml
+  - services/kafka.yaml
+  - services/kafka-connect.yaml
+  - envs/contextiq-staging.yaml

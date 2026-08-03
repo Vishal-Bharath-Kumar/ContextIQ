@@ -1,0 +1,20 @@
+# Allow gateway pods to reach agent-worker pods on port 8000
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-gateway-to-agents
+  namespace: contextiq-agents
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/component: agent-worker
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: contextiq-gateway
+      ports:
+        - protocol: TCP
+          port: 8000

@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<title>REPLAY-001 — Replay Explorer · ContextIQ Wireframe</title>
+<link rel="stylesheet" href="_wireframe-base.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="topbar-logo"><div class="topbar-logo-icon">C</div>ContextIQ</div>
+  <div class="topbar-sep"></div>
+  <nav class="topbar-breadcrumb">Replay Explorer</nav>
+  <div class="topbar-actions"><div class="topbar-search">🔍 Search</div><button class="topbar-icon-btn">🔔</button></div>
+</header>
+<nav class="sidebar" aria-label="Main navigation">
+  <div class="sidebar-nav">
+    <a class="nav-item"><span class="icon">⊞</span>Dashboard</a>
+    <div class="nav-section">Data Sources</div>
+    <a class="nav-item"><span class="icon">⬡</span>Connectors</a><a class="nav-item"><span class="icon">🗄</span>Knowledge Sources</a>
+    <div class="nav-section">Governance</div><a class="nav-item"><span class="icon">🛡</span>Policies</a>
+    <div class="nav-section">Observability</div>
+    <a class="nav-item active" aria-current="page"><span class="icon">▶</span>Replay Explorer</a>
+    <a class="nav-item"><span class="icon">📋</span>Audit Log</a><a class="nav-item"><span class="icon">📊</span>Observability</a>
+    <div class="nav-section">Platform</div><a class="nav-item"><span class="icon">👥</span>Users</a><a class="nav-item"><span class="icon">💻</span>Models</a><a class="nav-item"><span class="icon">⚙</span>Settings</a>
+  </div>
+  <div class="sidebar-user"><div class="user-avatar">DA</div><div class="user-info"><div class="user-name">Dave Auditor</div><div class="user-role">Auditor</div></div></div>
+</nav>
+<main class="main-content" role="main">
+  <div class="page-header">
+    <div class="page-title">Replay Explorer</div>
+  </div>
+  <!-- Filter bar -->
+  <div class="filter-bar" style="flex-wrap:wrap;gap:8px">
+    <input class="input-wf" style="width:200px" placeholder="🔍  Session / trace ID…">
+    <input class="input-wf" style="width:130px" type="date" value="2026-07-07">
+    <input class="input-wf" style="width:130px" type="date" value="2026-07-14">
+    <select class="select-wf"><option>All Models</option><option>gpt-4o</option><option>claude-3-sonnet</option><option>llama3-70b</option></select>
+    <select class="select-wf"><option>All Status</option><option>Completed</option><option>Policy Blocked</option><option>Failed</option></select>
+    <select class="select-wf"><option>All Intents</option><option>Code Search</option><option>Incident Investigation</option><option>Architecture Query</option></select>
+  </div>
+  <div class="table-wrapper">
+    <table class="table-wf" aria-label="Traces">
+      <thead><tr><th>Execution ID</th><th>Timestamp</th><th>User</th><th>Intent</th><th>Model</th><th>Latency</th><th>Tokens In</th><th>Tokens Out</th><th>Status</th></tr></thead>
+      <tbody>
+        <tr style="cursor:pointer">
+          <td class="mono tabular" style="color:var(--brand-blue-400)">trace-abc-001</td>
+          <td class="mono tabular text-small">2026-07-14 14:32:01.234</td>
+          <td>alice@co.com</td>
+          <td><span class="badge badge-neutral">Code Search</span></td>
+          <td><span class="badge badge-brand">gpt-4o</span></td>
+          <td class="mono tabular">842ms</td>
+          <td class="mono tabular">1,024</td>
+          <td class="mono tabular">512</td>
+          <td><span class="badge badge-success">✓ PASS</span></td>
+        </tr>
+        <tr style="cursor:pointer;background:var(--danger-900)">
+          <td class="mono tabular" style="color:var(--brand-blue-400)">trace-abc-002</td>
+          <td class="mono tabular text-small">2026-07-14 14:28:15.891</td>
+          <td>bob@co.com</td>
+          <td><span class="badge badge-neutral">Code Search</span></td>
+          <td><span class="badge badge-brand">gpt-4o</span></td>
+          <td class="mono tabular">1,240ms</td>
+          <td class="mono tabular">2,048</td>
+          <td class="mono tabular" style="color:var(--neutral-600)">—</td>
+          <td><span class="badge badge-danger">✗ DENIED</span></td>
+        </tr>
+        <tr style="cursor:pointer">
+          <td class="mono tabular" style="color:var(--brand-blue-400)">trace-abc-003</td>
+          <td class="mono tabular text-small">2026-07-14 14:20:44.012</td>
+          <td>alice@co.com</td>
+          <td><span class="badge badge-neutral">Architecture Query</span></td>
+          <td><span class="badge badge-brand">claude-3-sonnet</span></td>
+          <td class="mono tabular">620ms</td>
+          <td class="mono tabular">768</td>
+          <td class="mono tabular">384</td>
+          <td><span class="badge badge-success">✓ PASS</span></td>
+        </tr>
+        <tr style="cursor:pointer">
+          <td class="mono tabular" style="color:var(--brand-blue-400)">trace-abc-004</td>
+          <td class="mono tabular text-small">2026-07-14 13:55:22.301</td>
+          <td>dave@co.com</td>
+          <td><span class="badge badge-neutral">Incident Investigation</span></td>
+          <td><span class="badge badge-brand">llama3-70b</span></td>
+          <td class="mono tabular" style="color:var(--warning-400)">3,841ms</td>
+          <td class="mono tabular">512</td>
+          <td class="mono tabular">256</td>
+          <td><span class="badge badge-warning">⚠ WARN</span></td>
+        </tr>
+        <tr style="cursor:pointer">
+          <td class="mono tabular" style="color:var(--brand-blue-400)">trace-abc-005</td>
+          <td class="mono tabular text-small">2026-07-14 13:40:08.777</td>
+          <td>bob@co.com</td>
+          <td><span class="badge badge-neutral">Code Search</span></td>
+          <td><span class="badge badge-brand">gpt-4o</span></td>
+          <td class="mono tabular">290ms</td>
+          <td class="mono tabular">384</td>
+          <td class="mono tabular">192</td>
+          <td><span class="badge badge-success">✓ PASS</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <div style="text-align:center;margin-top:16px">
+    <button class="btn btn-ghost">Load more <span class="text-muted text-small">(cursor-paginated)</span></button>
+  </div>
+</main>
+<aside class="annotation-panel">
+  <div class="ann-screen-id">REPLAY-001</div>
+  <div class="ann-route">Route: /traces</div>
+  <div class="ann-guard">Guard: AUDITOR, DEVOPS_SRE, SECURITY_OFFICER, ADMIN</div>
+  <div class="ann-divider"></div>
+  <div class="ann-section">Components</div>
+  <div class="ann-item"><div class="ann-component">&lt;DateRangePicker&gt;</div><div class="ann-note">From/To date range filter</div></div>
+  <div class="ann-item"><div class="ann-component">&lt;DataTable&gt;</div><div class="ann-note">Row click → REPLAY-002 · latency colored: &gt;2s=warning, &gt;5s=danger</div></div>
+  <div class="ann-item"><div class="ann-component">&lt;Pagination variant="load-more"&gt;</div><div class="ann-note">cursor-paginated infinite scroll</div></div>
+  <div class="ann-divider"></div>
+  <div class="ann-section">Latency Thresholds</div>
+  <div class="ann-note">&lt; 2000ms: neutral<br>2000–5000ms: warning-400<br>&gt; 5000ms: danger-400</div>
+</aside>
+</body>
+</html>

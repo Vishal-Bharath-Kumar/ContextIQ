@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<title>CONN-003 — Connector Health · ContextIQ Wireframe</title>
+<link rel="stylesheet" href="_wireframe-base.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-logo"><div class="topbar-logo-icon">C</div>ContextIQ</div>
+  <div class="topbar-sep"></div>
+  <nav class="topbar-breadcrumb"><a>Connectors</a> <span>›</span> sql-prod</nav>
+  <div class="topbar-actions">
+    <div class="topbar-search">🔍 Search</div>
+    <button class="topbar-icon-btn">🔔</button><button class="topbar-icon-btn">☀️</button>
+  </div>
+</header>
+
+<nav class="sidebar" aria-label="Main navigation">
+  <div class="sidebar-nav">
+    <a class="nav-item"><span class="icon">⊞</span>Dashboard</a>
+    <div class="nav-section">Data Sources</div>
+    <a class="nav-item active" aria-current="page"><span class="icon">⬡</span>Connectors</a>
+    <a class="nav-item"><span class="icon">🗄</span>Knowledge Sources</a>
+    <div class="nav-section">Governance</div>
+    <a class="nav-item"><span class="icon">🛡</span>Policies</a>
+    <div class="nav-section">Observability</div>
+    <a class="nav-item"><span class="icon">▶</span>Replay Explorer</a>
+    <a class="nav-item"><span class="icon">📋</span>Audit Log</a>
+    <a class="nav-item"><span class="icon">📊</span>Observability</a>
+    <div class="nav-section">Platform</div>
+    <a class="nav-item"><span class="icon">👥</span>Users</a>
+    <a class="nav-item"><span class="icon">💻</span>Models</a>
+    <a class="nav-item"><span class="icon">⚙</span>Settings</a>
+  </div>
+  <div class="sidebar-user"><div class="user-avatar">AA</div><div class="user-info"><div class="user-name">Alice Admin</div><div class="user-role">Admin</div></div></div>
+</nav>
+
+<main class="main-content" role="main">
+  <div class="page-header">
+    <div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <div class="page-title">sql-prod</div>
+        <span class="badge badge-success"><span class="status-dot healthy"></span> HEALTHY</span>
+      </div>
+      <div class="page-description">SQL Database · Last sync: 2 min ago · Next sync: in 28 min</div>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-secondary btn-sm">Trigger Sync</button>
+      <button class="btn btn-secondary btn-sm">Edit</button>
+      <button class="btn btn-danger btn-sm">Delete</button>
+    </div>
+  </div>
+
+  <div class="grid-2 mb-6">
+    <div class="card">
+      <div class="card-title">Connection Info</div>
+      <table style="width:100%;font-size:13px;border-collapse:collapse">
+        <tr><td style="padding:5px 0;color:var(--neutral-500);width:110px">Host</td><td class="mono">db.internal:5432</td></tr>
+        <tr><td style="padding:5px 0;color:var(--neutral-500)">Database</td><td class="mono">contextiq_prod</td></tr>
+        <tr><td style="padding:5px 0;color:var(--neutral-500)">Schema</td><td class="mono">public</td></tr>
+        <tr><td style="padding:5px 0;color:var(--neutral-500)">Auth</td><td><span class="badge badge-info">PAT</span></td></tr>
+        <tr><td style="padding:5px 0;color:var(--neutral-500)">SSL</td><td><span style="color:var(--success-400)">✓ Enabled</span></td></tr>
+        <tr><td style="padding:5px 0;color:var(--neutral-500)">Credentials</td><td class="mono" style="color:var(--neutral-600)">••••••••</td></tr>
+      </table>
+    </div>
+    <div class="card">
+      <div class="card-title">Health History (24h)</div>
+      <div class="chart-placeholder" style="height:80px;margin-bottom:8px">
+        <div class="chart-series" style="align-items:flex-end">
+          <div class="chart-bar-wf" style="height:100%;background:var(--success-600);opacity:0.8"></div>
+          <div class="chart-bar-wf" style="height:100%;background:var(--success-600);opacity:0.8"></div>
+          <div class="chart-bar-wf" style="height:100%;background:var(--success-600);opacity:0.8"></div>
+          <div class="chart-bar-wf" style="height:30%;background:var(--warning-600);opacity:0.8"></div>
+          <div class="chart-bar-wf" style="height:100%;background:var(--success-600);opacity:0.8"></div>
+          <div class="chart-bar-wf" style="height:100%;background:var(--success-600);opacity:0.8"></div>
+          <div class="chart-bar-wf" style="height:100%;background:var(--success-600);opacity:0.8"></div>
+          <div class="chart-bar-wf" style="height:100%;background:var(--success-600);opacity:0.8"></div>
+        </div>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:12px">
+        <span style="color:var(--success-400)">Uptime 99.8%</span>
+        <span class="text-muted">Documents indexed: 8,402</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:12px;margin-top:4px">
+        <span class="text-muted">Sync errors (24h): 1</span>
+        <span class="text-muted">Avg latency: 4ms</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="table-wrapper">
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border-bottom:1px solid var(--neutral-800)">
+      <div style="font-size:13px;font-weight:600;color:var(--neutral-300)">Probe Log</div>
+      <button class="btn btn-ghost btn-sm">↻ Refresh</button>
+    </div>
+    <table class="table-wf">
+      <thead><tr><th>Timestamp</th><th>Status</th><th>Latency</th><th>Details</th></tr></thead>
+      <tbody>
+        <tr><td class="mono tabular">14:32:01</td><td><span class="badge badge-success"><span class="status-dot healthy"></span>HEALTHY</span></td><td class="mono tabular">4ms</td><td class="text-muted text-small">—</td></tr>
+        <tr><td class="mono tabular">14:27:01</td><td><span class="badge badge-success"><span class="status-dot healthy"></span>HEALTHY</span></td><td class="mono tabular">3ms</td><td class="text-muted text-small">—</td></tr>
+        <tr><td class="mono tabular">14:22:01</td><td><span class="badge badge-warning"><span class="status-dot degraded"></span>DEGRADED</span></td><td class="mono tabular">312ms</td><td class="text-small" style="color:var(--warning-400)">Timeout — exceeded 250ms threshold</td></tr>
+        <tr><td class="mono tabular">14:17:01</td><td><span class="badge badge-success"><span class="status-dot healthy"></span>HEALTHY</span></td><td class="mono tabular">5ms</td><td class="text-muted text-small">—</td></tr>
+        <tr><td class="mono tabular">14:12:01</td><td><span class="badge badge-success"><span class="status-dot healthy"></span>HEALTHY</span></td><td class="mono tabular">4ms</td><td class="text-muted text-small">—</td></tr>
+      </tbody>
+    </table>
+  </div>
+</main>
+
+<aside class="annotation-panel">
+  <div class="ann-screen-id">CONN-003</div>
+  <div class="ann-route">Route: /connectors/:id</div>
+  <div class="ann-guard">Guard: PLATFORM_ENGINEER, ADMIN</div>
+  <div class="ann-divider"></div>
+  <div class="ann-section">Components</div>
+  <div class="ann-item"><div class="ann-component">&lt;ConnectorStatusHero&gt;</div><div class="ann-note">Large StatusBadge + last-sync + name in page-title</div></div>
+  <div class="ann-item"><div class="ann-component">&lt;KeyValueList&gt;</div><div class="ann-note">Connection metadata · secrets masked ••••••</div></div>
+  <div class="ann-item"><div class="ann-component">&lt;HealthSparkline&gt;</div><div class="ann-note">24h availability · green/amber/red bars</div></div>
+  <div class="ann-item"><div class="ann-component">&lt;ProbeLogTable&gt;</div><div class="ann-note">IBM Plex Mono timestamps · auto-refresh 30s</div></div>
+  <div class="ann-divider"></div>
+  <div class="ann-section">States</div>
+  <span class="state-chip">loading (skeleton)</span>
+  <span class="state-chip">empty (no probes)</span>
+  <span class="state-chip">error</span>
+</aside>
+
+</body>
+</html>

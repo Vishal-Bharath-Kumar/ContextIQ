@@ -1,0 +1,106 @@
+{{- if .Values.prometheusRule.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ include "contextiq-common.fullname" . }}-sla
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "contextiq-common.labels" . | nindent 4 }}
+    release: {{ .Values.prometheusRule.release | default "prometheus" }}
+spec:
+  groups:
+    - name: contextiq.pipeline.sla
+      interval: 30s
+      rules:
+        # ── p95 SLA breach alert ────────────────────────────────────────────
+        - alert: PipelineSLABreach
+          expr: |
+            histogram_quantile(0.95,
+              rate(contextiq_pipeline_e2e_duration_seconds_bucket[5m])
+            ) > 3.0
+          for: 3m
+          labels:
+            severity: critical
+            service: agent-worker
+          annotations:
+            summary: "Pipeline p95 latency exceeds 3 s SLA"
+            description: >-
+              The ContextIQ pipeline p95 end-to-end latency is
+              {{ "{{" }} $value | humanizeDuration {{ "}}" }}, which exceeds the
+              3 s SLA. Check slow sub-agents or infrastructure degradation.
+            runbook_url: "https://docs.contextiq.internal/runbooks/pipeline-sla-breach"
+
+        # ── p99 warning alert (early warning before SLA breach) ────────────
+        - alert: PipelineLatencyP99Elevated
+          expr: |
+            histogram_quantile(0.99,
+              rate(contextiq_pipeline_e2e_duration_seconds_bucket[5m])
+            ) > 4.0
+          for: 5m
+          labels:
+            severity: warning
+            service: agent-worker
+          annotations:
+            summary: "Pipeline p99 latency elevated above 4 s"
+            description: >-
+              The ContextIQ pipeline p99 latency is
+              {{ "{{" }} $value | humanizeDuration {{ "}}" }}.
+              Investigate before the p95 SLA is impacted.
+            runbook_url: "https://docs.contextiq.internal/runbooks/pipeline-sla-breach"
+
+    # ── Connector circuit-breaker alerts (TASK-US008-05) ───────────────────
+    - name: connector_circuit_breakers
+      rules:
+        # ── Circuit breaker open for a sustained period ─────────────────
+        - alert: ConnectorCircuitBreakerOpen
+          expr: contextiq_connector_circuit_breaker_state == 1
+          for: 2m
+          labels:
+            severity: warning
+            service: agent-worker
+          annotations:
+            summary: >-
+              Connector circuit breaker open: {{ "{{" }} $labels.connector_id {{ "}}" }}
+            description: >-
+              The circuit breaker for connector
+              {{ "{{" }} $labels.connector_id {{ "}}" }} has been open for more than 2
+              minutes. Connector requests are being skipped. Check connector
+              health and downstream service availability.
+            runbook_url: "https://docs.contextiq.internal/runbooks/connector-circuit-breaker"
+
+        # ── High per-connector failure rate ─────────────────────────────
+        - alert: ConnectorHighFailureRate
+          expr: |
+            rate(contextiq_connector_failure_count[5m]) > 0.5
+          for: 3m
+          labels:
+            severity: warning
+            service: agent-worker
+          annotations:
+            summary: >-
+              High connector failure rate: {{ "{{" }} $labels.connector_id {{ "}}" }}
+            description: >-
+              Connector {{ "{{" }} $labels.connector_id {{ "}}" }} failure rate is
+              {{ "{{" }} $value | humanize {{ "}}" }}/s (failure_type:
+              {{ "{{" }} $labels.failure_type {{ "}}" }}) over the last 5 minutes.
+              Sustained high failure rates will open the circuit breaker.
+            runbook_url: "https://docs.contextiq.internal/runbooks/connector-high-failure-rate"
+
+        # ── All connectors have open circuits ───────────────────────────
+        - alert: AllConnectorsDown
+          expr: |
+            count(contextiq_connector_circuit_breaker_state == 1)
+            == count(contextiq_connector_circuit_breaker_state >= 0)
+          for: 1m
+          labels:
+            severity: critical
+            service: agent-worker
+          annotations:
+            summary: "ALL connectors have open circuit breakers"
+            description: >-
+              Every registered connector has an open circuit breaker. The
+              platform is running with zero knowledge sources available and
+              all context-retrieval requests will return empty results.
+              Immediate investigation required.
+            runbook_url: "https://docs.contextiq.internal/runbooks/all-connectors-down"
+{{- end }}

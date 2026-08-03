@@ -1,0 +1,32 @@
+cert-manager:
+  installCRDs: true    # install CRDs with the chart — avoids a separate kubectl apply step
+
+  replicaCount: 2      # HA: two controller replicas
+
+  resources:
+    requests: { cpu: "100m", memory: "128Mi" }
+    limits:   { cpu: "500m", memory: "512Mi" }
+
+  # Prometheus metrics endpoint (scraped by existing ServiceMonitor in contextiq-observability)
+  prometheus:
+    enabled: true
+    servicemonitor:
+      enabled:   true
+      namespace: contextiq-observability
+
+  # Run in contextiq-infra namespace
+  global:
+    leaderElection:
+      namespace: contextiq-infra
+
+  webhook:
+    replicaCount: 2
+    resources:
+      requests: { cpu: "50m",  memory: "64Mi" }
+      limits:   { cpu: "200m", memory: "128Mi" }
+
+  cainjector:
+    replicaCount: 2
+    resources:
+      requests: { cpu: "50m",  memory: "64Mi" }
+      limits:   { cpu: "200m", memory: "256Mi" }

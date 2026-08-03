@@ -1,0 +1,9 @@
+apiVersion: v2
+name:        qdrant
+description: Qdrant vector database for ContextIQ
+type:        application
+version:     0.1.0
+dependencies:
+  - name:       qdrant
+    version:    "0.10.0"    # pinned; tracks Qdrant 1.9.x — update after staging validation
+    repository: https://qdrant.github.io/qdrant-helm

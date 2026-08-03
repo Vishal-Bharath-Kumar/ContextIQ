@@ -1,0 +1,53 @@
+# AC-3: ArgoCD pre-sync hook — runs after topic bootstrap (wave -4 > -5), before consumer pods start.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name:      kafka-consumer-group-registration
+  namespace: contextiq-data
+  annotations:
+    argocd.argoproj.io/hook:               PreSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+    # Wave -4: runs after kafka-topic-bootstrap (wave -5) and before sync-wave 0 resources
+    argocd.argoproj.io/sync-wave:          "-4"
+spec:
+  backoffLimit:          2
+  activeDeadlineSeconds: 120
+  template:
+    metadata:
+      annotations:
+        vault.hashicorp.com/agent-inject:                      "true"
+        vault.hashicorp.com/role:                              "mcp-gateway"
+        vault.hashicorp.com/agent-pre-populate-only:           "true"
+        # Suffix must match the desired filename under /vault/secrets/
+        vault.hashicorp.com/agent-inject-secret-kafka.env:     "secret/data/contextiq/kafka/clients/mcp-gateway"
+        vault.hashicorp.com/agent-inject-template-kafka.env: |
+          {{- with secret "secret/data/contextiq/kafka/clients/mcp-gateway" -}}
+          export KAFKA_USERNAME="{{ .Data.data.username }}"
+          export KAFKA_PASSWORD="{{ .Data.data.password }}"
+          {{- end }}
+    spec:
+      restartPolicy:      OnFailure
+      serviceAccountName: kafka-bootstrap
+      containers:
+        - name: register-groups
+          # Image tag replaced at deploy time by CI (e.g. via kustomize image patch or pipeline sed)
+          image:   ghcr.io/your-org/contextiq-api:latest
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              . /vault/secrets/kafka.env
+              python scripts/kafka/register_consumer_groups.py
+          env:
+            - name:  KAFKA_BOOTSTRAP_SERVERS
+              value: kafka.contextiq-data.svc.cluster.local:9092
+          volumeMounts:
+            - name:      kafka-tls
+              mountPath: /tls
+              readOnly:  true
+          resources:
+            requests: { cpu: "100m", memory: "128Mi" }
+            limits:   { cpu: "300m", memory: "256Mi" }
+      volumes:
+        - name: kafka-tls
+          secret:
+            secretName: kafka-tls    # cert-manager Certificate (TASK-US048-01)

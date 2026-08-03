@@ -1,0 +1,83 @@
+replicaCount: 2
+
+image:
+  repository: contextiq/admin-portal
+  pullPolicy: IfNotPresent
+  tag: ""
+
+namespace: contextiq-admin
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 3000
+
+ingress:
+  enabled: true
+  className: nginx
+  host: admin.contextiq.internal
+  path: /
+
+resources:
+  requests:
+    cpu: "100m"
+    memory: "128Mi"
+  limits:
+    cpu: "500m"
+    memory: "512Mi"
+
+readinessProbe:
+  httpGet:
+    path: /healthz
+    port: 3000
+  initialDelaySeconds: 5
+  periodSeconds: 10
+  failureThreshold: 3
+
+livenessProbe:
+  httpGet:
+    path: /healthz
+    port: 3000
+  initialDelaySeconds: 15
+  periodSeconds: 30
+  failureThreshold: 5
+
+hpa:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 6
+  targetCPUUtilizationPercentage: 70
+
+pdb:
+  enabled: true
+  minAvailable: 1
+
+podSecurityContext:
+  runAsNonRoot: true
+  seccompProfile:
+    type: RuntimeDefault
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+  runAsUser: 1000
+  capabilities:
+    drop: ["ALL"]
+
+env:
+  GATEWAY_URL: "http://mcp-gateway.contextiq-gateway.svc.cluster.local"
+  KEYCLOAK_URL: "http://keycloak.contextiq-security.svc.cluster.local/auth"
+  KEYCLOAK_REALM: "contextiq"
+
+# AC-3: Vault Agent Injector — admin-api backend credentials
+vault:
+  enabled: true
+  role: admin-api   # matches Kubernetes auth role in TASK-US047-02
+  secrets:
+    - name:      postgres
+      vaultPath: "database/postgres/creds/admin-api"
+      format:    env
+    - name:      keycloak
+      vaultPath: "secret/data/contextiq/keycloak/client"
+      format:    env

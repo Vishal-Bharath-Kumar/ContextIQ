@@ -1,0 +1,60 @@
+pgbouncer:
+  replicaCount: 2    # HA: two PgBouncer pods behind a ClusterIP Service
+
+  # Vault Agent injects PostgreSQL credentials at startup (TASK-US047-03)
+  podAnnotations:
+    vault.hashicorp.com/agent-inject:                    "true"
+    vault.hashicorp.com/role:                            "mcp-gateway"
+    vault.hashicorp.com/agent-pre-populate-only:         "true"    # init-container only; no sidecar in Deployment
+    vault.hashicorp.com/agent-inject-secret-postgres:    "database/postgres/creds/mcp-gateway"
+    vault.hashicorp.com/agent-inject-template-postgres: |
+      {{- with secret "database/postgres/creds/mcp-gateway" -}}
+      export PGBOUNCER_AUTH_USER_PASSWORD="{{ .Data.password }}"
+      {{- end }}
+
+  postgresql:
+    host:     postgresql.contextiq-data.svc.cluster.local
+    port:     5432
+    database: contextiq
+
+  config:
+    # AC-5: transaction pooling — optimal for FastAPI async workloads
+    poolMode:            transaction
+    # AC-5: 200 server-side connections cap to PostgreSQL
+    maxClientConn:       2000    # application-facing: up to 2000 client connections
+    defaultPoolSize:     40      # per-database pool: 40 × 5 service types ≈ 200 server connections
+    minPoolSize:         5       # warm connections kept ready
+    reservePoolSize:     10      # emergency overflow above defaultPoolSize
+    reservePoolTimeout:  5       # seconds before returning error if reserve pool exhausted
+
+    authType:            scram-sha-256
+    authFile:            /etc/pgbouncer/userlist.txt
+
+    serverConnectTimeout: 10
+    serverIdleTimeout:    600    # reclaim idle server connections after 10 min
+    clientIdleTimeout:    300    # disconnect idle clients after 5 min
+    queryTimeout:         0      # no per-query timeout; enforced at application layer
+
+    # Structured logging for Loki forwarding
+    logConnections:    1
+    logDisconnections: 1
+    logPoolerErrors:   1
+    statsUsers:        pgbouncer_monitor    # read-only stats for Prometheus exporter
+
+  resources:
+    requests: { cpu: "250m", memory: "256Mi" }
+    limits:   { cpu: "1",    memory: "512Mi" }
+
+  metrics:
+    enabled: true    # pgbouncer_exporter sidecar
+    serviceMonitor:
+      enabled:   true
+      namespace: contextiq-observability
+      labels:
+        app.kubernetes.io/part-of: contextiq
+
+  autoscaling:
+    enabled:                        true
+    minReplicas:                    2
+    maxReplicas:                    6
+    targetCPUUtilizationPercentage: 70

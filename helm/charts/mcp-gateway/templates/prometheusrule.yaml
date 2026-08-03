@@ -1,0 +1,49 @@
+{{- if .Values.prometheusRule.enabled }}
+# TASK-US003-05: PrometheusRule for ToolCall p95 SLA monitoring.
+# Fires a warning alert when the p95 latency of tool calls exceeds 3 s
+# for two consecutive minutes.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ include "contextiq-common.fullname" . }}-sla
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "contextiq-common.labels" . | nindent 4 }}
+    release: prometheus   # required by kube-prometheus-stack selector
+spec:
+  groups:
+    - name: contextiq.mcp-gateway.sla
+      interval: 30s
+      rules:
+        - alert: ToolCallLatencySLABreach
+          expr: |
+            histogram_quantile(0.95,
+              rate(contextiq_tool_call_duration_seconds_bucket[5m])
+            ) > 3.0
+          for: 2m
+          labels:
+            severity: warning
+            team: platform
+          annotations:
+            summary: "p95 tool call latency exceeds 3 s SLA"
+            description: >-
+              The p95 tool-call latency is {{ "{{" }} $value | humanizeDuration {{ "}}" }}
+              over the last 5 minutes, breaching the < 3 s SLA target.
+              Investigate Agent Worker throughput or downstream retrieval latency.
+
+        - alert: ToolCallHighErrorRate
+          expr: |
+            rate(contextiq_tools_call_total{status="error"}[5m])
+              /
+            rate(contextiq_tools_call_total[5m])
+            > 0.05
+          for: 2m
+          labels:
+            severity: warning
+            team: platform
+          annotations:
+            summary: "Tool call error rate exceeds 5%"
+            description: >-
+              More than 5% of tool calls are failing over the last 5 minutes.
+              Check Agent Worker health and circuit-breaker state.
+{{- end }}

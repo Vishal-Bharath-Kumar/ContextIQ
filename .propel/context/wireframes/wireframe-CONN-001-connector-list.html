@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<title>CONN-001 — Connector List · ContextIQ Wireframe</title>
+<link rel="stylesheet" href="_wireframe-base.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-logo"><div class="topbar-logo-icon">C</div>ContextIQ</div>
+  <div class="topbar-sep"></div>
+  <nav class="topbar-breadcrumb"><a>Connectors</a></nav>
+  <div class="topbar-actions">
+    <div class="topbar-search">🔍 Search <span style="margin-left:auto;font-size:10px;opacity:.5">⌘K</span></div>
+    <button class="topbar-icon-btn">🔔</button><button class="topbar-icon-btn">☀️</button>
+  </div>
+</header>
+
+<nav class="sidebar" aria-label="Main navigation">
+  <div class="sidebar-nav">
+    <a class="nav-item"><span class="icon">⊞</span>Dashboard</a>
+    <div class="nav-section">Data Sources</div>
+    <a class="nav-item active" aria-current="page"><span class="icon">⬡</span>Connectors</a>
+    <a class="nav-item"><span class="icon">🗄</span>Knowledge Sources</a>
+    <div class="nav-section">Governance</div>
+    <a class="nav-item"><span class="icon">🛡</span>Policies</a>
+    <div class="nav-section">Observability</div>
+    <a class="nav-item"><span class="icon">▶</span>Replay Explorer</a>
+    <a class="nav-item"><span class="icon">📋</span>Audit Log</a>
+    <a class="nav-item"><span class="icon">📊</span>Observability</a>
+    <div class="nav-section">Platform</div>
+    <a class="nav-item"><span class="icon">👥</span>Users</a>
+    <a class="nav-item"><span class="icon">💻</span>Models</a>
+    <a class="nav-item"><span class="icon">⚙</span>Settings</a>
+  </div>
+  <div class="sidebar-user"><div class="user-avatar">AA</div><div class="user-info"><div class="user-name">Alice Admin</div><div class="user-role">Admin</div></div></div>
+</nav>
+
+<main class="main-content" role="main">
+  <div class="page-header">
+    <div><div class="page-title">Connectors</div><div class="page-description">Manage external data connectors and monitor health</div></div>
+    <button class="btn btn-primary">+ Add Connector</button>
+  </div>
+
+  <!-- Filter bar -->
+  <div class="filter-bar">
+    <input class="input-wf" style="width:240px" type="text" placeholder="🔍  Filter by name…">
+    <select class="select-wf"><option>All Types</option><option>SQL Database</option><option>REST API</option><option>gRPC</option><option>File / S3</option></select>
+    <select class="select-wf"><option>All Status</option><option>Healthy</option><option>Degraded</option><option>Offline</option></select>
+    <span class="text-muted text-small" style="margin-left:auto">14 connectors</span>
+  </div>
+
+  <!-- Table -->
+  <div class="table-wrapper">
+    <table class="table-wf" aria-label="Connectors list">
+      <thead>
+        <tr>
+          <th class="sort-asc">Name</th>
+          <th>Type</th>
+          <th>Auth</th>
+          <th class="sort-desc">Status</th>
+          <th>Last Sync</th>
+          <th>Next Sync</th>
+          <th style="width:80px">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>sql-prod</strong></td>
+          <td><span class="badge badge-neutral">SQL DB</span></td>
+          <td><span class="badge badge-info">PAT</span></td>
+          <td><span class="badge badge-success"><span class="status-dot healthy"></span>HEALTHY</span></td>
+          <td class="mono tabular">2 min ago</td>
+          <td class="text-muted mono tabular">in 28 min</td>
+          <td><button class="btn btn-ghost btn-icon btn-sm" title="Actions">⋯</button></td>
+        </tr>
+        <tr>
+          <td><strong>rest-ext-api</strong></td>
+          <td><span class="badge badge-neutral">REST API</span></td>
+          <td><span class="badge badge-brand">OAuth2</span></td>
+          <td><span class="badge badge-success"><span class="status-dot healthy"></span>HEALTHY</span></td>
+          <td class="mono tabular">5 min ago</td>
+          <td class="text-muted mono tabular">in 25 min</td>
+          <td><button class="btn btn-ghost btn-icon btn-sm">⋯</button></td>
+        </tr>
+        <tr>
+          <td><strong>grpc-ml-gateway</strong></td>
+          <td><span class="badge badge-neutral">gRPC</span></td>
+          <td><span class="badge badge-info">JWT</span></td>
+          <td><span class="badge badge-warning"><span class="status-dot degraded"></span>DEGRADED</span></td>
+          <td class="mono tabular">12 min ago</td>
+          <td class="text-muted mono tabular">in 18 min</td>
+          <td><button class="btn btn-ghost btn-icon btn-sm">⋯</button></td>
+        </tr>
+        <tr style="background:var(--danger-900)">
+          <td><strong>file-s3-archive</strong></td>
+          <td><span class="badge badge-neutral">File / S3</span></td>
+          <td><span class="badge badge-brand">API Key</span></td>
+          <td><span class="badge badge-danger"><span class="status-dot offline"></span>OFFLINE</span></td>
+          <td class="mono tabular" style="color:var(--danger-400)">1 hr ago</td>
+          <td class="text-muted mono tabular">—</td>
+          <td><button class="btn btn-ghost btn-icon btn-sm">⋯</button></td>
+        </tr>
+        <tr>
+          <td><strong>confluence-docs</strong></td>
+          <td><span class="badge badge-neutral">REST API</span></td>
+          <td><span class="badge badge-brand">OAuth2</span></td>
+          <td><span class="badge badge-info"><span class="status-dot syncing"></span>SYNCING</span></td>
+          <td class="mono tabular">—</td>
+          <td class="text-muted mono tabular">—</td>
+          <td><button class="btn btn-ghost btn-icon btn-sm">⋯</button></td>
+        </tr>
+        <!-- skeleton rows -->
+        <tr><td colspan="7"><div class="skeleton skeleton-row" style="height:36px;margin:0"></div></td></tr>
+        <tr><td colspan="7"><div class="skeleton skeleton-row" style="height:36px;margin:0;opacity:0.6"></div></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Pagination -->
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;font-size:12px;color:var(--neutral-500)">
+    <span>Showing 1–7 of 14</span>
+    <div style="display:flex;gap:6px">
+      <button class="btn btn-secondary btn-sm" disabled style="opacity:0.4">← Prev</button>
+      <button class="btn btn-secondary btn-sm">Next →</button>
+    </div>
+  </div>
+</main>
+
+<aside class="annotation-panel">
+  <div class="ann-screen-id">CONN-001</div>
+  <div class="ann-route">Route: /connectors</div>
+  <div class="ann-guard">Guard: PLATFORM_ENGINEER, ADMIN</div>
+  <div class="ann-divider"></div>
+  <div class="ann-section">Components</div>
+  <div class="ann-item"><div class="ann-component">&lt;FilterBar&gt;</div><div class="ann-note">Text search (300ms debounce) + type + status dropdowns</div></div>
+  <div class="ann-item"><div class="ann-component">&lt;DataTable&gt;</div><div class="ann-note">Sortable · keyboard nav · aria-sort on headers</div></div>
+  <div class="ann-item"><div class="ann-component">&lt;StatusBadge&gt;</div><div class="ann-note">color + icon — never color alone</div></div>
+  <div class="ann-item"><div class="ann-component">&lt;DropdownMenu&gt; [⋯]</div><div class="ann-note">Edit · Test · Delete (ADMIN only)</div></div>
+  <div class="ann-item"><div class="ann-component">&lt;ConfirmationModal&gt;</div><div class="ann-note">Opens on Delete: destructive variant</div></div>
+  <div class="ann-divider"></div>
+  <div class="ann-section">Row Error State</div>
+  <div class="ann-note">OFFLINE row: danger-900 bg + danger left border 1px</div>
+  <div class="ann-divider"></div>
+  <div class="ann-section">States</div>
+  <span class="state-chip">loading (skeletons)</span>
+  <span class="state-chip">empty</span>
+  <span class="state-chip">filter no-results</span>
+  <span class="state-chip">error banner</span>
+</aside>
+
+</body>
+</html>

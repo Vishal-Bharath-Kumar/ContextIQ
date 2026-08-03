@@ -1,0 +1,116 @@
+replicaCount: 2
+
+image:
+  repository: contextiq/agent-worker
+  pullPolicy: IfNotPresent
+  tag: ""
+
+namespace: contextiq-agents
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8000
+
+ingress:
+  enabled: false
+  className: nginx
+  host: contextiq.internal
+  path: /agents
+
+resources:
+  requests:
+    cpu: "500m"
+    memory: "1Gi"
+  limits:
+    cpu: "4"
+    memory: "8Gi"
+
+readinessProbe:
+  httpGet:
+    path: /healthz
+    port: 8000
+  initialDelaySeconds: 15
+  periodSeconds: 10
+  failureThreshold: 3
+
+livenessProbe:
+  httpGet:
+    path: /healthz
+    port: 8000
+  initialDelaySeconds: 30
+  periodSeconds: 30
+  failureThreshold: 5
+
+hpa:
+  enabled: true
+  minReplicas: 2      # AC-1
+  maxReplicas: 20     # AC-1
+  # AC-2: primary scale signal — contextiq_active_requests exposed by Prometheus Adapter
+  customMetric:
+    enabled:            true
+    name:               contextiq_active_requests    # must match adapter rule name (TASK-US046-02)
+    targetAverageValue: "5"                          # scale up when avg reqs/pod exceeds 5
+  # AC-3: CPU fallback — HPA uses MAX across metrics; fires when adapter is unavailable
+  cpuFallback:
+    enabled:                    true
+    targetAverageUtilization:   70
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 0     # AC-4: scale up immediately (< 30 s)
+      policies:
+        - type:          Pods
+          value:         5              # agent workers are heavyweight; add 5 at a time
+          periodSeconds: 30
+    scaleDown:
+      stabilizationWindowSeconds: 300   # AC-4: 5-minute scale-down stabilisation window
+      policies:
+        - type:          Pods
+          value:         2
+          periodSeconds: 60
+
+pdb:
+  enabled: true
+  minAvailable: 1
+
+podSecurityContext:
+  runAsNonRoot: true
+  seccompProfile:
+    type: RuntimeDefault
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+  runAsUser: 1000
+  capabilities:
+    drop: ["ALL"]
+
+env:
+  KEYCLOAK_URL: "http://keycloak.contextiq-security.svc.cluster.local/auth"
+  KEYCLOAK_REALM: "contextiq"
+  OPA_URL: "http://opa.contextiq-security.svc.cluster.local:8181"
+  DATABASE_URL: ""          # sourced from /vault/secrets/postgres.env
+  REDIS_URL: ""             # sourced from /vault/secrets/redis.env
+  QDRANT_URL: ""
+  NEO4J_URL: ""
+  KAFKA_BOOTSTRAP_SERVERS: ""
+  MINIO_ENDPOINT: ""
+
+# AC-3: Vault Agent Injector
+vault:
+  enabled: true
+  role: agent-worker   # matches Kubernetes auth role in TASK-US047-02
+  secrets:
+    - name:      postgres
+      vaultPath: "database/postgres/creds/agent-worker"
+      format:    env
+    - name:      redis
+      vaultPath: "database/redis/creds/agent-worker"
+      format:    env
+    - name:      neo4j
+      vaultPath: "database/neo4j/creds/agent-worker"
+      format:    env
+    - name:      qdrant
+      vaultPath: "secret/data/contextiq/qdrant/api-key"
+      format:    env

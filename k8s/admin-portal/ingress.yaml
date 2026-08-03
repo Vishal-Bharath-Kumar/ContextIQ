@@ -1,0 +1,25 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name:      admin-portal
+  namespace: contextiq-admin
+  annotations:
+    cert-manager.io/cluster-issuer:            "letsencrypt-prod"
+    cert-manager.io/renew-before:              "720h"
+    nginx.ingress.kubernetes.io/ssl-redirect:  "true"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - admin.contextiq.io
+      secretName: admin-portal-tls
+  rules:
+    - host: admin.contextiq.io
+      http:
+        paths:
+          - path:     /
+            pathType: Prefix
+            backend:
+              service:
+                name: admin-portal
+                port: { number: 80 }

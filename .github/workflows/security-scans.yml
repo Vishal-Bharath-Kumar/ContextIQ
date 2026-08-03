@@ -1,0 +1,139 @@
+name: Security Scans
+
+on:
+  workflow_call:
+    inputs:
+      image-ref:
+        description: "Full image reference to scan (e.g. ghcr.io/org/repo:sha)"
+        type:    string
+        required: true
+      fail-on-severity:
+        description: "Minimum severity to fail the build (CRITICAL, HIGH, MEDIUM)"
+        type:    string
+        default: HIGH
+
+jobs:
+  # -----------------------------------------------------------------------
+  # Job 1: Trivy container image scan
+  # AC-1: scans the image built in the same workflow run
+  # AC-6: .trivyignore entries without expiry dates fail the job
+  # -----------------------------------------------------------------------
+  trivy-scan:
+    name: Trivy Image Scan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      security-events: write    # required to upload SARIF to Code Scanning
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # AC-6: fail immediately if any .trivyignore entry is missing an expiry
+      # date or the expiry has passed. Enforced by scripts/ci/check_trivy_results.py.
+      # ubuntu-24.04 ships Python 3 — no setup step required.
+      - name: Validate .trivyignore expiry dates
+        run: python3 scripts/ci/check_trivy_results.py --validate-ignores .trivyignore
+
+      - name: Pull image for scanning
+        run: docker pull ${{ inputs.image-ref }}
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@0.24.0
+        with:
+          image-ref:       ${{ inputs.image-ref }}
+          format:          sarif
+          output:          trivy-results.sarif
+          severity:        CRITICAL,HIGH,MEDIUM
+          ignore-unfixed:  true       # suppress CVEs with no upstream fix available
+          trivyignores:    .trivyignore
+          exit-code:       "1"        # AC-3: fail on unaccepted HIGH/CRITICAL
+          vuln-type:       "os,library"
+
+      # Upload SARIF even on failure so reviewers can see findings inline on the PR
+      - name: Upload Trivy SARIF to Code Scanning
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-results.sarif
+          category:   trivy
+
+      - name: Upload Trivy results artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name:            trivy-results
+          path:            trivy-results.sarif
+          retention-days:  14
+
+  # -----------------------------------------------------------------------
+  # Job 2: OWASP Dependency-Check
+  # AC-1: scans Python dependency tree for known CVEs (NVD)
+  # -----------------------------------------------------------------------
+  dependency-check:
+    name: OWASP Dependency-Check
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15    # NVD database download can take 3-5 min on cold cache
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # BUG FIX: date step MUST come before the cache step that references
+      # ${{ steps.date.outputs.date }}. In the spec the order was reversed —
+      # the cache step ran first, so steps.date.outputs.date was always empty,
+      # making the cache key "dependency-check-nvd-ubuntu-latest-" on every run
+      # (no daily rotation, always a cache hit from stale data).
+      - name: Get current date (for daily NVD cache rotation)
+        id: date
+        run: echo "date=$(date +'%Y-%m-%d')" >> "$GITHUB_OUTPUT"
+
+      # Cache the NVD database — saves 3-4 min on warm runs (AC-7)
+      - name: Cache NVD database
+        id: nvd-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.dependency-check/data
+          key:          dependency-check-nvd-${{ runner.os }}-${{ steps.date.outputs.date }}
+          restore-keys: dependency-check-nvd-${{ runner.os }}-
+
+      # Install uv (no full Python env needed for uv export)
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: "0.4.x"
+
+      # Export locked Python dependencies to a flat requirements.txt for DC
+      - name: Export Python dependencies for scanning
+        run: uv export --no-dev --format requirements-txt > requirements-scan.txt
+
+      # BUG FIX: spec used @main which is an unpinned, mutable branch reference.
+      # @main is a supply-chain risk for any action, but especially for a security
+      # scanner. Pinned to @5.0.0 (stable release wrapping DC 9.x).
+      # To update: check https://github.com/dependency-check/Dependency-Check_Action/releases
+      - name: Run OWASP Dependency-Check
+        uses: dependency-check/Dependency-Check_Action@5.0.0
+        with:
+          project: ContextIQ
+          path:    requirements-scan.txt
+          format:  SARIF
+          out:     dependency-check-report
+          # AC-3: fail on CVSS >= 7.0 (HIGH/CRITICAL)
+          args: >-
+            --failOnCVSS 7
+            --enableRetired
+            --suppression .github/dependency-check-suppressions.xml
+            --nvdApiKey ${{ secrets.NVD_API_KEY }}
+
+      - name: Upload Dependency-Check SARIF to Code Scanning
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: dependency-check-report/dependency-check-report.sarif
+          category:   dependency-check
+
+      - name: Upload Dependency-Check report artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name:           dependency-check-report
+          path:           dependency-check-report/
+          retention-days: 14

@@ -1,0 +1,37 @@
+# OPERATOR REFERENCE — not applied to the cluster.
+# Single view of all HPA targets across the three autoscaled services.
+# Update this file whenever HPA thresholds change in individual chart values.
+
+hpa_summary:
+  # AC-1: three services, their min/max, and primary metric
+  - service:             mcp-gateway
+    namespace:           contextiq-gateway
+    min_replicas:        2
+    max_replicas:        10
+    primary_metric:      cpu
+    target:              "60% CPU utilization"
+    scale_up_window_s:   0
+    scale_down_window_s: 300    # AC-4
+
+  - service:             agent-worker
+    namespace:           contextiq-agents
+    min_replicas:        2
+    max_replicas:        20
+    primary_metric:      "contextiq_active_requests (custom)"
+    target:              "5 active requests per pod average"
+    scale_up_window_s:   0
+    scale_down_window_s: 300    # AC-4
+
+  - service:             indexing-service
+    namespace:           contextiq-agents
+    min_replicas:        1
+    max_replicas:        5
+    primary_metric:      cpu
+    target:              "70% CPU utilization"
+    scale_up_window_s:   0
+    scale_down_window_s: 300    # AC-4
+
+pdb_summary:
+  - service:       mcp-gateway
+    namespace:     contextiq-gateway
+    min_available: 2    # AC-5

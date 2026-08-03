@@ -1,0 +1,56 @@
+# AC-6: Deny kubectl exec and port-forward in production namespaces.
+# The constraint checks the exec/portforward sub-resource verb on Pod resources
+# and rejects unless the caller is in the break-glass allowedServiceAccounts list.
+apiVersion: templates.gatekeeper.sh/v1
+kind: ConstraintTemplate
+metadata:
+  name: denyexecportforward
+spec:
+  crd:
+    spec:
+      names:
+        kind: DenyExecPortForward
+      validation:
+        openAPIV3Schema:
+          type: object
+          properties:
+            allowedServiceAccounts:
+              type: array
+              items:
+                type: string
+              description: "ServiceAccount names (system:serviceaccount:ns:name) exempt from this restriction (break-glass)"
+  targets:
+    - target: admission.k8s.gatekeeper.sh
+      rego: |
+        package denyexecportforward
+
+        import future.keywords.if
+
+        violation[{"msg": msg}] if {
+          input.review.request.subResource == "exec"
+          not is_break_glass_user
+          msg := sprintf(
+            "kubectl exec is not allowed in namespace '%v' (AC-6). Use Vault Agent or approved debug tooling.",
+            [input.review.request.namespace]
+          )
+        }
+
+        violation[{"msg": msg}] if {
+          input.review.request.subResource == "portforward"
+          not is_break_glass_user
+          msg := sprintf(
+            "kubectl port-forward is not allowed in namespace '%v' (AC-6).",
+            [input.review.request.namespace]
+          )
+        }
+
+        is_break_glass_user if {
+          # Caller's username matches an entry in the explicit allowlist
+          input.review.request.userInfo.username == input.parameters.allowedServiceAccounts[_]
+        }
+
+        is_break_glass_user if {
+          # Caller carries a break-glass extra claim (requires a custom auth webhook
+          # that propagates the ServiceAccount annotation into userInfo.extra)
+          input.review.request.userInfo.extra["contextiq.io/break-glass"][_] == "true"
+        }

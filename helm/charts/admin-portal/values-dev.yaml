@@ -1,0 +1,9 @@
+replicaCount: 1
+hpa:
+  enabled: false
+pdb:
+  enabled: false
+env:
+  LOG_LEVEL: DEBUG
+vault:
+  enabled: false

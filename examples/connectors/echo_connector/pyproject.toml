@@ -1,0 +1,12 @@
+[build-system]
+requires      = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name    = "contextiq-echo-connector"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies    = ["contextiq-connector-sdk"]
+
+[project.entry-points."contextiq.connectors"]
+echo = "echo_connector.connector:EchoConnector"

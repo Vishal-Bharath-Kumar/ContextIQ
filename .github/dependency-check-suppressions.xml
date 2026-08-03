@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  OWASP Dependency-Check suppression file — .github/dependency-check-suppressions.xml
+
+  RULES:
+    1. Every suppression MUST include a <notes> element with:
+       - The CVE identifier
+       - A justification (why it is suppressed)
+       - The name of the control that mitigates the risk (if any)
+       - A review-by date (matching the `until` attribute, max 90 days)
+    2. Suppressions without <notes> are rejected in PR review.
+    3. Expired suppressions (past the `until` date) cause the scan to fail
+       again — forcing periodic review of whether the vulnerability is still
+       mitigated or an upstream fix has become available.
+
+  ADDING A NEW SUPPRESSION:
+    <suppress until="YYYY-MM-DDZ">
+      <notes>CVE-XXXX-YYYY: <justification>. Mitigated by <control>. Review by YYYY-MM-DD.</notes>
+      <cve>CVE-XXXX-YYYY</cve>
+    </suppress>
+
+  Currently no active suppressions.
+-->
+<suppressions xmlns="https://jeremylong.github.io/DependencyCheck/dependency-suppression.1.3.xsd">
+  <!--
+  Example suppression structure (uncomment and populate with real CVEs):
+
+  <suppress until="2026-10-01Z">
+    <notes>CVE-XXXX-YYYY: no upstream fix available as of 2026-07-14.
+           Mitigated by US-048 mTLS network controls (all inter-service traffic
+           encrypted and mutually authenticated). Review by 2026-10-01.</notes>
+    <cve>CVE-XXXX-YYYY</cve>
+  </suppress>
+  -->
+</suppressions>

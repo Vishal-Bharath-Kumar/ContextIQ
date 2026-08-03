@@ -1,0 +1,9 @@
+apiVersion: v2
+name:        istio-base
+description: Istio CRDs and cluster-level resources for ContextIQ
+type:        application
+version:     0.1.0
+dependencies:
+  - name:       base
+    version:    "1.22.3"
+    repository: https://istio-release.storage.googleapis.com/charts

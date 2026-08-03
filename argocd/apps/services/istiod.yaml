@@ -1,0 +1,37 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: istiod
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: contextiq
+  # Multi-source: upstream Istio istiod Helm chart + custom values from git (ArgoCD 2.6+)
+  sources:
+    # Source 1: upstream istiod Helm chart
+    - repoURL:        https://istio-release.storage.googleapis.com/charts
+      chart:          istiod
+      targetRevision: "1.22.3"
+      helm:
+        valueFiles:
+          - $values/helm/charts/istiod/values.yaml
+    # Source 2: git repo supplying the custom values files (referenced as $values above)
+    - repoURL:        https://github.com/your-org/contextiq.git
+      targetRevision: HEAD
+      ref:            values
+  destination:
+    server:    https://kubernetes.default.svc
+    namespace: istio-system
+  syncPolicy:
+    automated:
+      prune:    true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false    # created by istio-base Application above
+      - ApplyOutOfSyncOnly=true
+  ignoreDifferences:
+    - group: apps
+      kind:  Deployment
+      jsonPointers:
+        - /spec/replicas   # ignore HPA-driven replica drift

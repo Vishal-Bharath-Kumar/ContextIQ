@@ -1,0 +1,75 @@
+minio:
+  image:
+    tag: "RELEASE.2024-07-16T23-46-41Z"    # pinned for reproducibility
+
+  # AC-5: 4-node distributed mode — erasure coding across 4 nodes tolerates 2 node failures
+  mode:         distributed
+  replicas:     4
+  drivesPerNode: 1
+
+  # Credentials via Vault Agent at runtime (AC-6) — NOT hard-coded here
+  rootUser:     ""    # overwritten by /vault/secrets/minio.env
+  rootPassword: ""
+
+  # Encrypted PVC per node (TASK-US048-04)
+  persistence:
+    enabled:      true
+    storageClass: contextiq-encrypted-gp3
+    size:         500Gi    # per pod; 4 × 500 Gi = 2 TB raw
+
+  resources:
+    requests: { cpu: "1",    memory: "4Gi"  }
+    limits:   { cpu: "4",    memory: "16Gi" }
+
+  # AC-6: Vault Agent init-container injects MinIO root credentials
+  podAnnotations:
+    vault.hashicorp.com/agent-inject:                "true"
+    vault.hashicorp.com/role:                        "admin-api"
+    vault.hashicorp.com/agent-pre-populate-only:     "true"
+    vault.hashicorp.com/agent-inject-secret-minio:   "secret/data/contextiq/minio/root"
+    vault.hashicorp.com/agent-inject-template-minio: |
+      {{- with secret "secret/data/contextiq/minio/root" -}}
+      export MINIO_ROOT_USER="{{ .Data.data.access_key }}"
+      export MINIO_ROOT_PASSWORD="{{ .Data.data.secret_key }}"
+      {{- end }}
+
+  # TLS via cert-manager certificate (TASK-US048-02)
+  tls:
+    enabled:    true
+    certSecret: minio-tls
+
+  # AC-5: spread all 4 nodes across distinct K8s nodes for fault isolation
+  affinity:
+    podAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        - labelSelector:
+            matchLabels:
+              app: minio
+          topologyKey: kubernetes.io/hostname
+
+  # PDB: MinIO write quorum requires n/2+1 nodes; allow at most 1 disruption
+  podDisruptionBudget:
+    enabled:        true
+    maxUnavailable: 1
+
+  # AC-7: Prometheus ServiceMonitor
+  metrics:
+    serviceMonitor:
+      enabled:   true
+      namespace: contextiq-observability
+      additionalLabels:
+        app.kubernetes.io/part-of: contextiq
+
+  # MinIO Console ingress (admin UI)
+  consoleIngress:
+    enabled: true
+    annotations:
+      cert-manager.io/cluster-issuer: letsencrypt-prod
+    hosts: [minio.contextiq.io]
+    tls:
+      - secretName: minio-console-tls
+        hosts:      [minio.contextiq.io]
+
+  # SSE-S3 encryption key (TASK-US048-04) — set via Vault if using external KMS
+  environment:
+    MINIO_KMS_SECRET_KEY: ""

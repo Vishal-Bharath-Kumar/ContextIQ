@@ -1,0 +1,68 @@
+<!--
+  scripts/keycloak/saml_idp_metadata.xml.template
+  ================================================
+  Documentation aid for on-premises IdP administrators.
+
+  This template documents the SAML SP metadata fields that Keycloak exposes at:
+    GET /auth/realms/contextiq/protocol/saml/descriptor
+
+  IMPORTANT: Always fetch the live metadata from the Keycloak endpoint — never
+  use this static template as the actual SP metadata.  The live endpoint
+  includes the current SP signing certificate and the correct ACS URL for the
+  deployed environment.
+
+  Key fields your IdP admin needs:
+    EntityDescriptor[@entityID]
+      → ContextIQ SAML SP entity ID (use this to register ContextIQ in your IdP)
+    AssertionConsumerService[@Location]
+      → ACS URL (POST binding) — where Keycloak receives SAML responses
+    KeyDescriptor[@use="signing"]
+      → SP signing certificate (Keycloak signs AuthnRequests with this key)
+
+  Attribute requirements:
+    Your IdP must include a multi-valued "Role" attribute in the SAML assertion.
+    Valid attribute values (mapped to Keycloak realm roles by configure_saml_broker.py):
+      ContextIQ-Admins           → admin
+      ContextIQ-PlatformEngineers → platform_engineer
+      ContextIQ-SecurityOfficers  → security_officer
+      ContextIQ-Developers        → developer
+      ContextIQ-Managers          → manager
+      ContextIQ-Auditors          → auditor
+      ContextIQ-DevOpsSRE         → devops_sre
+
+    Users with no matching Role value will be denied access (no realm role assigned).
+-->
+<EntityDescriptor
+    entityID="https://contextiq.internal/auth/realms/contextiq"
+    xmlns="urn:oasis:names:tc:SAML:2.0:metadata"
+    xmlns:ds="http://www.w3.org/2000/09/xmldsig#">
+
+  <SPSSODescriptor
+      AuthnRequestsSigned="true"
+      WantAssertionsSigned="true"
+      protocolSupportEnumeration="urn:oasis:names:tc:SAML:2.0:protocol">
+
+    <!--
+      SP signing certificate — fetched from live endpoint; placeholder here.
+      Your IdP uses this certificate to verify signed AuthnRequests from Keycloak.
+    -->
+    <KeyDescriptor use="signing">
+      <ds:KeyInfo>
+        <ds:X509Data>
+          <ds:X509Certificate>FETCHED_FROM_LIVE_METADATA_ENDPOINT</ds:X509Certificate>
+        </ds:X509Data>
+      </ds:KeyInfo>
+    </KeyDescriptor>
+
+    <!--
+      ACS URL (POST binding) — Keycloak broker endpoint for the saml-onprem alias.
+      Your IdP sends SAML responses (assertions) to this URL.
+    -->
+    <AssertionConsumerService
+        Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST"
+        Location="https://contextiq.internal/auth/realms/contextiq/broker/saml-onprem/endpoint"
+        index="1"/>
+
+  </SPSSODescriptor>
+
+</EntityDescriptor>

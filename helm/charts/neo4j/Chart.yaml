@@ -1,0 +1,9 @@
+apiVersion: v2
+name:        neo4j
+description: Neo4j Causal Cluster for ContextIQ knowledge graph
+type:        application
+version:     0.1.0
+dependencies:
+  - name:       neo4j
+    version:    "5.20.0"    # pinned; tracks Neo4j 5.20.x — update after staging validation
+    repository: https://helm.neo4j.com/neo4j

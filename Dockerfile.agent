@@ -1,0 +1,51 @@
+# syntax=docker/dockerfile:1.9
+# Agent Worker service image — shares the multi-stage pattern of Dockerfile.
+
+ARG PYTHON_VERSION=3.11
+ARG GIT_SHA=unknown
+ARG GIT_REF=unknown
+
+# ---- Stage 1: dependency builder ----------------------------------------
+FROM python:${PYTHON_VERSION}-slim-bookworm AS builder
+
+COPY --from=ghcr.io/astral-sh/uv:0.4 /uv /usr/local/bin/uv
+ENV UV_COMPILE_BYTECODE=1 \
+    UV_LINK_MODE=copy
+
+WORKDIR /app
+
+COPY pyproject.toml uv.lock ./
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --frozen --no-dev --no-install-project
+
+COPY src/ ./src/
+
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --frozen --no-dev
+
+# ---- Stage 2: runtime image ---------------------------------------------
+FROM python:${PYTHON_VERSION}-slim-bookworm AS runtime
+
+ARG GIT_SHA=unknown
+ARG GIT_REF=unknown
+
+RUN groupadd --gid 10001 appgroup && \
+    useradd --uid 10001 --gid appgroup --no-create-home appuser
+
+WORKDIR /app
+
+COPY --from=builder --chown=appuser:appgroup /app/.venv /app/.venv
+COPY --from=builder --chown=appuser:appgroup /app/src   /app/src
+
+ENV PATH="/app/.venv/bin:$PATH" \
+    PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    GIT_SHA=${GIT_SHA} \
+    GIT_REF=${GIT_REF}
+
+USER appuser
+
+ENTRYPOINT ["/bin/sh", "-c", "\
+  for f in /vault/secrets/*.env; do [ -f \"$f\" ] && . \"$f\"; done; \
+  exec python -m src.agent_worker.main \
+"]

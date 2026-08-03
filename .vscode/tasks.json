@@ -1,25 +1,145 @@
 {
-  "version": "2.0.0",
-  "tasks": [
-    {
-      "label": "PropelIQ: Copilot pre-prompt submit",
-      "type": "shell",
-      "command": "python",
-      "args": [
-        ".propel/hooks/context_tracker_tiktoken/copilot.py",
-        "userPromptSubmitted"
-      ],
-      "problemMatcher": []
-    },
-    {
-      "label": "PropelIQ: Copilot session end",
-      "type": "shell",
-      "command": "python",
-      "args": [
-        ".propel/hooks/context_tracker_tiktoken/copilot.py",
-        "sessionEnd"
-      ],
-      "problemMatcher": []
-    }
-  ]
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "PropelIQ: Copilot pre-prompt submit",
+			"type": "shell",
+			"command": "python",
+			"args": [
+				".propel/hooks/context_tracker_tiktoken/copilot.py",
+				"userPromptSubmitted"
+			],
+			"problemMatcher": []
+		},
+		{
+			"label": "PropelIQ: Copilot session end",
+			"type": "shell",
+			"command": "python",
+			"args": [
+				".propel/hooks/context_tracker_tiktoken/copilot.py",
+				"sessionEnd"
+			],
+			"problemMatcher": []
+		},
+		{
+			"label": "rebuild-api",
+			"type": "shell",
+			"command": "docker compose build api && docker compose up -d api && echo DEPLOY_DONE",
+			"isBackground": false
+		},
+		{
+			"label": "rebuild-indexing",
+			"type": "shell",
+			"command": "docker compose build indexing && docker compose up -d indexing && echo INDEXING_DONE",
+			"isBackground": false
+		},
+		{
+			"label": "verify-executor-fix",
+			"type": "shell",
+			"command": "docker compose exec api python -c \"\nimport asyncio\nfrom src.knowledge_sources.sync.executor import SyncJobExecutor, _SCOPE_CONFIG_FIELD\nprint('_SCOPE_CONFIG_FIELD:', _SCOPE_CONFIG_FIELD)\nprint('_build_connector_for_source present:', hasattr(SyncJobExecutor, '_build_connector_for_source'))\nprint('OK')\n\" && echo VERIFY_DONE",
+			"isBackground": false
+		},
+		{
+			"label": "check-sync-job",
+			"type": "shell",
+			"command": "docker compose exec api python -c \"\nimport asyncio\nfrom src.data.database import primary_session_factory\nfrom sqlalchemy import text\n\nasync def main():\n    async with primary_session_factory()() as session:\n        row = await session.execute(\n            text(\\\"SELECT id, source_id, status, attempt_number, items_processed, items_failed, error_message, started_at, completed_at, duration_s FROM sync_jobs WHERE id = :id\\\"),\n            {'id': '88ca5d0d-217f-41aa-9a31-94f8aaf1f162'}\n        )\n        r = row.fetchone()\n        if r:\n            print('job_id     :', r[0])\n            print('source_id  :', r[1])\n            print('status     :', r[2])\n            print('attempt    :', r[3])\n            print('processed  :', r[4])\n            print('failed     :', r[5])\n            print('error      :', r[6])\n            print('started_at :', r[7])\n            print('completed  :', r[8])\n            print('duration_s :', r[9])\n        else:\n            print('Job not found')\n\nasyncio.run(main())\n\"",
+			"isBackground": false
+		},
+		{
+			"label": "check-source-status",
+			"type": "shell",
+			"command": "docker compose exec api python -c \"\nimport asyncio\nfrom src.data.database import primary_session_factory\nfrom sqlalchemy import text\nfrom datetime import datetime, UTC\n\nasync def main():\n    async with primary_session_factory()() as session:\n        # Check knowledge source status\n        row = await session.execute(\n            text(\\\"SELECT id, name, status, document_count, last_sync_at FROM knowledge_sources WHERE id = :id\\\"),\n            {'id': '940f9c3b-c414-4e01-b116-37fa8570a864'}\n        )\n        r = row.fetchone()\n        if r:\n            print('source status  :', r[2])\n            print('document_count :', r[3])\n            print('last_sync_at   :', r[4])\n        now = datetime.now(UTC)\n        print('current UTC time:', now)\n        # Time since job started\n        print('job started at  : 2026-07-22 15:14:22 UTC')\n\nasyncio.run(main())\n\"",
+			"isBackground": false
+		},
+		{
+			"label": "check-api-logs",
+			"type": "shell",
+			"command": "docker compose logs api --since 15m 2>&1 | grep -E 'sync|github|error|Error|exception|Exception|connector|940f9c3b|88ca5d0d' | tail -40",
+			"isBackground": false
+		},
+		{
+			"label": "check-api-errors",
+			"type": "shell",
+			"command": "docker compose logs api --since 5m 2>&1 | grep -A 5 'sync_attempt_failed\\|error\\|Error' | head -60",
+			"isBackground": false
+		},
+		{
+			"label": "check-raw-errors",
+			"type": "shell",
+			"command": "docker compose logs api --since 2m 2>&1 | grep -E '\"error\"|\"source_id\"|sync_attempt' | head -30",
+			"isBackground": false
+		},
+		{
+			"label": "debug-sync-connector",
+			"type": "shell",
+			"command": "docker compose exec api python -c \"\nimport asyncio, traceback\nfrom src.data.database import primary_session_factory\nfrom src.knowledge_sources.repositories.knowledge_source_repository import KnowledgeSourceRepository\nfrom src.knowledge_sources.sync.executor import SyncJobExecutor, SyncExecutorSettings\nfrom src.connector_sdk.registry import ConnectorRegistry\nfrom sqlalchemy import text\nfrom uuid import UUID\n\nasync def main():\n    async with primary_session_factory()() as session:\n        repo = KnowledgeSourceRepository(session)\n        source = await repo.get_by_id(UUID('940f9c3b-c414-4e01-b116-37fa8570a864'))\n        if source:\n            print('name               :', source.name)\n            print('connector_type     :', source.connector_type)\n            print('credentials_vault_path:', source.credentials_vault_path)\n            print('scope              :', source.scope)\n            print('status             :', source.status)\n        else:\n            print('Source not found')\n            return\n        # Try building connector to see what errors occur\n        registry = ConnectorRegistry()\n        settings = SyncExecutorSettings()\n        executor = SyncJobExecutor(session, registry, settings)\n        print('--- Attempting _build_connector_for_source ---')\n        try:\n            connector = await executor._build_connector_for_source(source)\n            print('Connector built and authenticated OK:', type(connector).__name__)\n        except Exception as e:\n            print('ERROR building connector:', type(e).__name__, str(e))\n            traceback.print_exc()\n\nasyncio.run(main())\n\"",
+			"isBackground": false
+		},
+		{
+			"label": "recheck-job",
+			"type": "shell",
+			"command": "docker compose exec api python -c \"\nimport asyncio\nfrom src.data.database import primary_session_factory\nfrom sqlalchemy import text\n\nasync def main():\n    async with primary_session_factory()() as session:\n        row = await session.execute(\n            text(\\\"SELECT id, status, attempt_number, items_processed, items_failed, error_message, started_at, completed_at, duration_s FROM sync_jobs WHERE id = :id\\\"),\n            {'id': '88ca5d0d-217f-41aa-9a31-94f8aaf1f162'}\n        )\n        r = row.fetchone()\n        if r:\n            print('status     :', r[1])\n            print('attempt    :', r[2])\n            print('processed  :', r[3])\n            print('failed     :', r[4])\n            print('error      :', r[5])\n            print('started_at :', r[6])\n            print('completed  :', r[7])\n            print('duration_s :', r[8])\n        # Also show all knowledge sources\n        rows = await session.execute(text(\\\"SELECT id, name, status, document_count, last_sync_at FROM knowledge_sources ORDER BY created_at DESC LIMIT 5\\\"))\n        print('\\\\n--- All connectors ---')\n        for r in rows:\n            print(f' {r[1]:20s} | {r[2]:10s} | docs={r[3]:4d} | last_sync={r[4]}')\n\nasyncio.run(main())\n\"",
+			"isBackground": false
+		},
+		{
+			"label": "check-sync-state",
+			"type": "shell",
+			"command": "docker compose exec api python -c \"\nimport asyncio\nfrom src.data.database import primary_session_factory\nfrom sqlalchemy import text\n\nasync def main():\n    async with primary_session_factory()() as session:\n        # Check connector sync state\n        rows = await session.execute(text('SELECT connector_id, last_sync_at FROM connector_sync_state'))\n        print('--- connector_sync_state ---')\n        for r in rows:\n            print(' ', r[0], '->', r[1])\n        \n        # Check all recent sync jobs for the Expense Tracker source\n        rows2 = await session.execute(text(\\\"SELECT id, status, attempt_number, items_processed, error_message, started_at, completed_at FROM sync_jobs WHERE source_id = '940f9c3b-c414-4e01-b116-37fa8570a864' ORDER BY started_at DESC LIMIT 5\\\"))\n        print('\\\\n--- sync_jobs for Expense Tracker ---')\n        for r in rows2:\n            print(f' {r[0]} | {r[1]:10s} | attempt={r[2]} | processed={r[3]} | err={r[4]} | started={r[5]}')\n\nasyncio.run(main())\n\"",
+			"isBackground": false
+		},
+		{
+			"label": "apply-migration-0029",
+			"type": "shell",
+			"command": "docker compose exec api alembic upgrade head 2>&1 | tail -10 && echo MIGRATION_DONE",
+			"isBackground": false
+		},
+		{
+			"label": "apply-migration-docker",
+			"type": "shell",
+			"command": "docker compose exec api bash -c 'DATABASE_URL=postgresql://contextiq:contextiq@postgres:5432/contextiq alembic upgrade head' 2>&1 | tail -8 && echo MIGRATION_DONE",
+			"isBackground": false
+		},
+		{
+			"label": "run-db-migrate",
+			"type": "shell",
+			"command": "docker compose run --rm db-migrate 2>&1 | tail -10 && echo MIGRATION_DONE",
+			"isBackground": false
+		},
+		{
+			"label": "rebuild-and-migrate",
+			"type": "shell",
+			"command": "docker compose build db-migrate 2>&1 | tail -5 && docker compose run --rm db-migrate 2>&1 | tail -6 && echo ALL_DONE",
+			"isBackground": false
+		},
+		{
+			"label": "rebuild-api-indexing",
+			"type": "shell",
+			"command": "docker compose build api indexing && docker compose up -d api indexing && echo DEPLOY_DONE",
+			"isBackground": false
+		},
+		{
+			"label": "verify-migration",
+			"type": "shell",
+			"command": "docker compose exec api python -c \"\nimport asyncio\nfrom src.data.database import primary_session_factory\nfrom sqlalchemy import text\n\nasync def main():\n    async with primary_session_factory()() as session:\n        r = await session.execute(text(\\\"SELECT COUNT(*) FROM connector_sync_state\\\"))\n        print('connector_sync_state rows:', r.scalar())\n        # Also confirm current alembic revision\n        r2 = await session.execute(text(\\\"SELECT version_num FROM alembic_version\\\"))\n        print('alembic revision:', r2.scalar())\n\nasyncio.run(main())\n\"",
+			"isBackground": false
+		},
+		{
+			"label": "check-ks-settings",
+			"type": "shell",
+			"command": "docker compose exec api python -c \"\nfrom src.knowledge_sources.config import KnowledgeSourceSettings\ns = KnowledgeSourceSettings()\nprint('vault_addr    :', s.vault_addr)\nprint('vault_role_id :', s.vault_role_id[:8] + '...' if s.vault_role_id else '(empty)')\nprint('vault_secret_id set:', bool(s.vault_secret_id))\n\"",
+			"isBackground": false
+		},
+		{
+			"label": "check-vault-token",
+			"type": "shell",
+			"command": "docker compose exec api python -c \"\nimport asyncio\nimport hvac\nfrom src.knowledge_sources.config import KnowledgeSourceSettings\n\ns = KnowledgeSourceSettings()\nclient = hvac.Client(url=s.vault_addr)\nclient.auth.approle.login(role_id=s.vault_role_id, secret_id=s.vault_secret_id)\n\ntry:\n    secret = client.secrets.kv.v2.read_secret_version(\n        path='connectors/github/my-org-pat',\n        mount_point='secret'\n    )\n    data = secret['data']['data']\n    token = data.get('token', '')\n    token_type = data.get('token_type', 'unknown')\n    print('token_type:', token_type)\n    print('token starts with:', token[:8] + '...' if len(token) > 8 else repr(token))\n    print('token length:', len(token))\nexcept Exception as e:\n    print('ERROR reading from vault:', e)\n\"",
+			"isBackground": false
+		},
+		{
+			"label": "check-job-status",
+			"type": "shell",
+			"command": "docker compose exec api python -c \"\nimport asyncio\nfrom src.data.database import primary_session_factory\nfrom sqlalchemy import text\n\nasync def main():\n    async with primary_session_factory()() as session:\n        row = await session.execute(\n            text(\\\"SELECT j.id, j.status, j.attempt_number, j.items_processed, j.items_failed, j.error_message, j.started_at, j.completed_at, j.duration_s, s.name, s.status as src_status, s.document_count, s.last_sync_at FROM sync_jobs j JOIN knowledge_sources s ON s.id = j.source_id WHERE j.id = :id\\\"),\n            {'id': '69c9605a-ff67-4b57-959b-86765bb76924'}\n        )\n        r = row.fetchone()\n        if r:\n            print('--- Sync Job ---')\n            print('job status   :', r[1])\n            print('attempt      :', r[2])\n            print('processed    :', r[3])\n            print('failed       :', r[4])\n            print('error        :', r[5])\n            print('started_at   :', r[6])\n            print('completed_at :', r[7])\n            print('duration_s   :', r[8])\n            print('--- Source ---')\n            print('name         :', r[9])\n            print('src_status   :', r[10])\n            print('document_count:', r[11])\n            print('last_sync_at :', r[12])\n        else:\n            print('Job not found')\n\nasyncio.run(main())\n\"",
+			"isBackground": false
+		}
+	]
 }

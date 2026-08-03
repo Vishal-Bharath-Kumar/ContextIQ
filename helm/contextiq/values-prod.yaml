@@ -1,0 +1,43 @@
+global:
+  imageRegistry: registry.contextiq.internal
+  environment: production
+
+mcp-gateway:
+  replicaCount: 3
+  hpa:
+    enabled: true
+    minReplicas: 3
+    maxReplicas: 10
+  env:
+    LOG_LEVEL: WARNING
+
+agent-worker:
+  replicaCount: 4
+  hpa:
+    enabled: true
+    minReplicas: 4
+    maxReplicas: 20
+  env:
+    LOG_LEVEL: WARNING
+
+admin-portal:
+  replicaCount: 2
+  hpa:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 6
+
+keycloak:
+  replicaCount: 2
+  hpa:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 4
+
+jaeger:
+  replicaCount: 2
+  pdb:
+    enabled: true
+    minAvailable: 1
+  env:
+    SPAN_STORAGE_TYPE: elasticsearch

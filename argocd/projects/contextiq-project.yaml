@@ -1,0 +1,72 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: contextiq
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  description: "ContextIQ platform services"
+
+  # Only allow deployments from the canonical Git repository and upstream Helm chart registries
+  sourceRepos:
+    - "https://github.com/your-org/contextiq.git"
+    - "https://helm.releases.hashicorp.com"                       # Vault
+    - "https://charts.jetstack.io"                                # cert-manager
+    - "https://istio-release.storage.googleapis.com/charts"       # Istio
+    - "https://charts.bitnami.com/bitnami"                        # Bitnami (PostgreSQL, Redis, …)
+    - "https://prometheus-community.github.io/helm-charts"         # Prometheus Adapter
+    - "https://qdrant.github.io/qdrant-helm"                       # Qdrant
+    - "https://helm.neo4j.com/neo4j"                               # Neo4j
+    - "https://opensearch-project.github.io/helm-charts"           # OpenSearch
+    - "https://charts.min.io"                                         # MinIO
+
+  # Only allow deployments to the 7 ContextIQ namespaces + argocd namespace for Application objects
+  destinations:
+    - namespace: contextiq-gateway
+      server: https://kubernetes.default.svc
+    - namespace: contextiq-agents
+      server: https://kubernetes.default.svc
+    - namespace: contextiq-data
+      server: https://kubernetes.default.svc
+    - namespace: contextiq-admin
+      server: https://kubernetes.default.svc
+    - namespace: contextiq-observability
+      server: https://kubernetes.default.svc
+    - namespace: contextiq-security
+      server: https://kubernetes.default.svc
+    - namespace: contextiq-infra
+      server: https://kubernetes.default.svc
+    # ArgoCD itself deploys Application objects to the argocd namespace
+    - namespace: argocd
+      server: https://kubernetes.default.svc
+    # Istio control plane lives in its own namespace (managed by Istio, not TASK-US045-01)
+    - namespace: istio-system
+      server: https://kubernetes.default.svc
+
+  # Allow Namespace labels to be managed by umbrella chart; deny cluster-scoped RBAC
+  clusterResourceWhitelist:
+    - group: ""
+      kind: Namespace
+
+  # Application-level charts must not manage cluster-scoped RBAC — platform team owns those
+  namespaceResourceBlacklist:
+    - group: "rbac.authorization.k8s.io"
+      kind: ClusterRole
+    - group: "rbac.authorization.k8s.io"
+      kind: ClusterRoleBinding
+
+  # ArgoCD RBAC: Platform Engineers can sync; Developers and Auditors are read-only
+  roles:
+    - name: platform-engineer
+      policies:
+        - "p, proj:contextiq:platform-engineer, applications, sync, contextiq/*, allow"
+        - "p, proj:contextiq:platform-engineer, applications, get,  contextiq/*, allow"
+      groups:
+        - contextiq-platform-engineers   # Keycloak group name (via ArgoCD SSO)
+    - name: read-only
+      policies:
+        - "p, proj:contextiq:read-only, applications, get, contextiq/*, allow"
+      groups:
+        - contextiq-developers
+        - contextiq-auditors

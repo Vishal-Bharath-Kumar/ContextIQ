@@ -1,0 +1,20 @@
+# Allow admin portal → MCP gateway API
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-admin-to-gateway
+  namespace: contextiq-gateway
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/component: mcp-gateway
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: contextiq-admin
+      ports:
+        - protocol: TCP
+          port: 8000

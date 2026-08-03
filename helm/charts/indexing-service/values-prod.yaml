@@ -1,0 +1,6 @@
+hpa:
+  enabled: true
+  minReplicas: 2    # keep 2 warm in prod for throughput >= 1 000 chunks/min (US-027 AC-5)
+  maxReplicas: 5
+env:
+  LOG_LEVEL: WARNING

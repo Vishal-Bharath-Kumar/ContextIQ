@@ -1,0 +1,27 @@
+# Allow ALL contextiq pods to emit OTLP spans/metrics to Jaeger/collector in
+# contextiq-observability. Uses a label expression to match all contextiq namespaces
+# so new namespaces added to the platform are covered automatically.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-otlp-ingress
+  namespace: contextiq-observability
+spec:
+  podSelector:
+    matchLabels:
+      app: jaeger
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/part-of
+                operator: In
+                values:
+                  - contextiq
+      ports:
+        - protocol: TCP
+          port: 4317   # OTLP gRPC
+        - protocol: TCP
+          port: 4318   # OTLP HTTP

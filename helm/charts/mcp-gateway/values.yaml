@@ -1,0 +1,142 @@
+# AC-2: defaults (overridden per environment)
+replicaCount: 2
+
+image:
+  repository: contextiq/mcp-gateway
+  pullPolicy: IfNotPresent
+  tag: ""   # overridden by CI with the git SHA
+
+namespace: contextiq-gateway
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8000
+
+ingress:
+  enabled: true
+  className: nginx
+  host: contextiq.internal
+  path: /
+  tls:
+    enabled: true
+    clusterIssuer: letsencrypt-prod
+    secretName: mcp-gateway-tls
+
+resources:
+  requests:
+    cpu: "250m"
+    memory: "256Mi"
+  limits:
+    cpu: "1000m"
+    memory: "512Mi"
+
+readinessProbe:
+  httpGet:
+    path: /healthz   # AC-6
+    port: 8000
+  initialDelaySeconds: 10
+  periodSeconds: 10
+  failureThreshold: 3
+
+livenessProbe:
+  httpGet:
+    path: /healthz
+    port: 8000
+  initialDelaySeconds: 30
+  periodSeconds: 30
+  failureThreshold: 5
+
+hpa:
+  enabled: true
+  minReplicas: 2          # AC-1
+  maxReplicas: 10         # AC-1
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 60    # AC-3: target 60% CPU
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 0     # AC-4: scale up immediately (< 30 s)
+      policies:
+        - type:          Pods
+          value:         4              # add up to 4 pods per scaling event
+          periodSeconds: 30             # AC-4: evaluated every 30 s
+    scaleDown:
+      stabilizationWindowSeconds: 300   # AC-4: 5-minute scale-down stabilisation window
+      policies:
+        - type:          Pods
+          value:         1              # remove at most 1 pod per scaling event
+          periodSeconds: 60
+
+pdb:
+  enabled: true
+  minAvailable: 1
+
+podSecurityContext:
+  runAsNonRoot: true
+  seccompProfile:
+    type: RuntimeDefault
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+  runAsUser: 1000
+  capabilities:
+    drop: ["ALL"]
+
+env:
+  # Sensitive values sourced from /vault/secrets/ by Vault Agent sidecar
+  DATABASE_URL: ""   # sourced from /vault/secrets/postgres.env
+  REDIS_URL: ""      # sourced from /vault/secrets/redis.env
+
+# AC-3: Vault Agent Injector — injects init-container and sidecar for credential injection
+vault:
+  enabled: true
+  role: mcp-gateway   # matches Kubernetes auth role in TASK-US047-02
+  secrets:
+    # AC-3: PostgreSQL dynamic credentials
+    - name:      postgres
+      vaultPath: "database/postgres/creds/mcp-gateway"
+      format:    env   # renders as `export USERNAME=...` / `export PASSWORD=...`
+    # AC-3: Redis dynamic credentials
+    - name:      redis
+      vaultPath: "database/redis/creds/mcp-gateway"
+      format:    env
+    # AC-3: Keycloak client secret (static KV)
+    - name:      keycloak
+      vaultPath: "secret/data/contextiq/keycloak/client"
+      format:    env
+
+# AC-3: Pre-sync database migration Job (TASK-US050-03)
+migration:
+  enabled: true
+  resources:
+    requests: { cpu: "200m", memory: "256Mi" }
+    limits:   { cpu: "500m", memory: "512Mi" }
+
+postgresql:
+  host:     postgresql.contextiq-data.svc.cluster.local
+  database: contextiq
+
+# NetworkPolicy — default-deny with explicit allow rules (TASK-US001-02)
+networkPolicy:
+  enabled: true
+  agentsPort: 8000   # egress to contextiq-agents namespace
+  vaultPort: 8200    # egress to contextiq-security namespace (Vault)
+
+# TASK-US003-05: PrometheusRule for ToolCall SLA monitoring.
+# Requires the Prometheus Operator CRD (monitoring.coreos.com/v1) to be installed.
+prometheusRule:
+  enabled: true
+
+# ConfigMap — non-sensitive environment variables (secrets via Vault sidecar)
+config:
+  KEYCLOAK_URL: "http://keycloak.contextiq-security.svc.cluster.local/auth"
+  KEYCLOAK_REALM: "contextiq"
+  OPA_URL: "http://opa.contextiq-security.svc.cluster.local:8181"
+

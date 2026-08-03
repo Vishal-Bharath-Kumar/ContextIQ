@@ -1,0 +1,27 @@
+# AC-6: Applies the DenyExecPortForward constraint to all contextiq-* namespaces.
+# Emergency access: add the ServiceAccount username to allowedServiceAccounts
+# and raise an incident ticket before use.
+apiVersion: constraints.gatekeeper.sh/v1beta1
+kind: DenyExecPortForward
+metadata:
+  name: no-exec-portforward-prod
+  annotations:
+    contextiq.io/runbook: "https://wiki.contextiq.io/runbooks/break-glass-exec"
+spec:
+  enforcementAction: deny    # hard deny in production; use 'warn' during rollout testing
+  match:
+    namespaces:
+      - contextiq-data
+      - contextiq-agents
+      - contextiq-gateway
+      - contextiq-admin
+      - contextiq-security
+      - contextiq-observability
+      - contextiq-infra
+    kinds:
+      - apiGroups: [""]
+        kinds:     ["Pod"]
+  parameters:
+    allowedServiceAccounts:
+      # Only the SRE break-glass account may exec — requires manual approval + audit trail
+      - system:serviceaccount:contextiq-infra:sre-break-glass
