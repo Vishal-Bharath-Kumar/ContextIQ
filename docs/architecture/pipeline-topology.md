@@ -6,6 +6,12 @@ The ContextIQ multi-agent pipeline is implemented as a LangGraph `StateGraph`.
 `build_graph()` in `src/agents/graph.py` is the single source of truth for all
 topology decisions — edges, conditional routing, and terminal states.
 
+## Related Documents
+
+- [application-workflow.md](application-workflow.md) for the full system request and ingestion flow
+- [mcp-request-workflow.md](mcp-request-workflow.md) for the MCP-facing execution path
+- [workflow-refactoring-plan.md](workflow-refactoring-plan.md) for the proposed consolidation work
+
 ## Node Inventory
 
 | Node | File | Description |
