@@ -156,6 +156,20 @@ describe("ReplayExplorerPage", () => {
     });
   });
 
+  it("shows an error message when the trace request fails", async () => {
+    server.use(
+      http.get("/api/v1/traces", () =>
+        HttpResponse.json({ detail: "forbidden" }, { status: 403 })
+      )
+    );
+    renderPage(makeUser("u1", "devops@test.com", ["devops_sre"]));
+    await waitFor(() => {
+      expect(
+        screen.getByText(/Could not load execution traces/i)
+      ).toBeInTheDocument();
+    });
+  });
+
   it("shows pagination controls when results are present", async () => {
     renderPage(makeUser("u1", "auditor@test.com", ["auditor"]));
     await waitFor(() => {

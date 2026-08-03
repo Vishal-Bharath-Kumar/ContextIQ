@@ -1,13 +1,13 @@
 """Unit tests for Replay Explorer API routes — TASK-US035-02.
 
-Covers all acceptance criteria:
-  AC-1  — GET /v1/traces filters by user_id and date range
-  AC-2  — GET /v1/traces/{id} response contains timeline with steps
-  AC-3  — GET /v1/traces/{id} response contains all six detail fields
-  AC-4  — 403 for developer role; 200 for auditor (case-insensitive) and admin
-  AC-5  — Endpoints resolve via mocked service (SLA enforced by service layer)
-  AC-6  — GET /v1/traces/{id}/export returns Content-Disposition attachment
-  404   — GET /v1/traces/{id} returns 404 for unknown request_id
+ Covers all acceptance criteria:
+    AC-1  — GET /v1/traces filters by user_id and date range
+    AC-2  — GET /v1/traces/{id} response contains timeline with steps
+    AC-3  — GET /v1/traces/{id} response contains all six detail fields
+    AC-4  — 403 for developer role; 200 for auditor, devops, security officer, and admin
+    AC-5  — Endpoints resolve via mocked service (SLA enforced by service layer)
+    AC-6  — GET /v1/traces/{id}/export returns Content-Disposition attachment
+    404   — GET /v1/traces/{id} returns 404 for unknown request_id
 """
 from __future__ import annotations
 
@@ -22,7 +22,6 @@ from fastapi.testclient import TestClient
 from starlette.requests import Request
 from starlette.responses import Response
 
-from src.api.admin.dependencies import require_auditor_or_admin  # noqa: F401
 from src.audit.replay.schemas import (
     TimelineStep,
     TraceDetailResponse,
@@ -148,6 +147,16 @@ def developer_claims() -> JWTClaims:
 
 
 @pytest.fixture
+def devops_claims() -> JWTClaims:
+    return make_test_claims(PlatformRole.DEVOPS_SRE, sub="devops-user-001")
+
+
+@pytest.fixture
+def security_officer_claims() -> JWTClaims:
+    return make_test_claims(PlatformRole.SECURITY_OFFICER, sub="security-user-001")
+
+
+@pytest.fixture
 def client_as_auditor(
     auditor_claims: JWTClaims, mock_session: AsyncMock, mock_redis: MagicMock
 ) -> TestClient:
@@ -170,6 +179,24 @@ def client_as_developer(
     developer_claims: JWTClaims, mock_session: AsyncMock, mock_redis: MagicMock
 ) -> TestClient:
     client = _make_client(developer_claims, mock_session, mock_redis)
+    yield client
+    app.dependency_overrides.clear()
+
+
+@pytest.fixture
+def client_as_devops(
+    devops_claims: JWTClaims, mock_session: AsyncMock, mock_redis: MagicMock
+) -> TestClient:
+    client = _make_client(devops_claims, mock_session, mock_redis)
+    yield client
+    app.dependency_overrides.clear()
+
+
+@pytest.fixture
+def client_as_security_officer(
+    security_officer_claims: JWTClaims, mock_session: AsyncMock, mock_redis: MagicMock
+) -> TestClient:
+    client = _make_client(security_officer_claims, mock_session, mock_redis)
     yield client
     app.dependency_overrides.clear()
 
@@ -201,6 +228,22 @@ class TestRBAC:
         """AC-4: admin role must receive 200 on GET /v1/traces."""
         with _patch_service_search(_LIST_RESPONSE):
             resp = client_as_admin.get("/v1/traces")
+        assert resp.status_code == 200
+
+    def test_search_traces_returns_200_for_devops(
+        self, client_as_devops: TestClient
+    ) -> None:
+        """AC-4: devops role must receive 200 on GET /v1/traces."""
+        with _patch_service_search(_LIST_RESPONSE):
+            resp = client_as_devops.get("/v1/traces")
+        assert resp.status_code == 200
+
+    def test_search_traces_returns_200_for_security_officer(
+        self, client_as_security_officer: TestClient
+    ) -> None:
+        """AC-4: security officer role must receive 200 on GET /v1/traces."""
+        with _patch_service_search(_LIST_RESPONSE):
+            resp = client_as_security_officer.get("/v1/traces")
         assert resp.status_code == 200
 
     def test_get_detail_returns_403_for_developer(
