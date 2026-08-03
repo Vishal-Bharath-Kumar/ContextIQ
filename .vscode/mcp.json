@@ -1,18 +1,10 @@
 {
-  "inputs": [
-    {
-      "id": "contextiq-token-v2",
-      "type": "promptString",
-      "description": "ContextIQ bearer token (paste access_token from /auth/dev-login)",
-      "password": true
-    }
-  ],
   "servers": {
     "contextiq": {
       "type": "http",
       "url": "http://localhost:8000/mcp/",
       "headers": {
-        "Authorization": "Bearer ${input:contextiq-token-v2}",
+        "Authorization": "Bearer ${env:CONTEXTIQ_TOKEN}",
         "Content-Type": "application/json"
       }
     },

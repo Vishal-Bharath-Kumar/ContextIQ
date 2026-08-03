@@ -2,6 +2,25 @@
 	"version": "2.0.0",
 	"tasks": [
 		{
+			"label": "refresh-contextiq-dev-token",
+			"type": "shell",
+			"command": "python3",
+			"args": [
+				".propel/tools/refresh_mcp_token_input.py",
+				"${input:contextiq-dev-username}",
+				"${input:contextiq-dev-password}"
+			],
+			"runOptions": {
+				"runOn": "folderOpen"
+			},
+			"presentation": {
+				"reveal": "silent",
+				"panel": "dedicated"
+			},
+			"problemMatcher": [],
+			"detail": "Prompts for local dev credentials and refreshes the ContextIQ MCP bearer token."
+		},
+		{
 			"label": "PropelIQ: Copilot pre-prompt submit",
 			"type": "shell",
 			"command": "python",
@@ -140,6 +159,20 @@
 			"type": "shell",
 			"command": "docker compose exec api python -c \"\nimport asyncio\nfrom src.data.database import primary_session_factory\nfrom sqlalchemy import text\n\nasync def main():\n    async with primary_session_factory()() as session:\n        row = await session.execute(\n            text(\\\"SELECT j.id, j.status, j.attempt_number, j.items_processed, j.items_failed, j.error_message, j.started_at, j.completed_at, j.duration_s, s.name, s.status as src_status, s.document_count, s.last_sync_at FROM sync_jobs j JOIN knowledge_sources s ON s.id = j.source_id WHERE j.id = :id\\\"),\n            {'id': '69c9605a-ff67-4b57-959b-86765bb76924'}\n        )\n        r = row.fetchone()\n        if r:\n            print('--- Sync Job ---')\n            print('job status   :', r[1])\n            print('attempt      :', r[2])\n            print('processed    :', r[3])\n            print('failed       :', r[4])\n            print('error        :', r[5])\n            print('started_at   :', r[6])\n            print('completed_at :', r[7])\n            print('duration_s   :', r[8])\n            print('--- Source ---')\n            print('name         :', r[9])\n            print('src_status   :', r[10])\n            print('document_count:', r[11])\n            print('last_sync_at :', r[12])\n        else:\n            print('Job not found')\n\nasyncio.run(main())\n\"",
 			"isBackground": false
+		}
+	],
+	"inputs": [
+		{
+			"id": "contextiq-dev-username",
+			"type": "promptString",
+			"description": "ContextIQ dev username",
+			"default": "admin"
+		},
+		{
+			"id": "contextiq-dev-password",
+			"type": "promptString",
+			"description": "ContextIQ dev password",
+			"password": true
 		}
 	]
 }
