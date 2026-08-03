@@ -10,6 +10,12 @@ It also records the current live behavior observed in local Docker development
 so there is a clear distinction between the intended full pipeline and the
 fallback path that is currently serving some MCP requests.
 
+## Related Documents
+
+- [application-workflow.md](application-workflow.md) for the broader system workflow beyond MCP
+- [pipeline-topology.md](pipeline-topology.md) for the LangGraph node and edge layout
+- [workflow-refactoring-plan.md](workflow-refactoring-plan.md) for the architectural cleanup plan derived from this flow
+
 ## Entry Points
 
 There are two relevant application entry points:
