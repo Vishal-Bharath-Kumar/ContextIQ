@@ -7,8 +7,7 @@
 			"command": "python3",
 			"args": [
 				".propel/tools/refresh_mcp_token_input.py",
-				"${input:contextiq-dev-username}",
-				"${input:contextiq-dev-password}"
+				"--skip-if-missing"
 			],
 			"runOptions": {
 				"runOn": "folderOpen"
@@ -18,7 +17,23 @@
 				"panel": "dedicated"
 			},
 			"problemMatcher": [],
-			"detail": "Prompts for local dev credentials and refreshes the ContextIQ MCP bearer token."
+			"detail": "Refreshes the ContextIQ MCP bearer token using cached local-dev credentials or environment variables."
+		},
+		{
+			"label": "setup-contextiq-dev-login",
+			"type": "shell",
+			"command": "python3",
+			"args": [
+				".propel/tools/refresh_mcp_token_input.py",
+				"${input:contextiq-dev-username}",
+				"${input:contextiq-dev-password}"
+			],
+			"presentation": {
+				"reveal": "silent",
+				"panel": "dedicated"
+			},
+			"problemMatcher": [],
+			"detail": "Prompts once for local dev credentials, stores them for future auto-refresh, and refreshes the ContextIQ MCP bearer token."
 		},
 		{
 			"label": "PropelIQ: Copilot pre-prompt submit",

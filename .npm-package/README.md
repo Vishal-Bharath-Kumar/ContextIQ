@@ -74,6 +74,15 @@ This will install the following to your project root:
 - **mcp.json** - Model Context Protocol server configuration
 - **tasks.json** - VS Code task definitions
 
+If you use the local ContextIQ MCP server, the installed `.vscode/tasks.json`
+includes:
+
+- `setup-contextiq-dev-login` - prompts once for local dev credentials,
+  refreshes the ContextIQ bearer token, and caches credentials for later reloads
+- `refresh-contextiq-dev-token` - runs automatically on folder open and
+  refreshes the token using cached credentials or
+  `CONTEXTIQ_DEV_USERNAME` / `CONTEXTIQ_DEV_PASSWORD`
+
 ## Post-Installation Steps
 
 1. **Configure Environment Variables**
@@ -128,6 +137,14 @@ This will install the following to your project root:
      }
    }
    ```
+
+   **Using ContextIQ in another repo:**
+
+   - Start the local ContextIQ backend so `http://localhost:8000/mcp/` is reachable
+   - Keep the installed `.vscode/mcp.json` in its placeholder form using
+     `Bearer ${env:CONTEXTIQ_TOKEN}`
+   - Run the `setup-contextiq-dev-login` VS Code task once to seed cached
+     dev credentials and refresh the initial token
 
 3. **Customize Copilot Instructions**
    - Edit `.github/copilot-instructions.md` for your project

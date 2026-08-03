@@ -10,6 +10,8 @@ const path = require('path');
 
 const SOURCE_DIR = path.join(__dirname, '..');
 const TARGET_DIR = __dirname;
+const MCP_CONFIG_PATH = path.join(TARGET_DIR, '.vscode', 'mcp.json');
+const DEFAULT_CONTEXTIQ_AUTHORIZATION = 'Bearer ${env:CONTEXTIQ_TOKEN}';
 
 const ITEMS_TO_COPY = [
   { src: '.github', dest: '.github', type: 'dir' },
@@ -44,9 +46,38 @@ function copyRecursive(src, dest) {
 }
 
 function deleteRecursive(dir) {
-  if (fs.existsSync(dir)) {
-    fs.rmSync(dir, { recursive: true, force: true });
+  if (!fs.existsSync(dir)) {
+    return;
   }
+
+  const stats = fs.lstatSync(dir);
+  if (!stats.isDirectory() || stats.isSymbolicLink()) {
+    fs.rmSync(dir, { force: true, maxRetries: 5, retryDelay: 50 });
+    return;
+  }
+
+  for (const entry of fs.readdirSync(dir)) {
+    deleteRecursive(path.join(dir, entry));
+  }
+
+  fs.rmdirSync(dir);
+}
+
+function sanitizeMcpConfig(filePath) {
+  if (!fs.existsSync(filePath)) {
+    return;
+  }
+
+  const config = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+  const contextiqHeaders = config?.servers?.contextiq?.headers;
+
+  if (!contextiqHeaders || typeof contextiqHeaders !== 'object') {
+    throw new Error('Could not find servers.contextiq.headers in .vscode/mcp.json');
+  }
+
+  contextiqHeaders.Authorization = DEFAULT_CONTEXTIQ_AUTHORIZATION;
+  fs.writeFileSync(filePath, JSON.stringify(config, null, 2) + '\n');
+  console.log('[SANITIZE] .npm-package/.vscode/mcp.json');
 }
 
 function prepare() {
@@ -79,6 +110,8 @@ function prepare() {
       fs.copyFileSync(srcPath, destPath);
     }
   }
+
+  sanitizeMcpConfig(MCP_CONFIG_PATH);
   
   console.log('\n✅ Package prepared successfully!');
   console.log('\nNext steps:');
