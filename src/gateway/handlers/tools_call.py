@@ -26,9 +26,11 @@ from __future__ import annotations
 import json
 import logging
 import time
+import asyncio
 from contextvars import ContextVar
 from unittest.mock import Mock
-from uuid import uuid4
+from datetime import UTC, datetime
+from uuid import UUID, uuid4, uuid5, NAMESPACE_URL
 from typing import Any
 
 import httpx
@@ -39,7 +41,11 @@ from mcp.shared.exceptions import McpError
 from mcp.types import INVALID_PARAMS, ErrorData, TextContent
 from opentelemetry import trace
 from prometheus_client import Counter, Histogram
+from sqlalchemy.ext.asyncio import async_sessionmaker
 
+from src.audit.trace.object_store import TraceObjectStore
+from src.audit.trace.repository import TraceIndexRepository
+from src.audit.trace.schemas import ExecutionTrace, GovernanceDecisionSummary, TraceIndexEntry
 from src.gateway.clients.agent_worker_client import AgentWorkerClient
 from src.gateway.context.request_context import RequestContext, get_request_context, set_request_context
 from src.gateway.errors.tool_errors import (
@@ -53,6 +59,9 @@ from src.gateway.services.tool_registry import ToolRegistryService
 
 logger = logging.getLogger(__name__)
 runtime_logger = logging.getLogger("uvicorn.error")
+
+_DEFAULT_TRACE_OBJECT_STORE: TraceObjectStore | None = None
+_DEFAULT_TRACE_SESSION_FACTORY: async_sessionmaker | None = None
 
 _tracer = trace.get_tracer("contextiq.gateway")
 
@@ -146,6 +155,16 @@ def _get_registry() -> ToolRegistryService:
     return _default_registry
 
 
+def set_builtin_tool_trace_object_store(store: TraceObjectStore) -> None:
+    global _DEFAULT_TRACE_OBJECT_STORE
+    _DEFAULT_TRACE_OBJECT_STORE = store
+
+
+def set_builtin_tool_trace_session_factory(factory: async_sessionmaker) -> None:
+    global _DEFAULT_TRACE_SESSION_FACTORY
+    _DEFAULT_TRACE_SESSION_FACTORY = factory
+
+
 def register_tools_call_handler(
     mcp: FastMCP,
     registry: ToolRegistryService | None = None,
@@ -232,7 +251,26 @@ def register_tools_call_handler(
             # 4. Forward to Agent Worker.
             client = effective_client if effective_client is not None else _default_client
             if builtin_tool is not None:
-                return await _run_builtin_tool(builtin_tool, arguments)
+                result = await _run_builtin_tool(builtin_tool, arguments)
+                _schedule_builtin_tool_trace(
+                    request_id=dispatch.request_id,
+                    user_id=user_id,
+                    tool_name=name,
+                    arguments=arguments,
+                    result=result,
+                )
+
+                elapsed = time.monotonic() - _start
+                _record_span_outcome(span, elapsed, success=True)
+                tool_call_duration.labels(tool_name=name, status="success").observe(elapsed)
+                tools_call_total.labels(status="success").inc()
+                logger.debug(
+                    "tools/call: tool=%s request_id=%s elapsed_ms=%.1f",
+                    name,
+                    dispatch.request_id,
+                    elapsed * 1000,
+                )
+                return result
 
             if client is None:  # pragma: no cover — only reachable in mis-configured deploys
                 raise McpError(INVALID_PARAMS, "Agent Worker client is not configured")
@@ -361,3 +399,119 @@ async def _run_builtin_tool(tool: object, arguments: dict) -> list[TextContent]:
     if structured is not None:
         return [TextContent(type="text", text=json.dumps(structured))]
     return [TextContent(type="text", text="")]
+
+
+def _schedule_builtin_tool_trace(
+    *,
+    request_id: str,
+    user_id: str,
+    tool_name: str,
+    arguments: dict[str, Any],
+    result: list[TextContent],
+) -> None:
+    if _DEFAULT_TRACE_OBJECT_STORE is None or _DEFAULT_TRACE_SESSION_FACTORY is None:
+        logger.debug("builtin tool trace skipped: trace dependencies not configured")
+        return
+
+    trace_doc = _build_builtin_tool_trace(
+        request_id=request_id,
+        user_id=user_id,
+        tool_name=tool_name,
+        arguments=arguments,
+        result=result,
+    )
+
+    asyncio.create_task(
+        _persist_builtin_tool_trace(trace_doc),
+        name=f"persist_builtin_trace_{trace_doc.request_id}",
+    )
+
+
+def _build_builtin_tool_trace(
+    *,
+    request_id: str,
+    user_id: str,
+    tool_name: str,
+    arguments: dict[str, Any],
+    result: list[TextContent],
+) -> ExecutionTrace:
+    request_uuid = _parse_request_id(request_id)
+    prompt = _builtin_tool_prompt(tool_name, arguments)
+    response_summary = _summarise_tool_result(result)
+    timestamp = datetime.now(tz=UTC)
+
+    return ExecutionTrace(
+        request_id=request_uuid,
+        tenant_id="default",
+        user_id=user_id or "anonymous",
+        timestamp=timestamp,
+        latency_ms=None,
+        prompt=prompt,
+        intent=f"mcp.{tool_name}",
+        execution_plan=[],
+        governance_decisions=GovernanceDecisionSummary(),
+        model_selected=None,
+        prompt_tokens=None,
+        completion_tokens=None,
+        response_summary=response_summary,
+    )
+
+
+async def _persist_builtin_tool_trace(trace_doc: ExecutionTrace) -> None:
+    try:
+        object_store = _DEFAULT_TRACE_OBJECT_STORE
+        session_factory = _DEFAULT_TRACE_SESSION_FACTORY
+        if object_store is None or session_factory is None:
+            return
+
+        write_result = await object_store.write(trace_doc)
+        index_entry = TraceIndexEntry(
+            request_id=trace_doc.request_id,
+            tenant_id=trace_doc.tenant_id,
+            user_id=trace_doc.user_id,
+            timestamp=trace_doc.timestamp,
+            intent=trace_doc.intent,
+            model_selected=trace_doc.model_selected,
+            governance_blocked=False,
+            opa_denied_count=0,
+            object_key=write_result.object_key,
+            object_version=write_result.version_id,
+        )
+        async with session_factory() as session:
+            repo = TraceIndexRepository(session)
+            await repo.upsert(index_entry)
+            await session.commit()
+
+        logger.info(
+            "builtin_tool_trace.persisted request_id=%s tool=%s key=%s",
+            trace_doc.request_id,
+            trace_doc.intent,
+            write_result.object_key,
+        )
+    except Exception:
+        logger.exception(
+            "builtin_tool_trace.persist_failed request_id=%s",
+            trace_doc.request_id,
+        )
+
+
+def _parse_request_id(request_id: str) -> UUID:
+    try:
+        return UUID(request_id)
+    except ValueError:
+        return uuid5(NAMESPACE_URL, request_id)
+
+
+def _builtin_tool_prompt(tool_name: str, arguments: dict[str, Any]) -> str:
+    candidate = arguments.get("prompt") or arguments.get("query") or arguments.get("document_id") or arguments.get("service") or tool_name
+    return str(candidate)
+
+
+def _summarise_tool_result(result: list[TextContent]) -> str | None:
+    if not result:
+        return None
+
+    summary = "\n".join(item.text for item in result if getattr(item, "text", ""))
+    if not summary:
+        return None
+    return summary[:500]

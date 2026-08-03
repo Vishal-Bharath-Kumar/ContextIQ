@@ -37,6 +37,10 @@ from src.connector_sdk.registry import ConnectorRegistry
 from src.data.database import primary_session_factory
 from src.data.redis_client import create_redis_client
 from src.gateway.config import settings
+from src.gateway.handlers.tools_call import (
+    set_builtin_tool_trace_object_store,
+    set_builtin_tool_trace_session_factory,
+)
 from src.gateway.lifespan import start_cache_invalidation_subscriber, start_entity_consumer, start_indexing_consumer
 from src.gateway.mcp_server import mcp, sse_app
 from src.gateway.middleware.circuit_breaker import CircuitBreakerMiddleware
@@ -191,6 +195,8 @@ def create_gateway_app(jwks_client: Any = None) -> FastAPI:
                 trace_store = TraceObjectStore()
                 set_trace_object_store(trace_store)
                 set_trace_session_factory(primary_session_factory())
+                set_builtin_tool_trace_object_store(trace_store)
+                set_builtin_tool_trace_session_factory(primary_session_factory())
                 app.state.trace_object_store = trace_store
             except Exception:
                 logger.warning("Could not configure trace writer dependencies", exc_info=True)
