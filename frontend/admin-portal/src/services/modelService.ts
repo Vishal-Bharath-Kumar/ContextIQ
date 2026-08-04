@@ -1,5 +1,6 @@
 import axios from "axios";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import type { UseQueryResult } from "@tanstack/react-query";
 
 export type LatencyTier = "fast" | "medium" | "slow";
 export type ModelCapability =
@@ -41,7 +42,7 @@ export const MODEL_KEYS = {
   detail: (id: string) => ["models", id] as const,
 };
 
-export function useModels() {
+export function useModels(): UseQueryResult<ModelDefinition[], Error> {
   return useQuery({
     queryKey: MODEL_KEYS.all,
     queryFn: () =>
@@ -87,7 +88,7 @@ export interface ModelInstallationResponse {
   credentials_stored: boolean;
 }
 
-export function useOllamaModels() {
+export function useOllamaModels(): UseQueryResult<OllamaModel[], Error> {
   return useQuery({
     queryKey: ["ollama-models"],
     queryFn: () =>

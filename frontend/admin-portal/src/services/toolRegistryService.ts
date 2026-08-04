@@ -1,5 +1,6 @@
 import axios from "axios";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import type { UseQueryResult } from "@tanstack/react-query";
 
 export type ToolStatus = "active" | "inactive";
 
@@ -46,7 +47,7 @@ export const TOOL_KEYS = {
   detail: (name: string) => ["tools", name] as const,
 };
 
-export function useTools(status?: ToolStatus) {
+export function useTools(status?: ToolStatus): UseQueryResult<ToolDefinition[], Error> {
   return useQuery({
     queryKey: [...TOOL_KEYS.all, status ?? "all"],
     queryFn: () =>
@@ -56,7 +57,7 @@ export function useTools(status?: ToolStatus) {
   });
 }
 
-export function useTool(name?: string) {
+export function useTool(name?: string): UseQueryResult<ToolDefinition, Error> {
   return useQuery({
     queryKey: name ? TOOL_KEYS.detail(name) : ["tools", "detail-disabled"],
     queryFn: () => api.get<ToolDefinition>(`/v1/tools/${name}`).then((r) => r.data),

@@ -138,6 +138,24 @@ async def test_health_endpoint_skips_auth(app_with_mock_jwks: FastAPI) -> None:
     assert response.status_code == 200
 
 
+@pytest.mark.real_middleware
+async def test_dev_register_skips_auth(app_with_mock_jwks: FastAPI) -> None:
+    """/auth/dev-register must remain public so local self-registration can obtain a user without a JWT."""
+    async with AsyncClient(transport=ASGITransport(app_with_mock_jwks), base_url="http://test") as client:
+        response = await client.post(
+            "/auth/dev-register",
+            json={
+                "username": "newuser",
+                "email": "newuser@example.com",
+                "first_name": "New",
+                "last_name": "User",
+                "password": "supersecret",
+                "role": "developer",
+            },
+        )
+    assert response.status_code != 401
+
+
 def test_create_app_includes_request_context_middleware() -> None:
     app = create_app(jwks_client=None)
     middleware_names = [entry.cls.__name__ for entry in app.user_middleware]
