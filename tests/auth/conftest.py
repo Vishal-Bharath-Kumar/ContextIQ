@@ -147,6 +147,7 @@ def mint_token(
         aud: str = "contextiq-mcp-gateway",
         iss: str = f"{_TEST_KC_URL}/realms/{_REALM}",
         sub: str = "user-test-001",
+        azp: str = "contextiq-mcp-gateway",
     ) -> str:
         now = int(time.time())
         claims: dict[str, Any] = {
@@ -154,6 +155,7 @@ def mint_token(
             "preferred_username": "testuser",
             "iss":                iss,
             "aud":                aud,
+            "azp":                azp,
             "iat":                now,
             "exp":                now + exp_offset,
             "realm_access":       {"roles": roles or ["developer"]},

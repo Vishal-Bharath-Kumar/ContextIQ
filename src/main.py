@@ -45,6 +45,10 @@ from src.agents.nodes.retrieval import set_connector_registry
 from src.audit.trace.object_store import TraceObjectStore
 from src.audit.trace.writer_node import set_trace_object_store, set_trace_session_factory
 from src.gateway.config import settings as gateway_settings
+from src.gateway.handlers.tools_call import (
+    set_builtin_tool_trace_object_store,
+    set_builtin_tool_trace_session_factory,
+)
 from src.gateway.middleware.context_middleware import RequestContextMiddleware
 from src.gateway.mcp_handler import mcp_router
 from src.gateway.mcp_server import sse_app, streamable_http_app
@@ -148,6 +152,8 @@ def create_app(jwks_client: JWKSClient | None = None) -> FastAPI:
                 await trace_store.ensure_bucket_ready()
                 set_trace_object_store(trace_store)
                 set_trace_session_factory(primary_session_factory())
+                set_builtin_tool_trace_object_store(trace_store)
+                set_builtin_tool_trace_session_factory(primary_session_factory())
                 app.state.trace_object_store = trace_store
             except Exception:
                 logger.warning("Could not configure trace writer dependencies", exc_info=True)

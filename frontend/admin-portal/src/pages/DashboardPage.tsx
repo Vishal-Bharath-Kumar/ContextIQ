@@ -59,7 +59,7 @@ export function DashboardPage() {
   const { data: connectors, isLoading: connectorsLoading } = useConnectors();
   const { data: models, isLoading: modelsLoading } = useModels();
   const { data: policies, isLoading: policiesLoading } = usePolicies();
-  const { data: auditPages } = useAuditLog({});
+  const { data: auditLog } = useAuditLog({ limit: 10 });
   const { data: tools, isLoading: toolsLoading } = useTools();
 
   const isLoading = connectorsLoading || modelsLoading || policiesLoading || toolsLoading;
@@ -84,7 +84,7 @@ export function DashboardPage() {
     return Array.from(counts.entries()).map(([tier, count]) => ({ tier, count }));
   }, [models]);
 
-  const recentActivity = auditPages?.pages[0]?.items?.slice(0, 6) ?? [];
+  const recentActivity = auditLog?.items?.slice(0, 6) ?? [];
 
   return (
     <main aria-labelledby="dashboard-heading" className="page-layout">

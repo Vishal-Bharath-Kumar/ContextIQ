@@ -1,4 +1,4 @@
-import { useInfiniteQuery } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import axios from "axios";
 
 export interface AuditLogEntry {
@@ -23,6 +23,11 @@ export interface AuditLogFilters {
   date_to?:       string;
 }
 
+export interface AuditLogSearchParams extends AuditLogFilters {
+  cursor?: string;
+  limit?:  number;
+}
+
 interface AuditLogPage {
   items:       AuditLogEntry[];
   next_cursor: string | null;
@@ -42,26 +47,25 @@ api.interceptors.request.use((cfg) => {
 });
 
 export const AUDIT_KEYS = {
-  list: (filters: AuditLogFilters) => ["audit-log", filters] as const,
+  list: (params: AuditLogSearchParams) => ["audit-log", params] as const,
 };
 
-export function useAuditLog(filters: AuditLogFilters) {
-  return useInfiniteQuery({
-    queryKey:  AUDIT_KEYS.list(filters),
-    queryFn:   async ({ pageParam }) => {
-      const params = new URLSearchParams();
-      if (filters.user)          params.set("user",          filters.user);
-      if (filters.action)        params.set("action",        filters.action);
-      if (filters.resource_type) params.set("resource_type", filters.resource_type);
-      if (filters.resource_id)   params.set("resource_id",   filters.resource_id);
-      if (filters.date_from)     params.set("date_from",     filters.date_from);
-      if (filters.date_to)       params.set("date_to",       filters.date_to);
-      if (pageParam)             params.set("cursor",        pageParam);
-      const { data } = await api.get<AuditLogPage>(`/v1/audit-log?${params.toString()}`);
+export function useAuditLog(params: AuditLogSearchParams) {
+  return useQuery({
+    queryKey: AUDIT_KEYS.list(params),
+    queryFn:  async () => {
+      const queryParams = new URLSearchParams();
+      if (params.user)          queryParams.set("user",          params.user);
+      if (params.action)        queryParams.set("action",        params.action);
+      if (params.resource_type) queryParams.set("resource_type", params.resource_type);
+      if (params.resource_id)   queryParams.set("resource_id",   params.resource_id);
+      if (params.date_from)     queryParams.set("date_from",     params.date_from);
+      if (params.date_to)       queryParams.set("date_to",       params.date_to);
+      if (params.cursor)        queryParams.set("cursor",        params.cursor);
+      queryParams.set("limit", String(params.limit ?? 10));
+      const { data } = await api.get<AuditLogPage>(`/v1/audit-log?${queryParams.toString()}`);
       return data;
     },
-    initialPageParam: undefined as string | undefined,
-    getNextPageParam: (last) => last.next_cursor ?? undefined,
     staleTime: 60_000,   // 1 min — audit log entries are immutable and change slowly
   });
 }

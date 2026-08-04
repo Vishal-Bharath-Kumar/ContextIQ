@@ -65,6 +65,35 @@ async def test_decode_wrong_audience_raises(
     await client.shutdown()
 
 
+async def test_decode_keycloak_account_audience_with_matching_azp(
+    mock_jwks: Any,
+    keycloak_settings: Any,
+    mint_token: Any,
+) -> None:
+    """Keycloak access tokens with aud=account are accepted when azp matches."""
+    token = mint_token(aud="account", azp=keycloak_settings.client_id, roles=["admin"])
+    client = JWKSClient(keycloak_settings)
+    await client.startup()
+    claims = await client.decode(token)
+    assert claims["azp"] == keycloak_settings.client_id
+    assert claims["aud"] == "account"
+    await client.shutdown()
+
+
+async def test_decode_keycloak_account_audience_with_wrong_azp_raises(
+    mock_jwks: Any,
+    keycloak_settings: Any,
+    mint_token: Any,
+) -> None:
+    """Keycloak account-audience tokens are rejected when azp targets another client."""
+    token = mint_token(aud="account", azp="some-other-client")
+    client = JWKSClient(keycloak_settings)
+    await client.startup()
+    with pytest.raises(JWTError):
+        await client.decode(token)
+    await client.shutdown()
+
+
 # ---------------------------------------------------------------------------
 # Cache behaviour
 # ---------------------------------------------------------------------------
