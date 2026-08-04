@@ -10,6 +10,11 @@ _DEFAULT_ORIGIN = "http://localhost"
 MCP_REQUIRED_SCOPES: tuple[str, ...] = ("openid",)
 
 
+def inserted_protected_resource_metadata_path(mcp_path: str) -> str:
+    """Return the RFC9728 path-inserted protected-resource metadata URI."""
+    return f"{PROTECTED_RESOURCE_METADATA_PATH}{mcp_path.rstrip('/') or '/'}"
+
+
 def is_mcp_path(path: str, mcp_path: str) -> bool:
     """Return True when *path* targets the configured MCP HTTP surface."""
     return path == mcp_path or path.startswith(f"{mcp_path}/")

@@ -61,6 +61,19 @@
         "http://localhost",
         "https://vscode.dev"
       ],
+      "protocolMappers": [
+        {
+          "name": "contextiq-mcp-gateway-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.client.audience": "contextiq-mcp-gateway",
+            "id.token.claim": "false",
+            "access.token.claim": "true"
+          }
+        }
+      ],
       "defaultClientScopes": ["openid", "profile", "email", "roles", "basic"],
       "protocol": "openid-connect",
       "attributes": {

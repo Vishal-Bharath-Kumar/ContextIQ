@@ -49,6 +49,9 @@ _SKIP_PATHS: frozenset[str] = frozenset({
     "/openapi.json",
     "/metrics",
 })
+_INSERTED_PROTECTED_RESOURCE_METADATA_PATH = (
+    f"{PROTECTED_RESOURCE_METADATA_PATH}{gateway_settings.mcp_path}"
+)
 
 
 class JWTAuthMiddleware(BaseHTTPMiddleware):
@@ -86,7 +89,10 @@ class JWTAuthMiddleware(BaseHTTPMiddleware):
         }
 
     async def dispatch(self, request: Request, call_next: Any) -> Response:
-        if request.url.path in _SKIP_PATHS:
+        if request.url.path in _SKIP_PATHS or request.url.path in {
+            _INSERTED_PROTECTED_RESOURCE_METADATA_PATH,
+            f"{_INSERTED_PROTECTED_RESOURCE_METADATA_PATH}/",
+        }:
             return await call_next(request)
 
         auth_header = request.headers.get("Authorization", "")

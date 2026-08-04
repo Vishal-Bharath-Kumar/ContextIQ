@@ -51,6 +51,14 @@ class KeycloakSettings(BaseSettings):
         return f"{self.url}/realms/{self.realm}"
 
     @property
+    def accepted_issuers(self) -> tuple[str, ...]:
+        """All issuer values accepted by the local gateway verifier."""
+        issuers = [self.issuer]
+        if self.public_issuer not in issuers:
+            issuers.append(self.public_issuer)
+        return tuple(issuers)
+
+    @property
     def public_issuer(self) -> str:
         """Browser-reachable issuer for OAuth discovery metadata."""
         base_url = self.public_url or self.url

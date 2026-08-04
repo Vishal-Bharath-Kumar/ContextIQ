@@ -35,6 +35,7 @@ from src.auth.oauth_metadata import (
     MCP_REQUIRED_SCOPES,
     PROTECTED_RESOURCE_METADATA_PATH,
     build_protected_resource_metadata,
+    inserted_protected_resource_metadata_path,
 )
 from src.agents.checkpointer import get_redis_checkpointer
 from src.connector_sdk.registry import ConnectorRegistry
@@ -375,6 +376,15 @@ def create_app(jwks_client: JWKSClient | None = None) -> FastAPI:
     @new_app.get(PROTECTED_RESOURCE_METADATA_PATH)
     async def oauth_protected_resource_metadata(request: Request) -> dict[str, object]:
         """Advertise OAuth metadata so MCP clients can trigger browser login."""
+        origin = str(request.base_url).rstrip("/")
+        return build_protected_resource_metadata(origin, gateway_settings.mcp_path)
+
+    inserted_metadata_path = inserted_protected_resource_metadata_path(gateway_settings.mcp_path)
+
+    @new_app.get(inserted_metadata_path)
+    @new_app.get(f"{inserted_metadata_path}/")
+    async def oauth_protected_resource_metadata_inserted(request: Request) -> dict[str, object]:
+        """Serve the RFC9728 path-inserted protected-resource metadata URI."""
         origin = str(request.base_url).rstrip("/")
         return build_protected_resource_metadata(origin, gateway_settings.mcp_path)
 
