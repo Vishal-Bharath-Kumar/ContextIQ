@@ -41,6 +41,7 @@ _SKIP_PATHS: frozenset[str] = frozenset({
     "/auth/health/ready",
     "/auth/health/live",
     "/auth/dev-login",  # local-dev-only login route (src/auth/dev_login.py); 404s unless enabled
+    "/auth/dev-register",  # local-dev-only self-registration route; must be public like dev-login
     PROTECTED_RESOURCE_METADATA_PATH,
     "/.well-known/oauth-authorization-server",
     "/.well-known/openid-configuration",

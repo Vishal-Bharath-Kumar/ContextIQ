@@ -1,5 +1,6 @@
 import axios from "axios";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import type { UseQueryResult } from "@tanstack/react-query";
 
 export interface ConnectorSummary {
   id: string;
@@ -30,7 +31,7 @@ export const CONNECTOR_KEYS = {
   detail: (id: string) => ["connectors", id] as const,
 };
 
-export function useConnectors() {
+export function useConnectors(): UseQueryResult<ConnectorSummary[], Error> {
   return useQuery({
     queryKey: CONNECTOR_KEYS.all,
     queryFn: () =>

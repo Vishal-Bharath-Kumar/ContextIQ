@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from urllib.parse import urljoin
 
+from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -39,6 +40,22 @@ class KeycloakSettings(BaseSettings):
     # production, which relies on the full browser-redirect OIDC flow instead.
     client_id:     str = "contextiq-mcp-gateway"
     client_secret: str = ""
+
+    # Local-dev-only Keycloak admin API credentials used by /auth/dev-register
+    # to create users and assign realm roles. These are not used in the
+    # production browser redirect flow.
+    admin_realm: str = "master"
+    admin_client_id: str = "admin-cli"
+    admin_user: str = Field(
+        default="admin",
+        validation_alias=AliasChoices("KEYCLOAK_ADMIN_USER", "KEYCLOAK_ADMIN"),
+    )
+    admin_password: str = ""
+
+    @property
+    def admin_username(self) -> str:
+        """Backward-compatible alias for callers still using admin_username."""
+        return self.admin_user
 
     @property
     def jwks_uri(self) -> str:
@@ -98,3 +115,21 @@ class KeycloakSettings(BaseSettings):
     def token_uri(self) -> str:
         """Full URI for Keycloak's token endpoint (password/client_credentials grants)."""
         return f"{self.url}/realms/{self.realm}/protocol/openid-connect/token"
+
+    @property
+    def admin_token_uri(self) -> str:
+        """Master-realm token endpoint used to obtain an admin REST API token."""
+        return f"{self.url}/realms/{self.admin_realm}/protocol/openid-connect/token"
+
+    @property
+    def admin_users_uri(self) -> str:
+        """Realm users collection for local-dev user creation."""
+        return f"{self.url}/admin/realms/{self.realm}/users"
+
+    def admin_realm_role_uri(self, role_name: str) -> str:
+        """Realm-role lookup endpoint for assigning a selected platform role."""
+        return f"{self.url}/admin/realms/{self.realm}/roles/{role_name}"
+
+    def admin_user_role_mappings_uri(self, user_id: str) -> str:
+        """Realm-role mapping endpoint for a specific user."""
+        return f"{self.url}/admin/realms/{self.realm}/users/{user_id}/role-mappings/realm"

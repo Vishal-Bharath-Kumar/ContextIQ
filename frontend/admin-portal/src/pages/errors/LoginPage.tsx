@@ -1,8 +1,8 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
-import { useNavigate } from "react-router-dom";
-import axios from "axios";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
+  CheckCircledIcon,
   ExclamationTriangleIcon,
   EyeClosedIcon,
   EyeOpenIcon,
@@ -12,6 +12,7 @@ import {
 
 import { useAuth } from "../../context/AuthContext";
 import { GlassCard } from "../../components/ui/GlassCard";
+import { loginUser } from "../../services/authService";
 
 /**
  * Local-dev login form — exchanges username/password for a real Keycloak JWT
@@ -22,21 +23,20 @@ import { GlassCard } from "../../components/ui/GlassCard";
 export function LoginPage() {
   const { signIn } = useAuth();
   const navigate = useNavigate();
-  const [username, setUsername] = useState("");
+  const [searchParams] = useSearchParams();
+  const [username, setUsername] = useState(searchParams.get("username") ?? "");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const justRegistered = searchParams.get("registered") === "1";
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
     setError(null);
     setIsSubmitting(true);
     try {
-      const { data } = await axios.post<{ access_token: string }>(
-        `${import.meta.env.VITE_API_BASE_URL ?? "/api"}/auth/dev-login`,
-        { username, password },
-      );
+      const data = await loginUser(username, password);
       await signIn(data.access_token);
       navigate("/", { replace: true });
     } catch {
@@ -71,6 +71,13 @@ export function LoginPage() {
         </div>
 
         <GlassCard className="p-6 sm:p-8" delay={80}>
+          {justRegistered && (
+            <div className="mb-4 flex items-start gap-2 rounded-lg border border-emerald-200 bg-emerald-50/80 px-3 py-2 text-sm text-emerald-700 animate-slide-up">
+              <CheckCircledIcon className="mt-0.5 h-4 w-4 flex-shrink-0" />
+              <span>Account created. Sign in with your new username and password.</span>
+            </div>
+          )}
+
           <form onSubmit={handleSubmit} noValidate>
             <div className="mb-4">
               <label htmlFor="username" className="form-label">
@@ -139,6 +146,13 @@ export function LoginPage() {
               {isSubmitting ? "Signing in…" : "Sign in"}
             </button>
           </form>
+
+          <p className="mt-5 text-center text-sm text-secondary">
+            Need an account?{" "}
+            <Link to="/register" className="font-semibold text-primary-700 hover:text-primary-800">
+              Create one
+            </Link>
+          </p>
         </GlassCard>
 
         <p className="mt-6 text-center text-xs text-secondary">

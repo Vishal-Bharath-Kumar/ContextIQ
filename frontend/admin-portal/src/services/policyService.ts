@@ -1,5 +1,6 @@
 import axios from "axios";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import type { UseQueryResult } from "@tanstack/react-query";
 
 export interface PolicyVersion {
   id: string;
@@ -40,7 +41,7 @@ export const POLICY_KEYS = {
   detail: (id: string) => ["policies", id] as const,
 };
 
-export function usePolicies() {
+export function usePolicies(): UseQueryResult<PolicyListItem[], Error> {
   return useQuery({
     queryKey: POLICY_KEYS.all,
     queryFn: () =>
@@ -76,7 +77,7 @@ export function useValidateRego() {
   });
 }
 
-export function usePolicyDetail(policyId: string | undefined) {
+export function usePolicyDetail(policyId: string | undefined): UseQueryResult<PolicyListItem, Error> {
   return useQuery({
     queryKey: POLICY_KEYS.detail(policyId ?? ""),
     queryFn: () =>
@@ -175,7 +176,7 @@ export interface AuditLogEntry {
   created_at: string; // ISO-8601
 }
 
-export function usePolicyAuditTrail(policyId: string | undefined) {
+export function usePolicyAuditTrail(policyId: string | undefined): UseQueryResult<AuditLogEntry[], Error> {
   return useQuery({
     queryKey: [...POLICY_KEYS.detail(policyId ?? ""), "audit"],
     queryFn: () =>

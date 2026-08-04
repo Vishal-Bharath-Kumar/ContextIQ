@@ -1,5 +1,6 @@
 import axios from "axios";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import type { QueryClient, UseQueryResult } from "@tanstack/react-query";
 
 // ------------------------------------------------------------------ //
 // Types                                                               //
@@ -103,7 +104,7 @@ export const GOVERNANCE_KEYS = {
 /**
  * Get complete governance settings
  */
-export function useGovernanceSettings() {
+export function useGovernanceSettings(): UseQueryResult<GovernanceSettings, Error> {
   return useQuery({
     queryKey: GOVERNANCE_KEYS.settings(),
     queryFn: () =>
@@ -115,14 +116,14 @@ export function useGovernanceSettings() {
  * Update compliance standards configuration
  */
 export function useUpdateComplianceSettings() {
-  const qc = useQueryClient();
+  const qc: QueryClient = useQueryClient();
   return useMutation({
     mutationFn: (settings: ComplianceSettings) =>
       api.put<ComplianceSettings>("/v1/governance/compliance", settings).then((r) => r.data),
     onSuccess: (data) => {
       qc.setQueryData<GovernanceSettings | undefined>(
         GOVERNANCE_KEYS.settings(),
-        (current) => current ? { ...current, compliance: data } : current
+        (current: GovernanceSettings | undefined) => current ? { ...current, compliance: data } : current
       );
       qc.invalidateQueries({ queryKey: GOVERNANCE_KEYS.settings() });
       qc.invalidateQueries({ queryKey: GOVERNANCE_KEYS.compliance() });
@@ -134,14 +135,14 @@ export function useUpdateComplianceSettings() {
  * Update RBAC role permissions
  */
 export function useUpdateRBACSettings() {
-  const qc = useQueryClient();
+  const qc: QueryClient = useQueryClient();
   return useMutation({
     mutationFn: (settings: RBACSettings) =>
       api.put<RBACSettings>("/v1/governance/rbac", settings).then((r) => r.data),
     onSuccess: (data) => {
       qc.setQueryData<GovernanceSettings | undefined>(
         GOVERNANCE_KEYS.settings(),
-        (current) => current ? { ...current, rbac: data } : current
+        (current: GovernanceSettings | undefined) => current ? { ...current, rbac: data } : current
       );
       qc.invalidateQueries({ queryKey: GOVERNANCE_KEYS.settings() });
       qc.invalidateQueries({ queryKey: GOVERNANCE_KEYS.rbac() });
@@ -153,14 +154,14 @@ export function useUpdateRBACSettings() {
  * Update pattern detection configuration
  */
 export function useUpdatePatternSettings() {
-  const qc = useQueryClient();
+  const qc: QueryClient = useQueryClient();
   return useMutation({
     mutationFn: (settings: PatternDetectionSettings) =>
       api.put<PatternDetectionSettings>("/v1/governance/patterns", settings).then((r) => r.data),
     onSuccess: (data) => {
       qc.setQueryData<GovernanceSettings | undefined>(
         GOVERNANCE_KEYS.settings(),
-        (current) => current ? { ...current, patterns: data } : current
+        (current: GovernanceSettings | undefined) => current ? { ...current, patterns: data } : current
       );
       qc.invalidateQueries({ queryKey: GOVERNANCE_KEYS.settings() });
       qc.invalidateQueries({ queryKey: GOVERNANCE_KEYS.patterns() });
@@ -172,14 +173,14 @@ export function useUpdatePatternSettings() {
  * Update risk scoring weights and thresholds
  */
 export function useUpdateRiskScoringSettings() {
-  const qc = useQueryClient();
+  const qc: QueryClient = useQueryClient();
   return useMutation({
     mutationFn: (settings: RiskScoringSettings) =>
       api.put<RiskScoringSettings>("/v1/governance/risk-scoring", settings).then((r) => r.data),
     onSuccess: (data) => {
       qc.setQueryData<GovernanceSettings | undefined>(
         GOVERNANCE_KEYS.settings(),
-        (current) => current ? { ...current, riskScoring: data } : current
+        (current: GovernanceSettings | undefined) => current ? { ...current, riskScoring: data } : current
       );
       qc.invalidateQueries({ queryKey: GOVERNANCE_KEYS.settings() });
       qc.invalidateQueries({ queryKey: GOVERNANCE_KEYS.riskScoring() });

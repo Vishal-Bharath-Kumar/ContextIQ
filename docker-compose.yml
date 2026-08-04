@@ -71,6 +71,10 @@ x-app-env-vars: &app-env-vars
     # Used solely by src/auth/dev_login.py's password-grant exchange; never a
     # production credential. Override here if you change the realm.json secret.
     KEYCLOAK_CLIENT_SECRET: "contextiq-dev-client-secret"
+    # Local-dev-only Keycloak admin credentials used by /auth/dev-register to
+    # create users and assign roles through the admin REST API.
+    KEYCLOAK_ADMIN_USER: "admin"
+    KEYCLOAK_ADMIN_PASSWORD: "admin"
     # ── OpenTelemetry Tracing ────────────────────────────────────────────────
     OTEL_EXPORTER_OTLP_ENDPOINT: "http://jaeger:4317"
     OTEL_SERVICE_NAME: "contextiq-api"

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { CheckIcon, Cross2Icon } from "@radix-ui/react-icons";
 import { useQueryClient } from "@tanstack/react-query";
+import type { QueryClient } from "@tanstack/react-query";
 
 import {
   GOVERNANCE_KEYS,
@@ -11,7 +12,7 @@ import {
 } from "../../services/governanceService";
 
 export function ComplianceSettings() {
-  const qc = useQueryClient();
+  const qc: QueryClient = useQueryClient();
   const { data: governanceSettings, isLoading } = useGovernanceSettings();
   const updateMutation = useUpdateComplianceSettings();
   
@@ -28,7 +29,7 @@ export function ComplianceSettings() {
   const setCompliancePreview = (nextStandards: ComplianceStandard[]) => {
     qc.setQueryData<GovernanceSettings | undefined>(
       GOVERNANCE_KEYS.settings(),
-      (current) =>
+      (current: GovernanceSettings | undefined) =>
         current
           ? {
               ...current,

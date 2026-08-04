@@ -4,6 +4,7 @@ import {
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
+import type { UseQueryResult } from "@tanstack/react-query";
 
 export interface RoutingWeightEntry {
   intent_type: string;
@@ -26,7 +27,7 @@ api.interceptors.request.use((cfg) => {
 
 export const WEIGHT_KEYS = { all: ["routing-weights"] as const };
 
-export function useRoutingWeights() {
+export function useRoutingWeights(): UseQueryResult<RoutingWeightEntry[], Error> {
   return useQuery({
     queryKey: WEIGHT_KEYS.all,
     queryFn: () =>
