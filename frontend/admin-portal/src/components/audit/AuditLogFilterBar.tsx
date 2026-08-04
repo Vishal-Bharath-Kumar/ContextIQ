@@ -23,6 +23,11 @@ export function AuditLogFilterBar({ onFilter }: Props) {
     resolver: zodResolver(filterSchema),
   });
 
+  function handleClear(): void {
+    reset();
+    onFilter({});
+  }
+
   return (
     <form
       onSubmit={handleSubmit(onFilter)}
@@ -66,7 +71,7 @@ export function AuditLogFilterBar({ onFilter }: Props) {
         className="input"
       />
       <button type="submit" className="btn-primary">Apply</button>
-      <button type="button" onClick={() => reset()} className="btn-secondary">
+      <button type="button" onClick={handleClear} className="btn-secondary">
         Clear
       </button>
     </form>

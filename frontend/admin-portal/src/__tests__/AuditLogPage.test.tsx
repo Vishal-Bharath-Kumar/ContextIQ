@@ -12,6 +12,7 @@
  *     interface { id, email, roles, name? }.  Fixed to { id, email, roles }.
  */
 import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { describe, it, expect, beforeAll, afterEach, afterAll } from "vitest";
@@ -28,25 +29,37 @@ import { AuditLogPage } from "../pages/AuditLogPage";
 // MSW mock server
 // ---------------------------------------------------------------------------
 
-const MOCK_ENTRIES = [
-  {
-    id:            "aaa-111",
-    action:        "policy.created",
-    resource_type: "policy",
-    resource_id:   "pol-1",
-    actor_user_id: "user-1",
-    ip_address:    "10.0.0.1",
-    before_state:  null,
-    after_state:   { name: "p1" },
-    timestamp:     "2026-07-09T12:00:00Z",
-    row_hash:      "abc123",
-  },
-];
+const MOCK_ENTRIES = Array.from({ length: 11 }, (_, index) => ({
+  id:            `audit-${index + 1}`,
+  action:        index === 0 ? "policy.created" : index === 10 ? "policy.deleted" : `policy.updated.${index + 1}`,
+  resource_type: "policy",
+  resource_id:   `pol-${index + 1}`,
+  actor_user_id: `user-${index + 1}`,
+  ip_address:    `10.0.0.${index + 1}`,
+  before_state:  null,
+  after_state:   { name: `p${index + 1}` },
+  timestamp:     `2026-07-${String(index + 9).padStart(2, "0")}T12:00:00Z`,
+  row_hash:      `hash-${index + 1}`,
+}));
+
+const SECOND_PAGE_CURSOR = "page-2";
 
 const server = setupServer(
-  http.get("/api/v1/audit-log", () =>
-    HttpResponse.json({ items: MOCK_ENTRIES, next_cursor: null })
-  )
+  http.get("/api/v1/audit-log", ({ request }) => {
+    const url = new URL(request.url);
+    const limit = url.searchParams.get("limit");
+    const cursor = url.searchParams.get("cursor");
+
+    if (limit !== "10") {
+      return HttpResponse.json({ message: `Expected limit=10, received ${limit}` }, { status: 400 });
+    }
+
+    if (cursor === SECOND_PAGE_CURSOR) {
+      return HttpResponse.json({ items: MOCK_ENTRIES.slice(10), next_cursor: null });
+    }
+
+    return HttpResponse.json({ items: MOCK_ENTRIES.slice(0, 10), next_cursor: SECOND_PAGE_CURSOR });
+  })
 );
 
 beforeAll(() => server.listen());
@@ -109,6 +122,36 @@ describe("AuditLogPage — AC-5", () => {
     await waitFor(() => {
       expect(screen.getByText("user-1")).toBeInTheDocument();
       expect(screen.getByText("10.0.0.1")).toBeInTheDocument();
+    });
+  });
+
+  it("paginates audit log entries 10 at a time", async () => {
+    const user = userEvent.setup();
+
+    renderAuditPage(makeUser("u1", "a@b.com", ["auditor"]));
+
+    await waitFor(() => {
+      expect(screen.getByText("policy.created")).toBeInTheDocument();
+      expect(screen.getByRole("navigation", { name: "Audit log pagination" })).toBeInTheDocument();
+      expect(screen.getByText("Page 1 · 10 entries per page")).toBeInTheDocument();
+    });
+
+    expect(screen.queryByText("policy.deleted")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Next page" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("policy.deleted")).toBeInTheDocument();
+      expect(screen.getByText("Page 2 · 10 entries per page")).toBeInTheDocument();
+    });
+
+    expect(screen.queryByText("policy.created")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Previous page" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("policy.created")).toBeInTheDocument();
+      expect(screen.getByText("Page 1 · 10 entries per page")).toBeInTheDocument();
     });
   });
 

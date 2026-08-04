@@ -7,8 +7,8 @@ ARG GIT_REF=unknown
 # ---- Stage 1: dependency builder ----------------------------------------
 FROM python:${PYTHON_VERSION}-slim-bookworm AS builder
 
-# Install uv for fast dependency resolution
-COPY --from=ghcr.io/astral-sh/uv:0.4 /uv /usr/local/bin/uv
+# Install uv inside the builder stage so local builds do not depend on ghcr.io.
+RUN python -m pip install --no-cache-dir "uv>=0.4,<0.5"
 ENV UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy
 
