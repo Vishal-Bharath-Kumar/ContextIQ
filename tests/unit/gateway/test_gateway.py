@@ -173,6 +173,26 @@ class TestGatewayAppSseMount:
         }
         assert "/mcp/sse" in route_paths
 
+    def test_oauth_metadata_route_registered(self) -> None:
+        mock_mcp = _make_mock_mcp()
+        mock_sse = _make_mock_sse_app()
+        mock_settings = MagicMock()
+        mock_settings.server_version = "0.1.0"
+        mock_settings.mcp_path = "/mcp"
+
+        with (
+            patch("src.gateway.main.mcp", mock_mcp),
+            patch("src.gateway.main.sse_app", mock_sse),
+            patch("src.gateway.main.settings", mock_settings),
+        ):
+            from src.gateway.main import create_gateway_app
+            gateway = create_gateway_app()
+
+        route_paths = {
+            getattr(r, "path", None) for r in gateway.routes
+        }
+        assert "/.well-known/oauth-protected-resource" in route_paths
+
     def test_ws_route_registered(self) -> None:
         mock_mcp = _make_mock_mcp()
         mock_sse = _make_mock_sse_app()

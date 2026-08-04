@@ -120,6 +120,9 @@ class TestHTTPRejectionPaths:
 
         assert _response_status(msgs) == 401
         assert _response_body(msgs)["error"] == "missing_token"
+        response_headers = _response_headers(msgs)
+        assert "www-authenticate" in response_headers
+        assert 'resource_metadata="http://localhost/.well-known/oauth-protected-resource"' in response_headers["www-authenticate"]
         inner.assert_not_called()
 
     @pytest.mark.asyncio
@@ -274,6 +277,16 @@ class TestBypassPaths:
         mw = JWTAuthMiddleware(inner, _make_jwks_client())
 
         scope = _make_scope(path="/docs")
+        await mw(scope, _noop_receive, AsyncMock())
+
+        inner.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_oauth_metadata_path_bypasses_auth(self) -> None:
+        inner = AsyncMock()
+        mw = JWTAuthMiddleware(inner, _make_jwks_client())
+
+        scope = _make_scope(path="/.well-known/oauth-protected-resource")
         await mw(scope, _noop_receive, AsyncMock())
 
         inner.assert_called_once()

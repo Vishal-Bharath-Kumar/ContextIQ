@@ -6,6 +6,8 @@ No hard-coded URLs or algorithms (OWASP A05 — Security Misconfiguration).
 """
 from __future__ import annotations
 
+from urllib.parse import urljoin
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -27,6 +29,7 @@ class KeycloakSettings(BaseSettings):
     )
 
     url:        str       = "http://keycloak.keycloak.svc.cluster.local/auth"
+    public_url: str | None = None
     realm:      str       = "contextiq"
     audience:   str       = "contextiq-mcp-gateway"
     algorithms: list[str] = ["RS256"]
@@ -46,6 +49,42 @@ class KeycloakSettings(BaseSettings):
     def issuer(self) -> str:
         """Expected `iss` claim value for tokens issued by this realm."""
         return f"{self.url}/realms/{self.realm}"
+
+    @property
+    def public_issuer(self) -> str:
+        """Browser-reachable issuer for OAuth discovery metadata."""
+        base_url = self.public_url or self.url
+        return f"{base_url}/realms/{self.realm}"
+
+    @property
+    def authorization_endpoint(self) -> str:
+        """Browser-reachable authorization endpoint."""
+        return f"{self.public_issuer}/protocol/openid-connect/auth"
+
+    @property
+    def public_token_uri(self) -> str:
+        """Browser-reachable token endpoint."""
+        return f"{self.public_issuer}/protocol/openid-connect/token"
+
+    @property
+    def public_revocation_endpoint(self) -> str:
+        """Browser-reachable revocation endpoint."""
+        return f"{self.public_issuer}/protocol/openid-connect/revoke"
+
+    @property
+    def revocation_endpoint(self) -> str:
+        """Internal revocation endpoint reachable from the API container."""
+        return f"{self.issuer}/protocol/openid-connect/revoke"
+
+    @property
+    def openid_configuration_uri(self) -> str:
+        """Browser-reachable OIDC discovery document."""
+        return urljoin(f"{self.public_issuer}/", ".well-known/openid-configuration")
+
+    @property
+    def internal_openid_configuration_uri(self) -> str:
+        """OIDC discovery document reachable from the API container."""
+        return urljoin(f"{self.issuer}/", ".well-known/openid-configuration")
 
     @property
     def token_uri(self) -> str:

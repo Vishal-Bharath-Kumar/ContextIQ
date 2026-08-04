@@ -130,7 +130,7 @@ Restart Cursor after saving.
   "servers": {
     "contextiq": {
       "type": "http",
-      "url": "http://localhost:8000/mcp/sse/",
+      "url": "http://localhost:8000/mcp/",
       "headers": {
         "Authorization": "Bearer ${env:CONTEXTIQ_TOKEN}",
         "Content-Type": "application/json"
@@ -143,6 +143,8 @@ Restart Cursor after saving.
 Reload VS Code window: `Cmd+Shift+P` → "Developer: Reload Window"
 
 For a ready-to-copy VS Code setup, use `examples/contextiq-mcp-starter/` and run `setup-contextiq-dev-login` once in the target repo.
+
+This repo also includes `.github/prompts/contextiq.prompt.md`, which VS Code exposes as the `/contextiq` slash command in Copilot Chat.
 
 ## Step 5: Test in Your AI Assistant
 
@@ -162,9 +164,9 @@ Search ContextIQ for authentication implementations
 
 ### VS Code Copilot
 ```
-@workspace using ContextIQ, find database migration examples
+/contextiq find database migration examples
 
-Search ContextIQ for API documentation
+/contextiq search ContextIQ for API documentation
 ```
 
 ## Quick Troubleshooting

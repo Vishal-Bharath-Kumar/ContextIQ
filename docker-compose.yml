@@ -63,6 +63,7 @@ x-app-env-vars: &app-env-vars
     AUDIT_ARCHIVE_MINIO_SECRET_KEY: "contextiq_dev"
     # ── Keycloak JWT Auth ────────────────────────────────────────────────────
     KEYCLOAK_URL: "http://keycloak:8080/auth"
+    KEYCLOAK_PUBLIC_URL: "http://localhost:8080/auth"
     KEYCLOAK_REALM: "contextiq"
     KEYCLOAK_AUDIENCE: "contextiq-mcp-gateway"
     KEYCLOAK_CLIENT_ID: "contextiq-mcp-gateway"

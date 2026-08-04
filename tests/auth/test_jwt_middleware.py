@@ -71,6 +71,35 @@ async def test_missing_auth_header_returns_401(app_with_mock_jwks: FastAPI) -> N
 
 
 @pytest.mark.real_middleware
+async def test_missing_auth_header_on_mcp_returns_oauth_challenge(
+    app_with_mock_jwks: FastAPI,
+) -> None:
+    async with AsyncClient(transport=ASGITransport(app_with_mock_jwks), base_url="http://test") as client:
+        response = await client.get("/mcp")
+
+    assert response.status_code == 401
+    assert "www-authenticate" in response.headers
+    challenge = response.headers["www-authenticate"]
+    assert 'realm="contextiq-mcp"' in challenge
+    assert 'resource_metadata="http://test/.well-known/oauth-protected-resource"' in challenge
+
+
+@pytest.mark.real_middleware
+async def test_oauth_protected_resource_metadata_is_public(
+    app_with_mock_jwks: FastAPI,
+    keycloak_settings: Any,
+) -> None:
+    async with AsyncClient(transport=ASGITransport(app_with_mock_jwks), base_url="http://test") as client:
+        response = await client.get("/.well-known/oauth-protected-resource")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "resource": "http://test/mcp",
+        "authorization_servers": [keycloak_settings.public_issuer],
+    }
+
+
+@pytest.mark.real_middleware
 async def test_valid_token_passes_middleware(
     app_with_mock_jwks: FastAPI,
     mint_token: Any,

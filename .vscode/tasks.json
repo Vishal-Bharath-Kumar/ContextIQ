@@ -9,15 +9,12 @@
 				".propel/tools/refresh_mcp_token_input.py",
 				"--skip-if-missing"
 			],
-			"runOptions": {
-				"runOn": "folderOpen"
-			},
 			"presentation": {
 				"reveal": "silent",
 				"panel": "dedicated"
 			},
 			"problemMatcher": [],
-			"detail": "Refreshes the ContextIQ MCP bearer token using cached local-dev credentials or environment variables."
+			"detail": "Legacy fallback: refreshes the ContextIQ MCP bearer token manually when you want to bypass the browser login flow."
 		},
 		{
 			"label": "setup-contextiq-dev-login",

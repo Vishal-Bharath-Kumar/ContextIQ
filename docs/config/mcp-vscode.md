@@ -39,7 +39,7 @@ Create or update `.vscode/mcp.json`:
   ./examples/contextiq-mcp-starter/install.sh /path/to/your-repo
   ```
 
-  That installs `.vscode/mcp.json`, `.vscode/tasks.json`, and `.propel/tools/refresh_mcp_token_input.py` into the target repo.
+  That installs `.vscode/mcp.json`, `.vscode/tasks.json`, `.github/prompts/contextiq.prompt.md`, and `.propel/tools/refresh_mcp_token_input.py` into the target repo.
 
 3. **Run the One-Time Setup Task**
 
@@ -53,6 +53,11 @@ Create or update `.vscode/mcp.json`:
 5. **Verify Connection**
    - Open GitHub Copilot Chat
    - Type: `@workspace list available MCP servers`
+
+6. **Use the Slash Command**
+  - Open GitHub Copilot Chat
+  - Type `/contextiq list available ContextIQ tools`
+  - Prompt files in `.github/prompts/` are exposed as slash commands in VS Code, so `.github/prompts/contextiq.prompt.md` becomes `/contextiq`
 
 If you do not use the starter tasks, make sure `CONTEXTIQ_TOKEN` is exported in the environment before VS Code starts. A repo `.env` file alone is not sufficient for `${env:CONTEXTIQ_TOKEN}`.
 
@@ -96,6 +101,15 @@ For different repositories, create separate `.vscode/mcp.json` files:
 
 ## Using ContextIQ with GitHub Copilot
 
+### Slash Command
+```
+/contextiq search enterprise docs for authentication patterns
+
+/contextiq find the service owner for the indexing pipeline
+
+/contextiq summarize the API gateway architecture
+```
+
 ### In Copilot Chat
 ```
 Search ContextIQ for authentication implementations
@@ -113,6 +127,8 @@ Sync the GitHub repository in ContextIQ
 
 @workspace search ContextIQ for security best practices
 ```
+
+Use `/contextiq` when you want the chat request to explicitly prefer the ContextIQ MCP server before falling back to regular workspace tools.
 
 ### Inline Suggestions
 GitHub Copilot will automatically use ContextIQ context when:

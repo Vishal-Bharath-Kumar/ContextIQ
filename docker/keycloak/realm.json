@@ -41,6 +41,32 @@
       "attributes": {
         "access.token.lifespan": "3600"
       }
+    },
+    {
+      "clientId": "contextiq-vscode-mcp",
+      "name": "ContextIQ VS Code MCP",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "authorizationServicesEnabled": false,
+      "redirectUris": [
+        "http://127.0.0.1/*",
+        "http://localhost/*",
+        "https://vscode.dev/redirect"
+      ],
+      "webOrigins": [
+        "http://127.0.0.1",
+        "http://localhost",
+        "https://vscode.dev"
+      ],
+      "defaultClientScopes": ["openid", "profile", "email", "roles", "basic"],
+      "protocol": "openid-connect",
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "access.token.lifespan": "3600"
+      }
     }
   ],
   "users": [

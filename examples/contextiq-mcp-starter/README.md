@@ -6,6 +6,7 @@ Copy these files into the root of any repository where you want GitHub Copilot i
 
 - `.vscode/mcp.json` for the `contextiq` HTTP MCP server
 - `.vscode/tasks.json` for one-time setup and automatic token refresh on folder open
+- `.github/prompts/contextiq.prompt.md` for a reusable `/contextiq` slash command in Copilot Chat
 - `.propel/tools/refresh_mcp_token_input.py` for local dev login and token rewrite
 - `.env.example` for optional environment variables
 
@@ -15,6 +16,7 @@ From this folder, copy the hidden files and folders into the target repository r
 
 ```text
 .env.example
+.github/prompts/contextiq.prompt.md
 .propel/tools/refresh_mcp_token_input.py
 .vscode/mcp.json
 .vscode/tasks.json
@@ -36,6 +38,7 @@ That copies the starter files into the target repository with a sanitized `.vsco
 2. Open the target repository in VS Code.
 3. Run the `setup-contextiq-dev-login` task once.
 4. Reload the VS Code window.
+5. Open Copilot Chat and run `/contextiq list available ContextIQ tools`.
 
 On macOS, the setup task stores the local dev credentials in Keychain. After that, the `refresh-contextiq-dev-token` folder-open task refreshes the token automatically on reload.
 
@@ -49,3 +52,4 @@ On macOS, the setup task stores the local dev credentials in Keychain. After tha
 - The tracked `mcp.json` file stays sanitized with `Bearer ${env:CONTEXTIQ_TOKEN}`.
 - Running the setup task rewrites `.vscode/mcp.json` locally with a fresh bearer token for the current repo.
 - The folder-open task exits cleanly when cached credentials are unavailable.
+- VS Code exposes prompt files in `.github/prompts/` as slash commands, so `contextiq.prompt.md` becomes `/contextiq`.

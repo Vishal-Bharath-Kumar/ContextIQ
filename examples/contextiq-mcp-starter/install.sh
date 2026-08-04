@@ -17,10 +17,13 @@ fi
 
 mkdir -p "$target_dir/.vscode" "$target_dir/.propel/tools"
 
+mkdir -p "$target_dir/.github/prompts"
+
 cp "$script_dir/.env.example" "$target_dir/.env.example"
 cp "$script_dir/.vscode/mcp.json" "$target_dir/.vscode/mcp.json"
 cp "$script_dir/.vscode/tasks.json" "$target_dir/.vscode/tasks.json"
 cp "$script_dir/.propel/tools/refresh_mcp_token_input.py" "$target_dir/.propel/tools/refresh_mcp_token_input.py"
+cp "$script_dir/.github/prompts/contextiq.prompt.md" "$target_dir/.github/prompts/contextiq.prompt.md"
 
 echo "Installed ContextIQ MCP starter into $target_dir"
-echo "Next: open the target repo in VS Code and run the 'setup-contextiq-dev-login' task once."
+echo "Next: open the target repo in VS Code, run the 'setup-contextiq-dev-login' task once, then reload and use '/contextiq'."

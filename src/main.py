@@ -17,8 +17,11 @@ import logging
 import os
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+from urllib.parse import urlencode
 
-from fastapi import FastAPI
+import httpx
+from fastapi import FastAPI, Request
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 
 from src.api.admin.routes.audit_log import router as audit_log_router
 from src.api.admin.routes.governance import router as governance_router
@@ -28,6 +31,11 @@ from src.auth.dev_login import router as dev_login_router
 from src.auth.jwks_client import JWKSClient
 from src.auth.keycloak_settings import KeycloakSettings
 from src.auth.middleware import JWTAuthMiddleware
+from src.auth.oauth_metadata import (
+    MCP_REQUIRED_SCOPES,
+    PROTECTED_RESOURCE_METADATA_PATH,
+    build_protected_resource_metadata,
+)
 from src.agents.checkpointer import get_redis_checkpointer
 from src.connector_sdk.registry import ConnectorRegistry
 from src.data.database import primary_session_factory
@@ -259,6 +267,110 @@ def create_app(jwks_client: JWKSClient | None = None) -> FastAPI:
             "ollama": getattr(new_app.state, "ollama_verification", default_ollama_verification_status()),
             "opa": getattr(new_app.state, "opa_health", default_opa_health_status()),
         }
+
+    @new_app.get("/", response_class=HTMLResponse)
+    async def root(request: Request) -> str:
+        """Human-facing landing page for the local API/MCP service."""
+        keycloak_settings = KeycloakSettings()
+        mcp_url = f"{request.base_url}mcp/"
+        metadata_url = f"{request.base_url}.well-known/oauth-protected-resource"
+        auth_server = keycloak_settings.public_issuer
+        return f"""
+<!doctype html>
+<html lang=\"en\">
+    <head>
+        <meta charset=\"utf-8\">
+        <title>ContextIQ Local API</title>
+        <style>
+            body {{ font-family: -apple-system, BlinkMacSystemFont, sans-serif; margin: 40px; line-height: 1.5; color: #1f2937; }}
+            code {{ background: #f3f4f6; padding: 0.15rem 0.35rem; border-radius: 4px; }}
+            a {{ color: #2563eb; text-decoration: none; }}
+            a:hover {{ text-decoration: underline; }}
+            .panel {{ max-width: 760px; padding: 24px; border: 1px solid #e5e7eb; border-radius: 12px; background: #ffffff; }}
+        </style>
+    </head>
+    <body>
+        <div class=\"panel\">
+            <h1>ContextIQ Local API</h1>
+            <p><code>{request.base_url}</code> is the protected API and MCP resource server, not the browser login page.</p>
+            <p>For MCP authentication, VS Code should call <code>{mcp_url}</code>, receive an OAuth challenge, read <code>{metadata_url}</code>, and then open the Keycloak authorization flow.</p>
+            <p>Authorization server: <a href=\"{auth_server}\">{auth_server}</a></p>
+            <p>If VS Code still opens this page or shows a client-ID prompt, reload the window and restart the ContextIQ MCP server so it picks up the current <code>oauth.clientId</code> workspace configuration.</p>
+        </div>
+    </body>
+</html>
+"""
+
+    @new_app.get("/.well-known/oauth-authorization-server")
+    async def oauth_authorization_server_metadata(request: Request) -> dict[str, object]:
+        """Expose OAuth authorization-server metadata on the MCP origin."""
+        origin = str(request.base_url).rstrip("/")
+        keycloak_settings = KeycloakSettings()
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            upstream = await client.get(keycloak_settings.internal_openid_configuration_uri)
+            upstream.raise_for_status()
+        metadata = upstream.json()
+        metadata["authorization_endpoint"] = f"{origin}/authorize"
+        metadata["token_endpoint"] = f"{origin}/token"
+        metadata["revocation_endpoint"] = f"{origin}/revoke"
+        metadata["issuer"] = keycloak_settings.public_issuer
+        metadata["scopes_supported"] = list(MCP_REQUIRED_SCOPES)
+        return metadata
+
+    @new_app.get("/.well-known/openid-configuration")
+    async def openid_configuration(request: Request) -> dict[str, object]:
+        """OIDC discovery alias for clients that probe this path on the MCP origin."""
+        return await oauth_authorization_server_metadata(request)
+
+    @new_app.get("/authorize")
+    async def authorize(request: Request) -> RedirectResponse:
+        """Redirect same-origin OAuth authorization requests to Keycloak."""
+        keycloak_settings = KeycloakSettings()
+        query = urlencode(list(request.query_params.multi_items()))
+        target = keycloak_settings.authorization_endpoint
+        if query:
+            target = f"{target}?{query}"
+        return RedirectResponse(url=target, status_code=307)
+
+    @new_app.post("/token")
+    async def token(request: Request) -> Response:
+        """Proxy token exchange requests from same-origin OAuth clients to Keycloak."""
+        keycloak_settings = KeycloakSettings()
+        body = await request.body()
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            upstream = await client.post(
+                keycloak_settings.token_uri,
+                content=body,
+                headers={"Content-Type": request.headers.get("content-type", "application/x-www-form-urlencoded")},
+            )
+        return Response(
+            content=upstream.content,
+            status_code=upstream.status_code,
+            media_type=upstream.headers.get("content-type", "application/json"),
+        )
+
+    @new_app.post("/revoke")
+    async def revoke(request: Request) -> Response:
+        """Proxy token revocation requests from same-origin OAuth clients to Keycloak."""
+        keycloak_settings = KeycloakSettings()
+        body = await request.body()
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            upstream = await client.post(
+                keycloak_settings.revocation_endpoint,
+                content=body,
+                headers={"Content-Type": request.headers.get("content-type", "application/x-www-form-urlencoded")},
+            )
+        return Response(
+            content=upstream.content,
+            status_code=upstream.status_code,
+            media_type=upstream.headers.get("content-type", "application/json"),
+        )
+
+    @new_app.get(PROTECTED_RESOURCE_METADATA_PATH)
+    async def oauth_protected_resource_metadata(request: Request) -> dict[str, object]:
+        """Advertise OAuth metadata so MCP clients can trigger browser login."""
+        origin = str(request.base_url).rstrip("/")
+        return build_protected_resource_metadata(origin, gateway_settings.mcp_path)
 
     return new_app
 

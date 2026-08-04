@@ -29,9 +29,13 @@ from typing import TYPE_CHECKING, Any
 
 import anyio
 from anyio.streams.memory import MemoryObjectReceiveStream, MemoryObjectSendStream
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from pydantic import TypeAdapter
 
+from src.auth.oauth_metadata import (
+    PROTECTED_RESOURCE_METADATA_PATH,
+    build_protected_resource_metadata,
+)
 from src.connector_sdk.health_poller import ConnectorHealthPoller
 from src.connector_sdk.registry import ConnectorRegistry
 from src.data.database import primary_session_factory
@@ -378,6 +382,12 @@ def create_gateway_app(jwks_client: Any = None) -> FastAPI:
     # SSE transport
     # ------------------------------------------------------------------
     gateway.mount(f"{settings.mcp_path}/sse", sse_app)
+
+    @gateway.get(PROTECTED_RESOURCE_METADATA_PATH)
+    async def oauth_protected_resource_metadata(request: Request) -> dict[str, object]:
+        """Advertise OAuth metadata so MCP clients can open browser auth."""
+        origin = str(request.base_url).rstrip("/")
+        return build_protected_resource_metadata(origin, settings.mcp_path)
 
     # ------------------------------------------------------------------
     # WebSocket transport
