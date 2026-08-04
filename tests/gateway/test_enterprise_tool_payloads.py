@@ -537,6 +537,43 @@ class TestContextToolPayloads:
 
 @pytest.mark.asyncio
 class TestSourceCodeToolPayloads:
+    async def test_search_code_uses_indexed_repository_results_when_repository_supplied(self) -> None:
+        mcp = FastMCP("test-source")
+        register_source_code_tools(mcp)
+
+        indexed_results = [
+            {
+                "path": "README.md",
+                "line": 1,
+                "snippet": "KitchenIQ indexed readme",
+                "score": 8.5,
+                "matched_terms": ["readme"],
+                "last_modified": "2026-08-04T16:37:14+00:00",
+                "document_id": "github:Vishal-Bharath-Kumar/KitchenIQ:README.md",
+                "title": "README.md",
+            }
+        ]
+        diagnostics = {
+            "adapter": "opensearch_index_search",
+            "source_availability": {"resolved": True, "matched_scope": "Vishal-Bharath-Kumar/KitchenIQ"},
+            "degraded_reasons": [],
+        }
+
+        with patch(
+            "src.gateway.tools.enterprise.source_code_tools._search_indexed_repository",
+            new=AsyncMock(return_value=(indexed_results, diagnostics)),
+        ) as indexed_search:
+            payload = await _invoke_tool(
+                mcp,
+                "search_code",
+                {"query": "README", "repository": "Vishal-Bharath-Kumar/KitchenIQ", "limit": 5},
+            )
+
+        indexed_search.assert_awaited_once()
+        assert payload["status"] == "success"
+        assert payload["results"][0]["path"] == "README.md"
+        assert payload["diagnostics"]["adapter"] == "opensearch_index_search"
+
     async def test_search_code_returns_workspace_results(self) -> None:
         mcp = FastMCP("test-source")
         register_source_code_tools(mcp)
@@ -564,6 +601,43 @@ class TestSourceCodeToolPayloads:
         assert payload["status"] == "empty"
         assert payload["diagnostics"]["adapter"] == "workspace_search"
         assert "source_availability" in payload["diagnostics"]
+
+    async def test_search_repository_uses_indexed_repository_results(self) -> None:
+        mcp = FastMCP("test-source")
+        register_source_code_tools(mcp)
+
+        indexed_results = [
+            {
+                "path": "KitchenIQ/KitchenIQ/App.swift",
+                "line": 1,
+                "snippet": "@main struct KitchenIQApp: App {",
+                "score": 12.4,
+                "matched_terms": ["app", "main"],
+                "last_modified": "2026-08-04T16:37:14+00:00",
+                "document_id": "github:Vishal-Bharath-Kumar/KitchenIQ:KitchenIQ/KitchenIQ/App.swift",
+                "title": "App.swift",
+            }
+        ]
+        diagnostics = {
+            "adapter": "opensearch_index_search",
+            "source_availability": {"resolved": True, "matched_scope": "Vishal-Bharath-Kumar/KitchenIQ"},
+            "degraded_reasons": [],
+        }
+
+        with patch(
+            "src.gateway.tools.enterprise.source_code_tools._search_indexed_repository",
+            new=AsyncMock(return_value=(indexed_results, diagnostics)),
+        ) as indexed_search:
+            payload = await _invoke_tool(
+                mcp,
+                "search_repository",
+                {"repository": "Vishal-Bharath-Kumar/KitchenIQ", "query": "App"},
+            )
+
+        indexed_search.assert_awaited_once()
+        assert payload["status"] == "success"
+        assert payload["results"][0]["path"] == "KitchenIQ/KitchenIQ/App.swift"
+        assert payload["diagnostics"]["adapter"] == "opensearch_index_search"
 
     async def test_explain_code_returns_summary_fields(self) -> None:
         mcp = FastMCP("test-source")
