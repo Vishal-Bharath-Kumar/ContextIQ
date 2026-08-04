@@ -15,18 +15,27 @@ from datetime import UTC, datetime
 from typing import Any
 
 from fastmcp import FastMCP
+from sqlalchemy import distinct, func, select
 from src.agents.config import settings as agent_settings
 from src.agents.state import ExecutionStatus
+from src.audit.trace.models import TraceRecord
 from src.gateway.context.request_context import get_request_context
 from src.gateway.tools.enterprise._local_tools import (
     CODE_ROOTS,
     DOC_ROOT,
     build_error_response,
     build_tool_response,
+    compose_service_logs,
+    git_history,
     json_text_response,
     search_workspace,
+    service_graph,
+    service_graph_diagnostics,
+    service_health_snapshot,
     workspace_coverage,
 )
+from src.indexing.models.chunk import ChunkRecord
+from src.knowledge_sources.models.knowledge_source import KnowledgeSourceRecord
 from src.model_router.config import RoutingSettings
 from src.retrieval.ranking.filters import count_tokens
 from mcp.types import TextContent
@@ -233,6 +242,14 @@ async def _generate_context_payload(
     compression_level: str,
     context_service: Any = None,
 ) -> dict[str, Any]:
+    runtime_payload = await _try_live_operational_context(
+        prompt=prompt,
+        max_tokens=max_tokens,
+        compression_level=compression_level,
+    )
+    if runtime_payload is not None:
+        return runtime_payload
+
     if context_service is not None and hasattr(context_service, "generate_context"):
         service_payload = await context_service.generate_context(
             prompt,
@@ -401,6 +418,598 @@ async def _replay_execution_payload(execution_id: str, context_service: Any = No
             ),
             execution_id=execution_id,
         )
+
+
+async def _try_live_operational_context(
+    *,
+    prompt: str,
+    max_tokens: int,
+    compression_level: str,
+) -> dict[str, Any] | None:
+    context_kind = _detect_live_runtime_context_kind(prompt)
+    if context_kind is None:
+        return None
+
+    started = time.perf_counter()
+    governance = {"blocked": False, "redacted": False, "findings_count": 0, "masking_counts": {}}
+    try:
+        if context_kind == "service_health":
+            service = _extract_runtime_service_name(prompt)
+            health = service_health_snapshot(service)
+            diagnostics = service_graph_diagnostics()
+            context_items = _build_service_health_context_items(health)
+            compressed_items, compression = _compress_context_items(
+                context_items,
+                max_tokens=max_tokens,
+                compression_level=compression_level,
+                method="runtime_operational_context",
+            )
+            routing = await _build_routing_metadata(
+                prompt=prompt,
+                intent="operations",
+                context_items=compressed_items,
+                governance=governance,
+                requested_tool="generate_context",
+            )
+            status = "success" if health else "degraded"
+            summary = (
+                f"Retrieved live service-health snapshot for {len(health)} service(s)."
+                if health
+                else "Service-health prompt routed to the runtime adapter, but no health metadata was available."
+            )
+            answer = _service_health_answer(health, service)
+            response = build_tool_response(
+                status=status,
+                summary=summary,
+                data={
+                    "prompt": prompt,
+                    "intent": "operations",
+                    "context": compressed_items,
+                    "sources": ["runtime_health"],
+                    "ranking": {
+                        "strategy": "runtime_operational_query",
+                        "returned_items": len(compressed_items),
+                    },
+                    "answer": answer,
+                    "live_health": {
+                        "service": service or "all services",
+                        "health": health,
+                    },
+                },
+                diagnostics={
+                    **diagnostics,
+                    "adapter": "runtime_operational_context",
+                    "requested_max_tokens": max_tokens,
+                    "compression_level": compression_level,
+                    "elapsed_ms": round((time.perf_counter() - started) * 1000, 2),
+                },
+                governance=governance,
+                routing=routing,
+                compression=compression,
+            )
+            return _with_generate_context_compatibility(response)
+
+        if context_kind == "deployment_history":
+            service = _extract_runtime_service_name(prompt)
+            history_limit = min(max(max_tokens // 200, 5), 15)
+            deployments = git_history(history_limit, grep=service) if service else git_history(history_limit)
+            if service and not deployments:
+                deployments = git_history(history_limit)
+            context_items = _build_deployment_history_context_items(deployments, service)
+            compressed_items, compression = _compress_context_items(
+                context_items,
+                max_tokens=max_tokens,
+                compression_level=compression_level,
+                method="runtime_operational_context",
+            )
+            routing = await _build_routing_metadata(
+                prompt=prompt,
+                intent="operations",
+                context_items=compressed_items,
+                governance=governance,
+                requested_tool="generate_context",
+            )
+            status = "success" if deployments else "empty"
+            summary = (
+                f"Retrieved {len(deployments)} deployment-history entry/entries from git metadata."
+                if deployments
+                else "Deployment-history prompt routed to the runtime adapter, but no matching git history was available."
+            )
+            answer = _deployment_history_answer(deployments, service)
+            response = build_tool_response(
+                status=status,
+                summary=summary,
+                data={
+                    "prompt": prompt,
+                    "intent": "operations",
+                    "context": compressed_items,
+                    "sources": ["runtime_git"],
+                    "ranking": {
+                        "strategy": "runtime_operational_query",
+                        "returned_items": len(compressed_items),
+                    },
+                    "answer": answer,
+                    "live_deployments": {
+                        "service": service,
+                        "deployments": deployments,
+                    },
+                },
+                diagnostics={
+                    "adapter": "runtime_operational_context",
+                    "requested_max_tokens": max_tokens,
+                    "compression_level": compression_level,
+                    "source_availability": {"git_history": True},
+                    "degraded_reasons": [] if deployments else ["No matching git history was available."],
+                    "elapsed_ms": round((time.perf_counter() - started) * 1000, 2),
+                },
+                governance=governance,
+                routing=routing,
+                compression=compression,
+            )
+            return _with_generate_context_compatibility(response)
+
+        if context_kind == "service_logs":
+            service = _extract_runtime_service_name(prompt)
+            level = _extract_runtime_log_level(prompt)
+            log_limit = min(max(max_tokens // 40, 10), 50)
+            logs = compose_service_logs(
+                query=_extract_runtime_log_query(prompt),
+                service=service,
+                level=level,
+                limit=log_limit,
+            )
+            context_items = _build_service_log_context_items(logs)
+            compressed_items, compression = _compress_context_items(
+                context_items,
+                max_tokens=max_tokens,
+                compression_level=compression_level,
+                method="runtime_operational_context",
+            )
+            routing = await _build_routing_metadata(
+                prompt=prompt,
+                intent="operations",
+                context_items=compressed_items,
+                governance=governance,
+                requested_tool="generate_context",
+            )
+            status = "success" if logs else "empty"
+            summary = (
+                f"Retrieved {len(logs)} live log entry/entries from docker compose."
+                if logs
+                else "Log prompt routed to the runtime adapter, but no matching compose logs were available."
+            )
+            answer = _service_logs_answer(logs, service, level)
+            response = build_tool_response(
+                status=status,
+                summary=summary,
+                data={
+                    "prompt": prompt,
+                    "intent": "operations",
+                    "context": compressed_items,
+                    "sources": ["runtime_logs"],
+                    "ranking": {
+                        "strategy": "runtime_operational_query",
+                        "returned_items": len(compressed_items),
+                    },
+                    "answer": answer,
+                    "live_logs": {
+                        "service": service,
+                        "level": level,
+                        "logs": logs,
+                    },
+                },
+                diagnostics={
+                    "adapter": "runtime_operational_context",
+                    "requested_max_tokens": max_tokens,
+                    "compression_level": compression_level,
+                    "source_availability": {"docker_compose_logs": True},
+                    "degraded_reasons": [] if logs else ["No matching docker compose log entries were available."],
+                    "elapsed_ms": round((time.perf_counter() - started) * 1000, 2),
+                },
+                governance=governance,
+                routing=routing,
+                compression=compression,
+            )
+            return _with_generate_context_compatibility(response)
+
+        from src.data.database import primary_session_factory  # noqa: PLC0415
+
+        async with primary_session_factory()() as session:
+            total_traces_result = await session.execute(
+                select(func.count()).select_from(TraceRecord)
+            )
+            total_traces = int(total_traces_result.scalar_one() or 0)
+
+            total_documents_result = await session.execute(
+                select(func.count(distinct(ChunkRecord.document_id)))
+            )
+            total_documents = int(total_documents_result.scalar_one() or 0)
+
+            per_source_result = await session.execute(
+                select(
+                    KnowledgeSourceRecord.id,
+                    KnowledgeSourceRecord.name,
+                    KnowledgeSourceRecord.connector_type,
+                    KnowledgeSourceRecord.scope,
+                    func.count(distinct(ChunkRecord.document_id)).label("document_count"),
+                )
+                .select_from(ChunkRecord)
+                .outerjoin(
+                    KnowledgeSourceRecord,
+                    KnowledgeSourceRecord.id == ChunkRecord.source_id,
+                )
+                .group_by(
+                    KnowledgeSourceRecord.id,
+                    KnowledgeSourceRecord.name,
+                    KnowledgeSourceRecord.connector_type,
+                    KnowledgeSourceRecord.scope,
+                )
+                .order_by(
+                    func.count(distinct(ChunkRecord.document_id)).desc(),
+                    KnowledgeSourceRecord.name.asc().nulls_last(),
+                )
+            )
+
+            document_limit = min(max(max_tokens // 30, 25), 200)
+            latest_documents_result = await session.execute(
+                select(
+                    KnowledgeSourceRecord.id,
+                    KnowledgeSourceRecord.name,
+                    KnowledgeSourceRecord.connector_type,
+                    KnowledgeSourceRecord.scope,
+                    ChunkRecord.document_id,
+                    func.count().label("chunk_count"),
+                    func.max(ChunkRecord.indexed_at).label("last_indexed_at"),
+                )
+                .select_from(ChunkRecord)
+                .outerjoin(
+                    KnowledgeSourceRecord,
+                    KnowledgeSourceRecord.id == ChunkRecord.source_id,
+                )
+                .group_by(
+                    KnowledgeSourceRecord.id,
+                    KnowledgeSourceRecord.name,
+                    KnowledgeSourceRecord.connector_type,
+                    KnowledgeSourceRecord.scope,
+                    ChunkRecord.document_id,
+                )
+                .order_by(
+                    func.max(ChunkRecord.indexed_at).desc(),
+                    ChunkRecord.document_id.asc(),
+                )
+                .limit(document_limit)
+            )
+
+        per_source_counts = [
+            {
+                "source_id": str(source_id) if source_id else None,
+                "source_name": source_name,
+                "connector_type": str(connector_type) if connector_type else None,
+                "scope": scope,
+                "document_count": int(document_count or 0),
+            }
+            for source_id, source_name, connector_type, scope, document_count in per_source_result
+        ]
+        latest_documents = [
+            {
+                "source_id": str(source_id) if source_id else None,
+                "source_name": source_name,
+                "connector_type": str(connector_type) if connector_type else None,
+                "scope": scope,
+                "document_id": document_id,
+                "chunk_count": int(chunk_count or 0),
+                "last_indexed_at": (
+                    last_indexed_at.isoformat()
+                    if hasattr(last_indexed_at, "isoformat")
+                    else str(last_indexed_at)
+                ),
+            }
+            for source_id, source_name, connector_type, scope, document_id, chunk_count, last_indexed_at in latest_documents_result
+        ]
+
+        context_items = _build_live_runtime_context_items(
+            total_traces=total_traces,
+            total_documents=total_documents,
+            per_source_counts=per_source_counts,
+            latest_documents=latest_documents,
+        )
+        compressed_items, compression = _compress_context_items(
+            context_items,
+            max_tokens=max_tokens,
+            compression_level=compression_level,
+            method="runtime_operational_context",
+        )
+        routing = await _build_routing_metadata(
+            prompt=prompt,
+            intent="operations",
+            context_items=compressed_items,
+            governance=governance,
+            requested_tool="generate_context",
+        )
+        answer = (
+            f"Live runtime stats: {total_traces} total traces and {total_documents} distinct indexed documents. "
+            f"Returned {len(latest_documents)} indexed document entries and {len(per_source_counts)} per-source count row(s)."
+        )
+        response = build_tool_response(
+            status="success",
+            summary="Retrieved live runtime counts for traces and indexed documents.",
+            data={
+                "prompt": prompt,
+                "intent": "operations",
+                "context": compressed_items,
+                "sources": ["runtime_db"],
+                "ranking": {
+                    "strategy": "runtime_operational_query",
+                    "returned_items": len(compressed_items),
+                },
+                "answer": answer,
+                "live_stats": {
+                    "total_traces": total_traces,
+                    "total_distinct_indexed_documents": total_documents,
+                    "indexed_documents_by_source": per_source_counts,
+                    "indexed_documents": latest_documents,
+                },
+            },
+            diagnostics={
+                "adapter": "runtime_operational_context",
+                "requested_max_tokens": max_tokens,
+                "compression_level": compression_level,
+                "source_availability": {"database": True},
+                "degraded_reasons": [],
+                "elapsed_ms": round((time.perf_counter() - started) * 1000, 2),
+            },
+            governance=governance,
+            routing=routing,
+            compression=compression,
+        )
+        return _with_generate_context_compatibility(response)
+    except Exception:
+        logger.warning(
+            "generate_context live runtime context failed; falling back to retrieval pipeline",
+            exc_info=True,
+        )
+        return None
+
+
+def _detect_live_runtime_context_kind(prompt: str) -> str | None:
+    lowered = prompt.lower()
+    asks_for_live = any(term in lowered for term in ("live", "current", "latest", "right now"))
+    asks_for_counts = any(term in lowered for term in ("count", "counts", "total", "how many", "stats"))
+    asks_for_traces = any(term in lowered for term in ("trace", "traces", "execution traces"))
+    asks_for_index = any(
+        term in lowered
+        for term in (
+            "indexed document",
+            "indexed documents",
+            "document index",
+            "chunk index",
+            "knowledge source",
+        )
+    )
+    asks_to_fetch_docs = ("fetch" in lowered or "list" in lowered or "show" in lowered) and asks_for_index
+    if (asks_for_traces and asks_for_index) or (asks_for_live and asks_for_traces) or (asks_for_counts and asks_for_index) or asks_to_fetch_docs:
+        return "trace_index_stats"
+
+    asks_for_health = any(term in lowered for term in ("health", "status", "uptime", "reachable", "availability"))
+    asks_for_service = any(term in lowered for term in ("service", "services", "api", "redis", "postgres", "indexing"))
+    if asks_for_health and (asks_for_service or asks_for_live):
+        return "service_health"
+
+    asks_for_deployments = any(term in lowered for term in ("deployment", "deployments", "release", "releases", "deploy history", "deployment history"))
+    asks_for_history = any(term in lowered for term in ("history", "recent", "latest", "last"))
+    if asks_for_deployments or (asks_for_history and "deploy" in lowered):
+        return "deployment_history"
+
+    asks_for_logs = any(term in lowered for term in ("log", "logs", "errors", "warnings", "stack trace", "exception"))
+    if asks_for_logs and (asks_for_service or asks_for_live or asks_for_history):
+        return "service_logs"
+
+    return None
+
+
+def _extract_runtime_service_name(prompt: str) -> str | None:
+    lowered = prompt.lower()
+    known_services = sorted(service_graph().keys(), key=len, reverse=True)
+    for service in known_services:
+        if service.lower() in lowered:
+            return service
+    return None
+
+
+def _extract_runtime_log_level(prompt: str) -> str | None:
+    lowered = prompt.lower()
+    if "critical" in lowered:
+        return "critical"
+    if "error" in lowered or "errors" in lowered or "exception" in lowered:
+        return "error"
+    if "warn" in lowered or "warning" in lowered or "warnings" in lowered:
+        return "warn"
+    if "debug" in lowered:
+        return "debug"
+    if "info" in lowered:
+        return "info"
+    return None
+
+
+def _extract_runtime_log_query(prompt: str) -> str:
+    lowered = prompt.lower().strip()
+    for phrase in (
+        "show me",
+        "give me",
+        "fetch",
+        "find",
+        "search",
+        "the",
+        "current",
+        "latest",
+        "recent",
+        "live",
+    ):
+        lowered = lowered.replace(phrase, " ")
+    return " ".join(lowered.split()) or "error"
+
+
+def _build_live_runtime_context_items(
+    *,
+    total_traces: int,
+    total_documents: int,
+    per_source_counts: list[dict[str, Any]],
+    latest_documents: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    items: list[dict[str, Any]] = [
+        {
+            "source_id": "runtime_db",
+            "path": "runtime/execution_traces",
+            "title": "Live trace totals",
+            "content": f"Total traces available: {total_traces}",
+            "metric": "total_traces",
+            "value": total_traces,
+        },
+        {
+            "source_id": "runtime_db",
+            "path": "runtime/chunk_index",
+            "title": "Live indexed document totals",
+            "content": f"Total distinct indexed documents: {total_documents}",
+            "metric": "total_distinct_indexed_documents",
+            "value": total_documents,
+        },
+    ]
+
+    for row in per_source_counts:
+        source_name = row.get("source_name") or "(unmapped)"
+        connector_type = row.get("connector_type") or "unknown"
+        scope = row.get("scope") or "(none)"
+        items.append(
+            {
+                "source_id": "runtime_db",
+                "path": "runtime/chunk_index/by_source",
+                "title": f"Indexed documents for {source_name}",
+                "content": (
+                    f"Source={source_name}; connector_type={connector_type}; scope={scope}; "
+                    f"indexed_documents={row.get('document_count', 0)}"
+                ),
+                "source_name": row.get("source_name"),
+                "connector_type": row.get("connector_type"),
+                "scope": row.get("scope"),
+                "document_count": row.get("document_count", 0),
+            }
+        )
+
+    for row in latest_documents:
+        items.append(
+            {
+                "source_id": "runtime_db",
+                "path": "runtime/chunk_index/documents",
+                "title": row.get("document_id") or "indexed_document",
+                "content": (
+                    f"document_id={row.get('document_id')}; chunk_count={row.get('chunk_count')}; "
+                    f"last_indexed_at={row.get('last_indexed_at')}; source={row.get('source_name') or '(unmapped)'}"
+                ),
+                **row,
+            }
+        )
+    return items
+
+
+def _build_service_health_context_items(health: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    items: list[dict[str, Any]] = []
+    for row in health:
+        ports = row.get("ports") or []
+        port_summary = ", ".join(
+            f"{port.get('host_port')}->{port.get('container_port')} reachable={port.get('reachable')}"
+            for port in ports
+        ) or "no exposed ports"
+        items.append(
+            {
+                "source_id": "runtime_health",
+                "path": "runtime/service_health",
+                "title": f"Service health for {row.get('service')}",
+                "content": (
+                    f"service={row.get('service')}; status={row.get('status')}; "
+                    f"depends_on={','.join(row.get('depends_on') or []) or '(none)'}; ports={port_summary}; "
+                    f"timestamp={row.get('timestamp')}"
+                ),
+                **row,
+            }
+        )
+    return items
+
+
+def _build_deployment_history_context_items(
+    deployments: list[dict[str, str]],
+    service: str | None,
+) -> list[dict[str, Any]]:
+    items: list[dict[str, Any]] = []
+    for row in deployments:
+        items.append(
+            {
+                "source_id": "runtime_git",
+                "path": "runtime/deployment_history",
+                "title": row.get("message") or "deployment_history",
+                "content": (
+                    f"service={service or '(all)'}; commit={row.get('commit')}; timestamp={row.get('timestamp')}; "
+                    f"author={row.get('author')}; message={row.get('message')}"
+                ),
+                **row,
+            }
+        )
+    return items
+
+
+def _build_service_log_context_items(logs: list[dict[str, str]]) -> list[dict[str, Any]]:
+    items: list[dict[str, Any]] = []
+    for row in logs:
+        items.append(
+            {
+                "source_id": "runtime_logs",
+                "path": "runtime/service_logs",
+                "title": f"{row.get('service')} {row.get('level')} log",
+                "content": (
+                    f"timestamp={row.get('timestamp')}; service={row.get('service')}; "
+                    f"level={row.get('level')}; message={row.get('message')}"
+                ),
+                **row,
+            }
+        )
+    return items
+
+
+def _service_health_answer(health: list[dict[str, Any]], service: str | None) -> str:
+    if not health:
+        target = service or "requested services"
+        return f"No live service-health metadata was available for {target}."
+    healthy = sum(1 for row in health if row.get("status") == "healthy")
+    unreachable = sum(1 for row in health if row.get("status") == "unreachable")
+    target = service or f"{len(health)} service(s)"
+    return f"Live service-health snapshot for {target}: healthy={healthy}, unreachable={unreachable}, total={len(health)}."
+
+
+def _deployment_history_answer(deployments: list[dict[str, str]], service: str | None) -> str:
+    if not deployments:
+        target = service or "the repository"
+        return f"No deployment-history entries were available for {target}."
+    latest = deployments[0]
+    target = service or "the repository"
+    return (
+        f"Retrieved {len(deployments)} deployment-history entry/entries for {target}. "
+        f"Latest commit={latest.get('commit')} at {latest.get('timestamp')} by {latest.get('author')}."
+    )
+
+
+def _service_logs_answer(
+    logs: list[dict[str, str]],
+    service: str | None,
+    level: str | None,
+) -> str:
+    target = service or "all services"
+    level_suffix = f" at level {level}" if level else ""
+    if not logs:
+        return f"No live log entries were available for {target}{level_suffix}."
+    latest = logs[0]
+    return (
+        f"Retrieved {len(logs)} live log entry/entries for {target}{level_suffix}. "
+        f"Latest entry: [{latest.get('level')}] {latest.get('message')}"
+    )
 
 
 async def _build_workspace_fallback_context_payload(
@@ -837,6 +1446,44 @@ def _compress_matches(
     }
 
 
+def _compress_context_items(
+    items: list[dict[str, Any]],
+    *,
+    max_tokens: int,
+    compression_level: str,
+    method: str,
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    tokens_before = _count_context_tokens(items)
+    budget_ratio = {"low": 1.0, "medium": 0.85, "high": 0.65}.get(compression_level, 0.85)
+    target_budget = max(256, min(max_tokens, int(max_tokens * budget_ratio)))
+    compressed: list[dict[str, Any]] = []
+    running_tokens = 0
+    for item in items:
+        content = str(item.get("content") or item.get("summary") or item.get("value") or "")
+        item_tokens = count_tokens(content)
+        if running_tokens + item_tokens <= target_budget:
+            compressed.append(item)
+            running_tokens += item_tokens
+            continue
+        remaining = max(target_budget - running_tokens, 0)
+        if remaining <= 24:
+            break
+        trimmed_content = _truncate_to_token_budget(content, remaining)
+        if trimmed_content:
+            compressed.append({**item, "content": trimmed_content, "truncated": True})
+            running_tokens += count_tokens(trimmed_content)
+        break
+
+    tokens_after = _count_context_tokens(compressed)
+    return compressed, {
+        "enabled": tokens_before > tokens_after,
+        "method": method,
+        "tokens_before": tokens_before,
+        "tokens_after": tokens_after,
+        "ratio": _compression_ratio(tokens_before, tokens_after),
+    }
+
+
 def _truncate_to_token_budget(text: str, budget: int) -> str:
     words = text.split()
     if count_tokens(text) <= budget:
@@ -916,6 +1563,7 @@ def _with_generate_context_compatibility(response: dict[str, Any]) -> dict[str, 
         "langgraph_pipeline": "pipeline",
         "workspace_fallback": "workspace_fallback",
         "context_service": "service",
+        "runtime_operational_context": "runtime",
     }.get(adapter, adapter)
     compat = dict(response)
     compat.update(

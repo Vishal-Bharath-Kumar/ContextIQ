@@ -359,6 +359,96 @@ def git_history(limit: int, *, grep: str | None = None, paths: list[str] | None 
     return rows
 
 
+def compose_service_logs(
+    *,
+    query: str,
+    service: str | None = None,
+    level: str | None = None,
+    limit: int = 50,
+) -> list[dict[str, str]]:
+    compose = resolve_compose_path()
+    if compose is None:
+        return []
+
+    args = [
+        "docker",
+        "compose",
+        "-f",
+        str(compose),
+        "logs",
+        "--no-color",
+        "--timestamps",
+        f"--tail={max(limit * 4, limit)}",
+    ]
+    if service:
+        args.append(service)
+
+    try:
+        proc = subprocess.run(
+            args,
+            cwd=compose.parent,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+    except FileNotFoundError:
+        return []
+
+    if proc.returncode != 0:
+        return []
+
+    lowered_query = query.lower().strip()
+    lowered_level = level.lower().strip() if level else None
+    rows: list[dict[str, str]] = []
+    for raw_line in proc.stdout.splitlines():
+        parsed = _parse_compose_log_line(raw_line)
+        if parsed is None:
+            continue
+        message = parsed["message"]
+        message_lower = message.lower()
+        if lowered_query and lowered_query not in message_lower:
+            continue
+        if lowered_level and lowered_level not in message_lower:
+            continue
+        rows.append(parsed)
+        if len(rows) >= limit:
+            break
+    return rows
+
+
+def _parse_compose_log_line(raw_line: str) -> dict[str, str] | None:
+    parts = raw_line.split("|", 1)
+    if len(parts) != 2:
+        return None
+    service_part = parts[0].strip()
+    message_part = parts[1].strip()
+    if not message_part:
+        return None
+
+    timestamp = ""
+    message = message_part
+    message_tokens = message_part.split(" ", 1)
+    if len(message_tokens) == 2 and "T" in message_tokens[0]:
+        timestamp, message = message_tokens[0], message_tokens[1]
+
+    service_name = service_part.split()[0] if service_part else "unknown"
+    level = _infer_log_level(message)
+    return {
+        "timestamp": timestamp,
+        "service": service_name,
+        "level": level,
+        "message": message.strip(),
+    }
+
+
+def _infer_log_level(message: str) -> str:
+    lowered = message.lower()
+    for candidate in ("critical", "error", "warn", "warning", "info", "debug"):
+        if candidate in lowered:
+            return "WARN" if candidate == "warning" else candidate.upper()
+    return "INFO"
+
+
 def latest_file_authors(resource: str, limit: int = 5) -> list[dict[str, str]]:
     matches = search_workspace(resource, roots=[PROJECT_ROOT], suffixes=_TEXT_SUFFIXES, limit=limit)
     owners: list[dict[str, str]] = []

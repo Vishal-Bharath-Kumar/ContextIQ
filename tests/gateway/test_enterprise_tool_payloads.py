@@ -7,6 +7,7 @@ returned through the MCP content channel.
 from __future__ import annotations
 
 import json
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -298,6 +299,240 @@ class TestContextToolPayloads:
         assert payload["status"] == "success"
         assert payload["mode"] == "workspace_fallback"
         assert payload["context"]["context"][0]["path"] == "docs/architecture/system.md"
+
+    async def test_generate_context_routes_operational_count_prompts_to_live_runtime_branch(self) -> None:
+        mcp = FastMCP("test-context")
+        register_context_tools(mcp)
+
+        fake_now = datetime(2026, 8, 4, 10, 10, 42, tzinfo=UTC)
+        candidate_models = [
+            {
+                "model_id": "gpt-4o-mini",
+                "latency_tier": "fast",
+                "capabilities": ["chat"],
+                "context_window": 32000,
+                "cost_per_1k_tokens": 0.5,
+            }
+        ]
+
+        class _ScalarResult:
+            def __init__(self, value: int) -> None:
+                self._value = value
+
+            def scalar_one(self) -> int:
+                return self._value
+
+        class _RowsResult:
+            def __init__(self, rows: list[tuple]) -> None:
+                self._rows = rows
+
+            def __iter__(self):
+                return iter(self._rows)
+
+        class _Session:
+            def __init__(self) -> None:
+                self._call_count = 0
+
+            async def execute(self, _statement):
+                self._call_count += 1
+                if self._call_count == 1:
+                    return _ScalarResult(36)
+                if self._call_count == 2:
+                    return _ScalarResult(107)
+                if self._call_count == 3:
+                    return _RowsResult(
+                        [
+                            (None, None, None, None, 55),
+                            (
+                                "7089df8d-881e-4f29-b42c-7392a8560a55",
+                                "ContextIQ",
+                                "github",
+                                "Vishal-Bharath-Kumar/ContextIQ",
+                                49,
+                            ),
+                        ]
+                    )
+                return _RowsResult(
+                    [
+                        (
+                            "7089df8d-881e-4f29-b42c-7392a8560a55",
+                            "ContextIQ",
+                            "github",
+                            "Vishal-Bharath-Kumar/ContextIQ",
+                            "github:Vishal-Bharath-Kumar/ContextIQ:src/agents/checkpointer.py",
+                            2,
+                            fake_now,
+                        )
+                    ]
+                )
+
+        class _SessionFactoryContext:
+            async def __aenter__(self) -> _Session:
+                return _Session()
+
+            async def __aexit__(self, exc_type, exc, tb) -> bool:
+                return False
+
+        class _SessionFactory:
+            def __call__(self) -> _SessionFactoryContext:
+                return _SessionFactoryContext()
+
+        with (
+            patch("src.data.database.primary_session_factory", return_value=_SessionFactory()),
+            patch("src.gateway.tools.enterprise.context_tools._candidate_models", AsyncMock(return_value=candidate_models)),
+            patch("src.gateway.tools.enterprise.context_tools._try_pipeline_context", AsyncMock(side_effect=AssertionError("pipeline should not be called"))),
+        ):
+            payload = await _invoke_tool(
+                mcp,
+                "generate_context",
+                {
+                    "prompt": "give the live total traces available and fetch the indexed documents",
+                    "max_tokens": 2048,
+                    "compression_level": "medium",
+                },
+            )
+
+        assert payload["status"] == "success"
+        assert payload["mode"] == "runtime"
+        assert payload["diagnostics"]["adapter"] == "runtime_operational_context"
+        assert payload["data"]["live_stats"]["total_traces"] == 36
+        assert payload["data"]["live_stats"]["total_distinct_indexed_documents"] == 107
+        assert payload["context"]["answer"].startswith("Live runtime stats: 36 total traces")
+
+    async def test_generate_context_routes_service_health_prompts_to_runtime_branch(self) -> None:
+        mcp = FastMCP("test-context")
+        register_context_tools(mcp)
+
+        candidate_models = [
+            {
+                "model_id": "gpt-4o-mini",
+                "latency_tier": "fast",
+                "capabilities": ["chat"],
+                "context_window": 32000,
+                "cost_per_1k_tokens": 0.5,
+            }
+        ]
+        health_rows = [
+            {
+                "service": "api",
+                "status": "healthy",
+                "ports": [{"host_port": 8000, "container_port": 8000, "reachable": True}],
+                "depends_on": ["postgres", "redis"],
+                "timestamp": "2026-08-04T12:00:00Z",
+            }
+        ]
+
+        with (
+            patch("src.gateway.tools.enterprise.context_tools.service_graph", return_value={"api": {"ports": [], "depends_on": []}}),
+            patch("src.gateway.tools.enterprise.context_tools.service_graph_diagnostics", return_value={"adapter": "docker_compose", "source_available": True, "degraded_reasons": []}),
+            patch("src.gateway.tools.enterprise.context_tools.service_health_snapshot", return_value=health_rows),
+            patch("src.gateway.tools.enterprise.context_tools._candidate_models", AsyncMock(return_value=candidate_models)),
+            patch("src.gateway.tools.enterprise.context_tools._try_pipeline_context", AsyncMock(side_effect=AssertionError("pipeline should not be called"))),
+        ):
+            payload = await _invoke_tool(
+                mcp,
+                "generate_context",
+                {
+                    "prompt": "show me the current health status of the api service",
+                    "max_tokens": 1024,
+                    "compression_level": "medium",
+                },
+            )
+
+        assert payload["status"] == "success"
+        assert payload["mode"] == "runtime"
+        assert payload["data"]["live_health"]["service"] == "api"
+        assert payload["data"]["live_health"]["health"][0]["status"] == "healthy"
+        assert payload["context"]["answer"].startswith("Live service-health snapshot for api")
+
+    async def test_generate_context_routes_deployment_history_prompts_to_runtime_branch(self) -> None:
+        mcp = FastMCP("test-context")
+        register_context_tools(mcp)
+
+        candidate_models = [
+            {
+                "model_id": "gpt-4o-mini",
+                "latency_tier": "fast",
+                "capabilities": ["chat"],
+                "context_window": 32000,
+                "cost_per_1k_tokens": 0.5,
+            }
+        ]
+        deployments = [
+            {
+                "commit": "abc123",
+                "timestamp": "2026-08-04 12:34:56 +0000",
+                "author": "Vishal",
+                "message": "deploy api hotfix",
+            }
+        ]
+
+        with (
+            patch("src.gateway.tools.enterprise.context_tools.service_graph", return_value={"api": {"ports": [], "depends_on": []}}),
+            patch("src.gateway.tools.enterprise.context_tools.git_history", return_value=deployments),
+            patch("src.gateway.tools.enterprise.context_tools._candidate_models", AsyncMock(return_value=candidate_models)),
+            patch("src.gateway.tools.enterprise.context_tools._try_pipeline_context", AsyncMock(side_effect=AssertionError("pipeline should not be called"))),
+        ):
+            payload = await _invoke_tool(
+                mcp,
+                "generate_context",
+                {
+                    "prompt": "show me the latest deployment history for the api service",
+                    "max_tokens": 1024,
+                    "compression_level": "medium",
+                },
+            )
+
+        assert payload["status"] == "success"
+        assert payload["mode"] == "runtime"
+        assert payload["data"]["live_deployments"]["service"] == "api"
+        assert payload["data"]["live_deployments"]["deployments"][0]["commit"] == "abc123"
+        assert payload["context"]["answer"].startswith("Retrieved 1 deployment-history entry/entries for api")
+
+    async def test_generate_context_routes_log_prompts_to_runtime_branch(self) -> None:
+        mcp = FastMCP("test-context")
+        register_context_tools(mcp)
+
+        candidate_models = [
+            {
+                "model_id": "gpt-4o-mini",
+                "latency_tier": "fast",
+                "capabilities": ["chat"],
+                "context_window": 32000,
+                "cost_per_1k_tokens": 0.5,
+            }
+        ]
+        logs = [
+            {
+                "timestamp": "2026-08-04T12:10:00Z",
+                "service": "api",
+                "level": "ERROR",
+                "message": "database timeout while syncing connector",
+            }
+        ]
+
+        with (
+            patch("src.gateway.tools.enterprise.context_tools.service_graph", return_value={"api": {"ports": [], "depends_on": []}}),
+            patch("src.gateway.tools.enterprise.context_tools.compose_service_logs", return_value=logs),
+            patch("src.gateway.tools.enterprise.context_tools._candidate_models", AsyncMock(return_value=candidate_models)),
+            patch("src.gateway.tools.enterprise.context_tools._try_pipeline_context", AsyncMock(side_effect=AssertionError("pipeline should not be called"))),
+        ):
+            payload = await _invoke_tool(
+                mcp,
+                "generate_context",
+                {
+                    "prompt": "show me the latest error logs for the api service",
+                    "max_tokens": 1024,
+                    "compression_level": "medium",
+                },
+            )
+
+        assert payload["status"] == "success"
+        assert payload["mode"] == "runtime"
+        assert payload["data"]["live_logs"]["service"] == "api"
+        assert payload["data"]["live_logs"]["level"] == "error"
+        assert payload["data"]["live_logs"]["logs"][0]["message"] == "database timeout while syncing connector"
+        assert payload["context"]["answer"].startswith("Retrieved 1 live log entry/entries for api at level error")
 
 
 @pytest.mark.asyncio
