@@ -129,6 +129,76 @@ async def test_infer_three_entities_no_llm_returns_three_references_edges() -> N
     assert all(e.edge_type == EdgeType.REFERENCES for e in edges)
 
 
+@pytest.mark.asyncio
+async def test_deterministic_github_entities_produce_typed_heuristic_edges() -> None:
+    owner = ExtractedEntity(
+        entity_id=make_entity_id(EntityType.DEVELOPER, "acme"),
+        entity_type=EntityType.DEVELOPER,
+        name="Acme",
+        canonical_name="acme",
+        source_id=_SOURCE_ID,
+        chunk_id=_CHUNK_ID,
+        created_at=datetime.now(tz=UTC),
+        properties={"repository": "Acme/AuthService", "fallback_role": "repository_owner"},
+    )
+    repository = ExtractedEntity(
+        entity_id=make_entity_id(EntityType.REPOSITORY, "acme/authservice"),
+        entity_type=EntityType.REPOSITORY,
+        name="Acme/AuthService",
+        canonical_name="acme/authservice",
+        source_id=_SOURCE_ID,
+        chunk_id=_CHUNK_ID,
+        created_at=datetime.now(tz=UTC),
+        properties={
+            "repository": "Acme/AuthService",
+            "owner": "Acme",
+            "repo_name": "AuthService",
+            "fallback_role": "repository",
+        },
+    )
+    service = ExtractedEntity(
+        entity_id=make_entity_id(EntityType.SERVICE, "authservice"),
+        entity_type=EntityType.SERVICE,
+        name="AuthService",
+        canonical_name="authservice",
+        source_id=_SOURCE_ID,
+        chunk_id=_CHUNK_ID,
+        created_at=datetime.now(tz=UTC),
+        properties={
+            "repository": "Acme/AuthService",
+            "owner": "Acme",
+            "repo_name": "AuthService",
+            "fallback_role": "service",
+        },
+    )
+    document = ExtractedEntity(
+        entity_id=make_entity_id(EntityType.DOCUMENT, "acme/authservice/readme.md"),
+        entity_type=EntityType.DOCUMENT,
+        name="README.md",
+        canonical_name="acme/authservice/readme.md",
+        source_id=_SOURCE_ID,
+        chunk_id=_CHUNK_ID,
+        created_at=datetime.now(tz=UTC),
+        properties={
+            "document_id": "github:Acme/AuthService:README.md",
+            "repository": "Acme/AuthService",
+            "file_path": "README.md",
+            "owner": "Acme",
+            "repo_name": "AuthService",
+            "fallback_role": "document",
+        },
+    )
+    result = _make_result([owner, repository, service, document])
+
+    engine = EdgeInferenceEngine(settings=_no_llm_settings())
+    edges = await engine.infer(result, "README for AuthService")
+
+    edge_types = {(edge.edge_type, edge.from_entity_id, edge.to_entity_id) for edge in edges}
+    assert (EdgeType.OWNED_BY, repository.entity_id, owner.entity_id) in edge_types
+    assert (EdgeType.DEPENDS_ON, service.entity_id, repository.entity_id) in edge_types
+    assert (EdgeType.REFERENCES, document.entity_id, repository.entity_id) in edge_types
+
+
 # ---------------------------------------------------------------------------
 # AC-4 — LLM typed edge suppresses heuristic REFERENCES for same pair
 # ---------------------------------------------------------------------------

@@ -25,7 +25,7 @@ from src.llm.local_ollama_chain import get_ollama_base_url
 
 from src.knowledge_graph.inference.prompts import EDGE_INFERENCE_HUMAN, EDGE_INFERENCE_SYSTEM
 from src.knowledge_graph.schemas.edge import EdgeType
-from src.knowledge_graph.schemas.entity import EntityExtractionResult, ExtractedEntity
+from src.knowledge_graph.schemas.entity import EntityExtractionResult, EntityType, ExtractedEntity
 from src.knowledge_graph.schemas.relationship import GraphRelationship
 
 logger = logging.getLogger(__name__)
@@ -99,10 +99,20 @@ class EdgeInferenceEngine:
         chunk_id: UUID,
         source_id: UUID,
     ) -> list[GraphRelationship]:
-        """All unique ordered pairs → REFERENCES edge (co-location signal)."""
+        """Prefer deterministic typed edges, otherwise fall back to REFERENCES."""
         edges = []
         for a, b in combinations(entities, 2):
             try:
+                typed_edges = self._deterministic_edges(
+                    a=a,
+                    b=b,
+                    chunk_id=chunk_id,
+                    source_id=source_id,
+                )
+                if typed_edges:
+                    edges.extend(typed_edges)
+                    continue
+
                 edges.append(
                     GraphRelationship.create(
                         from_entity_id=a.entity_id,
@@ -117,6 +127,113 @@ class EdgeInferenceEngine:
             except ValueError:
                 pass  # skip self-loops (guard for safety)
         return edges
+
+    def _deterministic_edges(
+        self,
+        *,
+        a: ExtractedEntity,
+        b: ExtractedEntity,
+        chunk_id: UUID,
+        source_id: UUID,
+    ) -> list[GraphRelationship]:
+        repo_doc = self._repository_document_edge(a, b, chunk_id, source_id)
+        if repo_doc is not None:
+            return [repo_doc]
+
+        repo_owner = self._repository_owner_edge(a, b, chunk_id, source_id)
+        if repo_owner is not None:
+            return [repo_owner]
+
+        service_repo = self._service_repository_edge(a, b, chunk_id, source_id)
+        if service_repo is not None:
+            return [service_repo]
+
+        return []
+
+    def _repository_document_edge(
+        self,
+        a: ExtractedEntity,
+        b: ExtractedEntity,
+        chunk_id: UUID,
+        source_id: UUID,
+    ) -> GraphRelationship | None:
+        repository = self._find_entity_pair(a, b, EntityType.REPOSITORY, EntityType.DOCUMENT)
+        if repository is None:
+            return None
+        repo_entity, doc_entity = repository
+        if repo_entity.properties.get("repository") != doc_entity.properties.get("repository"):
+            return None
+        return GraphRelationship.create(
+            from_entity_id=doc_entity.entity_id,
+            to_entity_id=repo_entity.entity_id,
+            edge_type=EdgeType.REFERENCES,
+            source_id=source_id,
+            chunk_id=chunk_id,
+            weight=0.7,
+            ttl_days=self._settings.ttl_days,
+        )
+
+    def _repository_owner_edge(
+        self,
+        a: ExtractedEntity,
+        b: ExtractedEntity,
+        chunk_id: UUID,
+        source_id: UUID,
+    ) -> GraphRelationship | None:
+        pair = self._find_entity_pair(a, b, EntityType.REPOSITORY, EntityType.DEVELOPER)
+        if pair is None:
+            return None
+        repo_entity, owner_entity = pair
+        owner_name = repo_entity.properties.get("owner")
+        if not owner_name:
+            return None
+        if str(owner_name).strip().lower() != owner_entity.canonical_name:
+            return None
+        return GraphRelationship.create(
+            from_entity_id=repo_entity.entity_id,
+            to_entity_id=owner_entity.entity_id,
+            edge_type=EdgeType.OWNED_BY,
+            source_id=source_id,
+            chunk_id=chunk_id,
+            weight=0.95,
+            ttl_days=self._settings.ttl_days,
+        )
+
+    def _service_repository_edge(
+        self,
+        a: ExtractedEntity,
+        b: ExtractedEntity,
+        chunk_id: UUID,
+        source_id: UUID,
+    ) -> GraphRelationship | None:
+        pair = self._find_entity_pair(a, b, EntityType.SERVICE, EntityType.REPOSITORY)
+        if pair is None:
+            return None
+        service_entity, repo_entity = pair
+        if service_entity.properties.get("repository") != repo_entity.properties.get("repository"):
+            return None
+        return GraphRelationship.create(
+            from_entity_id=service_entity.entity_id,
+            to_entity_id=repo_entity.entity_id,
+            edge_type=EdgeType.DEPENDS_ON,
+            source_id=source_id,
+            chunk_id=chunk_id,
+            weight=0.8,
+            ttl_days=self._settings.ttl_days,
+        )
+
+    def _find_entity_pair(
+        self,
+        a: ExtractedEntity,
+        b: ExtractedEntity,
+        left_type: EntityType,
+        right_type: EntityType,
+    ) -> tuple[ExtractedEntity, ExtractedEntity] | None:
+        if a.entity_type == left_type and b.entity_type == right_type:
+            return a, b
+        if a.entity_type == right_type and b.entity_type == left_type:
+            return b, a
+        return None
 
     # ------------------------------------------------------------------
     # LLM path

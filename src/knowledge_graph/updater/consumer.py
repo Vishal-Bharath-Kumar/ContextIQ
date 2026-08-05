@@ -23,6 +23,7 @@ from datetime import UTC, datetime
 
 from aiokafka import AIOKafkaConsumer, AIOKafkaProducer
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from src.kafka.consumer_base import BOOTSTRAP_SERVERS, _sasl_kwargs
 
 from src.knowledge_graph.extraction.extractor import EntityExtractor
 from src.knowledge_graph.inference.edge_inference_engine import EdgeInferenceEngine
@@ -49,7 +50,7 @@ class GraphUpdaterSettings(BaseSettings):
 
     model_config = SettingsConfigDict(env_prefix="GRAPH_UPDATER_", env_file=".env", extra="ignore")
 
-    kafka_bootstrap_servers: str = "localhost:9092"
+    kafka_bootstrap_servers: str = BOOTSTRAP_SERVERS
     group_id: str = "contextiq-graph-updater"
     sync_topic: str = "knowledge.source.synced"
     chunk_indexed_topic: str = "knowledge.chunk.indexed"
@@ -101,10 +102,12 @@ class GraphUpdaterConsumer:
             value_deserializer=lambda v: json.loads(v.decode("utf-8")),
             enable_auto_commit=self._settings.enable_auto_commit,
             max_poll_records=self._settings.max_poll_records,
+            **_sasl_kwargs(),
         )
         self._producer = AIOKafkaProducer(
             bootstrap_servers=self._settings.kafka_bootstrap_servers,
             value_serializer=lambda v: json.dumps(v, default=str).encode("utf-8"),
+            **_sasl_kwargs(),
         )
         await self._consumer.start()
         await self._producer.start()

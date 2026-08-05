@@ -105,6 +105,7 @@ x-app-env-vars: &app-env-vars
     CONTEXTIQ_PREFER_RUNTIME_AVAILABLE_SOURCES: "true"
     ENTITY_LINKER_MODEL_ID: ${ENTITY_LINKER_MODEL_ID:-ollama/llama3.2}
     ENTITY_EXTRACTION_MODEL_ID: ${ENTITY_EXTRACTION_MODEL_ID:-ollama/llama3.2}
+    ENTITY_EXTRACTION_TIMEOUT_S: "30.0"
     EDGE_INFERENCE_MODEL_ID: ${EDGE_INFERENCE_MODEL_ID:-ollama/llama3.2}
     SUMMARIZATION_MODEL_NAME: ${SUMMARIZATION_MODEL_NAME:-ollama/llama3.2}
     # Extended timeout for pulling large models (e.g., 70B models)
@@ -392,10 +393,12 @@ services:
         vault write auth/approle/role/contextiq-connectors token_policies=\"contextiq-connectors\" secret_id_ttl=0 token_ttl=1h token_max_ttl=4h &&
         vault write auth/approle/role/contextiq-connectors/role-id role_id=contextiq-connectors-role &&
         (vault write auth/approle/role/contextiq-connectors/custom-secret-id secret_id=contextiq-connectors-secret 2>/dev/null || true) &&
-        if [ -n \"$GITHUB_CONNECTOR_TOKEN\" ]; then \
-          vault kv put secret/connectors/github/my-org-pat token=\"$GITHUB_CONNECTOR_TOKEN\" token_type=pat >/dev/null; \
-        elif ! vault kv get -format=json secret/connectors/github/my-org-pat >/dev/null 2>&1; then \
-          vault kv put secret/connectors/github/my-org-pat token=ghp_local_dev_dummy_token_1234 token_type=pat >/dev/null; \
+        if ! vault kv get -format=json secret/connectors/github/my-org-pat >/dev/null 2>&1; then \
+          if [ -n "$GITHUB_CONNECTOR_TOKEN" ]; then \
+            vault kv put secret/connectors/github/my-org-pat token="$GITHUB_CONNECTOR_TOKEN" token_type=pat >/dev/null; \
+          else \
+            vault kv put secret/connectors/github/my-org-pat token=ghp_local_dev_dummy_token_1234 token_type=pat >/dev/null; \
+          fi; \
         fi &&
         echo 'Vault bootstrap complete.'
       "

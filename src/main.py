@@ -12,6 +12,7 @@ JWKSClient backed by a respx mock without touching the module-level client.
 """
 from __future__ import annotations
 
+import asyncio
 from contextlib import AsyncExitStack
 import logging
 import os
@@ -49,6 +50,12 @@ from src.gateway.config import settings as gateway_settings
 from src.gateway.handlers.tools_call import (
     set_builtin_tool_trace_object_store,
     set_builtin_tool_trace_session_factory,
+)
+from src.gateway.health import build_knowledge_graph_health_status
+from src.gateway.lifespan import (
+    setup_neo4j_entity_store,
+    start_entity_consumer,
+    start_graph_updater_consumer,
 )
 from src.gateway.middleware.context_middleware import RequestContextMiddleware
 from src.gateway.mcp_handler import mcp_router
@@ -221,10 +228,98 @@ def create_app(jwks_client: JWKSClient | None = None) -> FastAPI:
             scheduler.start()
             app.state.sync_scheduler = scheduler
 
+            app.state.knowledge_graph_configured = bool(os.environ.get("NEO4J_URI"))
+            app.state.entity_consumer_task = None
+            app.state.graph_updater_task = None
+
+            _neo4j_enabled = bool(os.environ.get("NEO4J_URI"))
+            _entity_consumer_task = None
+            _entity_consumer = None
+            _graph_updater_task = None
+            _graph_updater = None
+            _neo4j_edge_store = None
+
+            if _neo4j_enabled:
+                try:
+                    await setup_neo4j_entity_store(app)
+                except Exception:
+                    logger.warning("Could not initialise Neo4j entity store", exc_info=True)
+                    _neo4j_enabled = False
+
+            if _neo4j_enabled:
+                try:
+                    from src.knowledge_graph.consumer import EntityConsumer  # noqa: PLC0415
+                    from src.knowledge_graph.extraction.extractor import EntityExtractor  # noqa: PLC0415
+
+                    _entity_consumer = EntityConsumer(
+                        extractor=EntityExtractor(),
+                        neo4j_store=app.state.neo4j_store,
+                    )
+                    _entity_consumer_task = asyncio.create_task(
+                        start_entity_consumer(_entity_consumer),
+                        name="entity_consumer",
+                    )
+                    app.state.entity_consumer = _entity_consumer
+                    app.state.entity_consumer_task = _entity_consumer_task
+                    logger.info("Entity consumer task started")
+                except Exception:
+                    logger.warning("Could not start entity consumer", exc_info=True)
+
+            if _neo4j_enabled:
+                try:
+                    from src.knowledge_graph.extraction.extractor import EntityExtractor  # noqa: PLC0415
+                    from src.knowledge_graph.inference.edge_inference_engine import EdgeInferenceEngine  # noqa: PLC0415
+                    from src.knowledge_graph.stores.neo4j_edge_store import Neo4jEdgeStore  # noqa: PLC0415
+                    from src.knowledge_graph.updater.consumer import GraphUpdaterConsumer  # noqa: PLC0415
+
+                    _neo4j_edge_store = Neo4jEdgeStore()
+                    _graph_updater = GraphUpdaterConsumer(
+                        entity_extractor=EntityExtractor(),
+                        edge_engine=EdgeInferenceEngine(),
+                        entity_store=app.state.neo4j_store,
+                        edge_store=_neo4j_edge_store,
+                    )
+                    _graph_updater_task = asyncio.create_task(
+                        start_graph_updater_consumer(_graph_updater),
+                        name="graph_updater_consumer",
+                    )
+                    app.state.graph_updater_consumer = _graph_updater
+                    app.state.graph_updater_task = _graph_updater_task
+                    logger.info("Graph updater consumer task started")
+                except Exception:
+                    if _neo4j_edge_store is not None:
+                        await _neo4j_edge_store.close()
+                        _neo4j_edge_store = None
+                    logger.warning("Could not start graph updater consumer", exc_info=True)
+
             yield
 
             # Cleanup observability stack
             scheduler.stop()
+            if _entity_consumer is not None:
+                await _entity_consumer.stop()
+            if _entity_consumer_task is not None and not _entity_consumer_task.done():
+                _entity_consumer_task.cancel()
+                try:
+                    await _entity_consumer_task
+                except asyncio.CancelledError:
+                    pass
+                logger.info("Entity consumer task stopped")
+            if _graph_updater is not None:
+                await _graph_updater.stop()
+            if _graph_updater_task is not None and not _graph_updater_task.done():
+                _graph_updater_task.cancel()
+                try:
+                    await _graph_updater_task
+                except asyncio.CancelledError:
+                    pass
+                logger.info("Graph updater consumer task stopped")
+            if _neo4j_edge_store is not None:
+                await _neo4j_edge_store.close()
+                logger.info("Neo4j edge store closed")
+            if hasattr(app.state, "neo4j_store"):
+                await app.state.neo4j_store.close()
+                logger.info("Neo4j entity store closed")
             await routing_runtime.close()
             if manage_lifecycle:
                 await client.shutdown()
@@ -273,6 +368,7 @@ def create_app(jwks_client: JWKSClient | None = None) -> FastAPI:
             "status": "ok",
             "ollama": getattr(new_app.state, "ollama_verification", default_ollama_verification_status()),
             "opa": getattr(new_app.state, "opa_health", default_opa_health_status()),
+            "knowledge_graph": build_knowledge_graph_health_status(new_app.state),
         }
 
     @new_app.get("/", response_class=HTMLResponse)

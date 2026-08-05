@@ -27,6 +27,7 @@ from fastapi import FastAPI
 
 from src.connector_sdk.registry import ConnectorRegistry
 from src.data.database import primary_session_factory
+from src.events.producer import close_kafka_producer, get_kafka_producer
 from src.governance.opa.health import opa_health_status
 from src.indexing.consumer import IndexingConsumer
 from src.indexing.embedding.service import EmbeddingService
@@ -51,6 +52,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     qdrant = QdrantIndexer()
     opensearch = OpenSearchIndexer()
     embedder = EmbeddingService()
+    producer = await get_kafka_producer()
     registry = ConnectorRegistry()
     logger.warning("indexing: loading connector registry")
     await registry.load()
@@ -62,6 +64,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         opensearch=opensearch,
         chunk_repo=chunk_repo,
         registry=registry,
+        producer=producer,
         # Enables lazily building a per-knowledge-source connector (from the
         # knowledge_sources table) the first time a source is synced, since
         # the entry-point registry.load() above only holds one shared,
@@ -91,6 +94,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     except asyncio.CancelledError:
         pass
     await pipeline.close()
+    await close_kafka_producer()
     await session.close()
     logger.warning("indexing: shutdown complete")
 
