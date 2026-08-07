@@ -1,0 +1,14 @@
+{
+  "servers": {
+    "contextiq": {
+      "type": "http",
+      "url": "http://localhost:8000/mcp/",
+      "oauth": {
+        "clientId": "contextiq-vscode-mcp"
+      },
+      "headers": {
+        "Content-Type": "application/json"
+      }
+    }
+  }
+}

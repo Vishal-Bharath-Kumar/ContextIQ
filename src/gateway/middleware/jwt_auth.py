@@ -46,6 +46,13 @@ import urllib.parse
 from datetime import datetime, timezone
 from typing import Any
 
+from src.auth.oauth_metadata import (
+    PROTECTED_RESOURCE_METADATA_PATH,
+    build_www_authenticate_header,
+    is_mcp_path,
+    origin_from_scope,
+)
+from src.gateway.config import settings
 from src.gateway.audit.auth_audit import (
     _get_client_ip,
     _sanitise_user_agent,
@@ -68,6 +75,7 @@ _BYPASS_PATHS: frozenset[str] = frozenset({
     "/metrics",
     "/auth/health/ready",
     "/auth/health/live",
+    PROTECTED_RESOURCE_METADATA_PATH,
     "/docs",
     "/redoc",
     "/openapi.json",
@@ -129,6 +137,23 @@ async def _send_http_error(
         headers.extend(extra_headers)
     await send({"type": "http.response.start", "status": status, "headers": headers})
     await send({"type": "http.response.body", "body": body, "more_body": False})
+
+
+def _mcp_auth_headers(
+    scope: dict[str, Any],
+    *,
+    error: str | None = None,
+    error_description: str | None = None,
+) -> list[tuple[bytes, bytes]]:
+    path = str(scope.get("path") or "")
+    if not is_mcp_path(path, settings.mcp_path):
+        return []
+    challenge = build_www_authenticate_header(
+        origin_from_scope(scope),
+        error=error,
+        error_description=error_description,
+    )
+    return [(b"www-authenticate", challenge.encode("latin-1"))]
 
 
 async def _close_websocket(send: Any, code: int = 4001) -> None:
@@ -232,7 +257,11 @@ class JWTAuthMiddleware:
                     timestamp=_utc_now_iso(),
                 )
                 await _send_http_error(
-                    send, 401, "missing_token", "Authorization header required"
+                    send,
+                    401,
+                    "missing_token",
+                    "Authorization header required",
+                    extra_headers=_mcp_auth_headers(scope),
                 )
                 return
 
@@ -249,7 +278,16 @@ class JWTAuthMiddleware:
             if scope_type == "websocket":
                 await _close_websocket(send, code=4001)
             else:
-                await _send_http_error(send, 401, "invalid_token_format")
+                await _send_http_error(
+                    send,
+                    401,
+                    "invalid_token_format",
+                    extra_headers=_mcp_auth_headers(
+                        scope,
+                        error="invalid_token",
+                        error_description="Invalid bearer token format",
+                    ),
+                )
             return
 
         token: str = raw_token_result
@@ -344,7 +382,11 @@ class JWTAuthMiddleware:
                     send,
                     401,
                     "token_expired",
-                    extra_headers=[
+                    extra_headers=_mcp_auth_headers(
+                        scope,
+                        error="invalid_token",
+                        error_description="Token expired",
+                    ) or [
                         (
                             b"www-authenticate",
                             b'Bearer error="invalid_token", error_description="Token expired"',
@@ -380,7 +422,16 @@ class JWTAuthMiddleware:
             if scope_type == "websocket":
                 await _close_websocket(send, code=4001)
             else:
-                await _send_http_error(send, 401, "malformed_token")
+                await _send_http_error(
+                    send,
+                    401,
+                    "malformed_token",
+                    extra_headers=_mcp_auth_headers(
+                        scope,
+                        error="invalid_token",
+                        error_description="Malformed token",
+                    ),
+                )
             return
 
         # ------------------------------------------------------------------

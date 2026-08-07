@@ -12,6 +12,7 @@ import { AddConnectorPage } from "../pages/connectors/AddConnectorPage";
 import { ConnectorListPage } from "../pages/connectors/ConnectorListPage";
 import { ForbiddenPage } from "../pages/errors/ForbiddenPage";
 import { LoginPage } from "../pages/errors/LoginPage";
+import { RegisterPage } from "../pages/errors/RegisterPage";
 import { AddModelPage } from "../pages/models/AddModelPage";
 import { InstallModelPage } from "../pages/models/InstallModelPage";
 import { ModelListPage } from "../pages/models/ModelListPage";
@@ -32,6 +33,7 @@ export const ADMIN_ROUTES: RouteObject[] = [
   // an infinite redirect loop: guard -> Navigate to /login -> re-matches the
   // same guarded parent -> guard -> Navigate to /login -> ... (blank screen).
   { path: "/login", element: <LoginPage /> },
+  { path: "/register", element: <RegisterPage /> },
   { path: "/403", element: <ForbiddenPage /> },
   {
     path: "/",

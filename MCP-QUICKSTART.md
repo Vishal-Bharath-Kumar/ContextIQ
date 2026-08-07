@@ -68,12 +68,14 @@ echo '$env:CONTEXTIQ_TOKEN = "your-jwt-token"' >> $PROFILE
 # Test health endpoint
 curl http://localhost:8000/healthz
 
-# Test MCP SSE handshake (with auth)
+# Test MCP SSE handshake (with auth) for SSE-based clients
 curl --max-time 5 \
   -H "Authorization: Bearer $CONTEXTIQ_TOKEN" \
   -H "Accept: text/event-stream" \
   http://localhost:8000/mcp/sse/
 ```
+
+For VS Code / GitHub Copilot workspace MCP configs, use `http://localhost:8000/mcp/` instead of `/mcp/sse/`.
 
 ## Step 4: Configure Your AI Assistant
 
@@ -107,7 +109,7 @@ Restart Claude Desktop after saving.
   "servers": {
     "contextiq": {
       "type": "http",
-      "url": "http://localhost:8000/mcp/sse/",
+      "url": "http://localhost:8000/mcp/",
       "headers": {
         "Authorization": "Bearer ${env:CONTEXTIQ_TOKEN}",
         "Content-Type": "application/json"
@@ -128,7 +130,7 @@ Restart Cursor after saving.
   "servers": {
     "contextiq": {
       "type": "http",
-      "url": "http://localhost:8000/mcp/sse/",
+      "url": "http://localhost:8000/mcp/",
       "headers": {
         "Authorization": "Bearer ${env:CONTEXTIQ_TOKEN}",
         "Content-Type": "application/json"
@@ -139,6 +141,10 @@ Restart Cursor after saving.
 ```
 
 Reload VS Code window: `Cmd+Shift+P` → "Developer: Reload Window"
+
+For a ready-to-copy VS Code setup, use `examples/contextiq-mcp-starter/` and run `setup-contextiq-dev-login` once in the target repo.
+
+This repo also includes `.github/prompts/contextiq.prompt.md`, which VS Code exposes as the `/contextiq` slash command in Copilot Chat.
 
 ## Step 5: Test in Your AI Assistant
 
@@ -158,9 +164,9 @@ Search ContextIQ for authentication implementations
 
 ### VS Code Copilot
 ```
-@workspace using ContextIQ, find database migration examples
+/contextiq find database migration examples
 
-Search ContextIQ for API documentation
+/contextiq search ContextIQ for API documentation
 ```
 
 ## Quick Troubleshooting
@@ -204,6 +210,7 @@ export CONTEXTIQ_TOKEN="$(
 - Restart your AI assistant completely
 - Verify JSON syntax in config file: `cat ~/.cursor/mcp.json | jq .`
 - Check AI assistant logs for errors
+- In VS Code, if you see a client ID prompt, your bearer token was missing or stale
 
 ## Available MCP Tools
 

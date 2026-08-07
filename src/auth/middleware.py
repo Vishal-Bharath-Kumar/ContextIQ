@@ -17,6 +17,12 @@ from starlette.requests import Request
 from starlette.responses import Response
 
 from src.auth.jwks_client import JWKSClient
+from src.auth.oauth_metadata import (
+    PROTECTED_RESOURCE_METADATA_PATH,
+    build_www_authenticate_header,
+    is_mcp_path,
+)
+from src.gateway.config import settings as gateway_settings
 from src.gateway.schemas.auth_types import JWTClaims
 
 logger = logging.getLogger(__name__)
@@ -28,15 +34,25 @@ logger = logging.getLogger(__name__)
 #   /docs, /redoc, /openapi.json — FastAPI OpenAPI UI (dev only)
 #   /metrics      — Prometheus scrape endpoint (secured by network policy)
 _SKIP_PATHS: frozenset[str] = frozenset({
+    "/",
     "/healthz",
+    "/authorize",
+    "/token",
     "/auth/health/ready",
     "/auth/health/live",
     "/auth/dev-login",  # local-dev-only login route (src/auth/dev_login.py); 404s unless enabled
+    "/auth/dev-register",  # local-dev-only self-registration route; must be public like dev-login
+    PROTECTED_RESOURCE_METADATA_PATH,
+    "/.well-known/oauth-authorization-server",
+    "/.well-known/openid-configuration",
     "/docs",
     "/redoc",
     "/openapi.json",
     "/metrics",
 })
+_INSERTED_PROTECTED_RESOURCE_METADATA_PATH = (
+    f"{PROTECTED_RESOURCE_METADATA_PATH}{gateway_settings.mcp_path}"
+)
 
 
 class JWTAuthMiddleware(BaseHTTPMiddleware):
@@ -55,8 +71,29 @@ class JWTAuthMiddleware(BaseHTTPMiddleware):
         super().__init__(app)
         self._jwks = jwks_client
 
+    def _challenge_headers(
+        self,
+        request: Request,
+        *,
+        error: str | None = None,
+        error_description: str | None = None,
+    ) -> dict[str, str]:
+        if not is_mcp_path(request.url.path, gateway_settings.mcp_path):
+            return {}
+        origin = str(request.base_url).rstrip("/")
+        return {
+            "WWW-Authenticate": build_www_authenticate_header(
+                origin,
+                error=error,
+                error_description=error_description,
+            )
+        }
+
     async def dispatch(self, request: Request, call_next: Any) -> Response:
-        if request.url.path in _SKIP_PATHS:
+        if request.url.path in _SKIP_PATHS or request.url.path in {
+            _INSERTED_PROTECTED_RESOURCE_METADATA_PATH,
+            f"{_INSERTED_PROTECTED_RESOURCE_METADATA_PATH}/",
+        }:
             return await call_next(request)
 
         auth_header = request.headers.get("Authorization", "")
@@ -64,6 +101,7 @@ class JWTAuthMiddleware(BaseHTTPMiddleware):
             return JSONResponse(
                 status_code=401,
                 content={"detail": "Missing or invalid Authorization header"},
+                headers=self._challenge_headers(request),
             )
 
         token = auth_header.removeprefix("Bearer ").strip()
@@ -75,6 +113,11 @@ class JWTAuthMiddleware(BaseHTTPMiddleware):
             return JSONResponse(
                 status_code=401,
                 content={"detail": "Token validation failed"},
+                headers=self._challenge_headers(
+                    request,
+                    error="invalid_token",
+                    error_description="Token validation failed",
+                ),
             )
 
         try:
@@ -84,6 +127,11 @@ class JWTAuthMiddleware(BaseHTTPMiddleware):
             return JSONResponse(
                 status_code=401,
                 content={"detail": "Malformed JWT claims"},
+                headers=self._challenge_headers(
+                    request,
+                    error="invalid_token",
+                    error_description="Malformed JWT claims",
+                ),
             )
 
         request.state.jwt_claims = claims

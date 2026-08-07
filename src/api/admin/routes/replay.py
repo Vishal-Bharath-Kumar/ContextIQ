@@ -17,7 +17,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.api.admin.dependencies import require_auditor_or_admin
+from src.auth import require_auditor
 from src.audit.replay.schemas import TraceDetailResponse, TraceListResponse
 from src.audit.replay.service import TraceDetailService, TraceNotFoundInIndexError
 from src.audit.trace.object_store import TraceObjectStore
@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/v1/traces", tags=["Admin — Replay Explorer"])
 
-AuditorClaims = Annotated[JWTClaims, Depends(require_auditor_or_admin)]
+AuditorClaims = Annotated[JWTClaims, Depends(require_auditor)]
 
 
 def _resolve_tenant_id(request: Request) -> str:
@@ -77,7 +77,7 @@ async def search_traces(
 ) -> TraceListResponse:
     """
     AC-1: Searchable by user_id, date range, intent type, model used, governance decision.
-    AC-4: 403 if caller lacks AUDITOR or ADMIN role.
+    AC-4: 403 if caller lacks AUDITOR, DEVOPS_SRE, SECURITY_OFFICER, or ADMIN role.
     AC-5: Served from PostgreSQL index — sub-second for recent traces.
     """
     query = TraceSearchQuery(

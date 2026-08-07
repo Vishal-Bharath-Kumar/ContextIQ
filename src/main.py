@@ -12,13 +12,17 @@ JWKSClient backed by a respx mock without touching the module-level client.
 """
 from __future__ import annotations
 
+import asyncio
 from contextlib import AsyncExitStack
 import logging
 import os
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+from urllib.parse import urlencode
 
-from fastapi import FastAPI
+import httpx
+from fastapi import FastAPI, Request
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 
 from src.api.admin.routes.audit_log import router as audit_log_router
 from src.api.admin.routes.governance import router as governance_router
@@ -28,6 +32,12 @@ from src.auth.dev_login import router as dev_login_router
 from src.auth.jwks_client import JWKSClient
 from src.auth.keycloak_settings import KeycloakSettings
 from src.auth.middleware import JWTAuthMiddleware
+from src.auth.oauth_metadata import (
+    MCP_REQUIRED_SCOPES,
+    PROTECTED_RESOURCE_METADATA_PATH,
+    build_protected_resource_metadata,
+    inserted_protected_resource_metadata_path,
+)
 from src.agents.checkpointer import get_redis_checkpointer
 from src.connector_sdk.registry import ConnectorRegistry
 from src.data.database import primary_session_factory
@@ -40,6 +50,12 @@ from src.gateway.config import settings as gateway_settings
 from src.gateway.handlers.tools_call import (
     set_builtin_tool_trace_object_store,
     set_builtin_tool_trace_session_factory,
+)
+from src.gateway.health import build_knowledge_graph_health_status
+from src.gateway.lifespan import (
+    setup_neo4j_entity_store,
+    start_entity_consumer,
+    start_graph_updater_consumer,
 )
 from src.gateway.middleware.context_middleware import RequestContextMiddleware
 from src.gateway.mcp_handler import mcp_router
@@ -212,10 +228,98 @@ def create_app(jwks_client: JWKSClient | None = None) -> FastAPI:
             scheduler.start()
             app.state.sync_scheduler = scheduler
 
+            app.state.knowledge_graph_configured = bool(os.environ.get("NEO4J_URI"))
+            app.state.entity_consumer_task = None
+            app.state.graph_updater_task = None
+
+            _neo4j_enabled = bool(os.environ.get("NEO4J_URI"))
+            _entity_consumer_task = None
+            _entity_consumer = None
+            _graph_updater_task = None
+            _graph_updater = None
+            _neo4j_edge_store = None
+
+            if _neo4j_enabled:
+                try:
+                    await setup_neo4j_entity_store(app)
+                except Exception:
+                    logger.warning("Could not initialise Neo4j entity store", exc_info=True)
+                    _neo4j_enabled = False
+
+            if _neo4j_enabled:
+                try:
+                    from src.knowledge_graph.consumer import EntityConsumer  # noqa: PLC0415
+                    from src.knowledge_graph.extraction.extractor import EntityExtractor  # noqa: PLC0415
+
+                    _entity_consumer = EntityConsumer(
+                        extractor=EntityExtractor(),
+                        neo4j_store=app.state.neo4j_store,
+                    )
+                    _entity_consumer_task = asyncio.create_task(
+                        start_entity_consumer(_entity_consumer),
+                        name="entity_consumer",
+                    )
+                    app.state.entity_consumer = _entity_consumer
+                    app.state.entity_consumer_task = _entity_consumer_task
+                    logger.info("Entity consumer task started")
+                except Exception:
+                    logger.warning("Could not start entity consumer", exc_info=True)
+
+            if _neo4j_enabled:
+                try:
+                    from src.knowledge_graph.extraction.extractor import EntityExtractor  # noqa: PLC0415
+                    from src.knowledge_graph.inference.edge_inference_engine import EdgeInferenceEngine  # noqa: PLC0415
+                    from src.knowledge_graph.stores.neo4j_edge_store import Neo4jEdgeStore  # noqa: PLC0415
+                    from src.knowledge_graph.updater.consumer import GraphUpdaterConsumer  # noqa: PLC0415
+
+                    _neo4j_edge_store = Neo4jEdgeStore()
+                    _graph_updater = GraphUpdaterConsumer(
+                        entity_extractor=EntityExtractor(),
+                        edge_engine=EdgeInferenceEngine(),
+                        entity_store=app.state.neo4j_store,
+                        edge_store=_neo4j_edge_store,
+                    )
+                    _graph_updater_task = asyncio.create_task(
+                        start_graph_updater_consumer(_graph_updater),
+                        name="graph_updater_consumer",
+                    )
+                    app.state.graph_updater_consumer = _graph_updater
+                    app.state.graph_updater_task = _graph_updater_task
+                    logger.info("Graph updater consumer task started")
+                except Exception:
+                    if _neo4j_edge_store is not None:
+                        await _neo4j_edge_store.close()
+                        _neo4j_edge_store = None
+                    logger.warning("Could not start graph updater consumer", exc_info=True)
+
             yield
 
             # Cleanup observability stack
             scheduler.stop()
+            if _entity_consumer is not None:
+                await _entity_consumer.stop()
+            if _entity_consumer_task is not None and not _entity_consumer_task.done():
+                _entity_consumer_task.cancel()
+                try:
+                    await _entity_consumer_task
+                except asyncio.CancelledError:
+                    pass
+                logger.info("Entity consumer task stopped")
+            if _graph_updater is not None:
+                await _graph_updater.stop()
+            if _graph_updater_task is not None and not _graph_updater_task.done():
+                _graph_updater_task.cancel()
+                try:
+                    await _graph_updater_task
+                except asyncio.CancelledError:
+                    pass
+                logger.info("Graph updater consumer task stopped")
+            if _neo4j_edge_store is not None:
+                await _neo4j_edge_store.close()
+                logger.info("Neo4j edge store closed")
+            if hasattr(app.state, "neo4j_store"):
+                await app.state.neo4j_store.close()
+                logger.info("Neo4j entity store closed")
             await routing_runtime.close()
             if manage_lifecycle:
                 await client.shutdown()
@@ -264,7 +368,121 @@ def create_app(jwks_client: JWKSClient | None = None) -> FastAPI:
             "status": "ok",
             "ollama": getattr(new_app.state, "ollama_verification", default_ollama_verification_status()),
             "opa": getattr(new_app.state, "opa_health", default_opa_health_status()),
+            "knowledge_graph": build_knowledge_graph_health_status(new_app.state),
         }
+
+    @new_app.get("/", response_class=HTMLResponse)
+    async def root(request: Request) -> str:
+        """Human-facing landing page for the local API/MCP service."""
+        keycloak_settings = KeycloakSettings()
+        mcp_url = f"{request.base_url}mcp/"
+        metadata_url = f"{request.base_url}.well-known/oauth-protected-resource"
+        auth_server = keycloak_settings.public_issuer
+        return f"""
+<!doctype html>
+<html lang=\"en\">
+    <head>
+        <meta charset=\"utf-8\">
+        <title>ContextIQ Local API</title>
+        <style>
+            body {{ font-family: -apple-system, BlinkMacSystemFont, sans-serif; margin: 40px; line-height: 1.5; color: #1f2937; }}
+            code {{ background: #f3f4f6; padding: 0.15rem 0.35rem; border-radius: 4px; }}
+            a {{ color: #2563eb; text-decoration: none; }}
+            a:hover {{ text-decoration: underline; }}
+            .panel {{ max-width: 760px; padding: 24px; border: 1px solid #e5e7eb; border-radius: 12px; background: #ffffff; }}
+        </style>
+    </head>
+    <body>
+        <div class=\"panel\">
+            <h1>ContextIQ Local API</h1>
+            <p><code>{request.base_url}</code> is the protected API and MCP resource server, not the browser login page.</p>
+            <p>For MCP authentication, VS Code should call <code>{mcp_url}</code>, receive an OAuth challenge, read <code>{metadata_url}</code>, and then open the Keycloak authorization flow.</p>
+            <p>Authorization server: <a href=\"{auth_server}\">{auth_server}</a></p>
+            <p>If VS Code still opens this page or shows a client-ID prompt, reload the window and restart the ContextIQ MCP server so it picks up the current <code>oauth.clientId</code> workspace configuration.</p>
+        </div>
+    </body>
+</html>
+"""
+
+    @new_app.get("/.well-known/oauth-authorization-server")
+    async def oauth_authorization_server_metadata(request: Request) -> dict[str, object]:
+        """Expose OAuth authorization-server metadata on the MCP origin."""
+        origin = str(request.base_url).rstrip("/")
+        keycloak_settings = KeycloakSettings()
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            upstream = await client.get(keycloak_settings.internal_openid_configuration_uri)
+            upstream.raise_for_status()
+        metadata = upstream.json()
+        metadata["authorization_endpoint"] = f"{origin}/authorize"
+        metadata["token_endpoint"] = f"{origin}/token"
+        metadata["revocation_endpoint"] = f"{origin}/revoke"
+        metadata["issuer"] = keycloak_settings.public_issuer
+        metadata["scopes_supported"] = list(MCP_REQUIRED_SCOPES)
+        return metadata
+
+    @new_app.get("/.well-known/openid-configuration")
+    async def openid_configuration(request: Request) -> dict[str, object]:
+        """OIDC discovery alias for clients that probe this path on the MCP origin."""
+        return await oauth_authorization_server_metadata(request)
+
+    @new_app.get("/authorize")
+    async def authorize(request: Request) -> RedirectResponse:
+        """Redirect same-origin OAuth authorization requests to Keycloak."""
+        keycloak_settings = KeycloakSettings()
+        query = urlencode(list(request.query_params.multi_items()))
+        target = keycloak_settings.authorization_endpoint
+        if query:
+            target = f"{target}?{query}"
+        return RedirectResponse(url=target, status_code=307)
+
+    @new_app.post("/token")
+    async def token(request: Request) -> Response:
+        """Proxy token exchange requests from same-origin OAuth clients to Keycloak."""
+        keycloak_settings = KeycloakSettings()
+        body = await request.body()
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            upstream = await client.post(
+                keycloak_settings.token_uri,
+                content=body,
+                headers={"Content-Type": request.headers.get("content-type", "application/x-www-form-urlencoded")},
+            )
+        return Response(
+            content=upstream.content,
+            status_code=upstream.status_code,
+            media_type=upstream.headers.get("content-type", "application/json"),
+        )
+
+    @new_app.post("/revoke")
+    async def revoke(request: Request) -> Response:
+        """Proxy token revocation requests from same-origin OAuth clients to Keycloak."""
+        keycloak_settings = KeycloakSettings()
+        body = await request.body()
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            upstream = await client.post(
+                keycloak_settings.revocation_endpoint,
+                content=body,
+                headers={"Content-Type": request.headers.get("content-type", "application/x-www-form-urlencoded")},
+            )
+        return Response(
+            content=upstream.content,
+            status_code=upstream.status_code,
+            media_type=upstream.headers.get("content-type", "application/json"),
+        )
+
+    @new_app.get(PROTECTED_RESOURCE_METADATA_PATH)
+    async def oauth_protected_resource_metadata(request: Request) -> dict[str, object]:
+        """Advertise OAuth metadata so MCP clients can trigger browser login."""
+        origin = str(request.base_url).rstrip("/")
+        return build_protected_resource_metadata(origin, gateway_settings.mcp_path)
+
+    inserted_metadata_path = inserted_protected_resource_metadata_path(gateway_settings.mcp_path)
+
+    @new_app.get(inserted_metadata_path)
+    @new_app.get(f"{inserted_metadata_path}/")
+    async def oauth_protected_resource_metadata_inserted(request: Request) -> dict[str, object]:
+        """Serve the RFC9728 path-inserted protected-resource metadata URI."""
+        origin = str(request.base_url).rstrip("/")
+        return build_protected_resource_metadata(origin, gateway_settings.mcp_path)
 
     return new_app
 

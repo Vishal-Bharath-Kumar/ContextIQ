@@ -5,8 +5,8 @@ Covers all acceptance criteria:
   AC-5  duration_ms > 0 in the returned result.
   AC-6  Empty entity list returned when LLM returns {"entities": []}.
         Malformed entity items are skipped; other entities still returned.
-        asyncio.TimeoutError propagated on LLM timeout.
-        ValueError raised on non-JSON LLM response.
+        asyncio.TimeoutError propagated on LLM timeout for non-GitHub chunks.
+        ValueError raised on non-JSON LLM response for non-GitHub chunks.
   deterministic entity_id derived from type + canonical_name.
 """
 from __future__ import annotations
@@ -225,9 +225,6 @@ async def test_extract_skips_malformed_entity_keeps_valid() -> None:
 
 @pytest.mark.asyncio
 async def test_extract_raises_timeout_error_on_llm_timeout() -> None:
-    async def _slow(*args: object, **kwargs: object) -> None:
-        await asyncio.sleep(10)
-
     with patch("litellm.acompletion", new=AsyncMock(side_effect=asyncio.TimeoutError)):
         extractor = EntityExtractor(settings=_settings())
         with pytest.raises(asyncio.TimeoutError):
@@ -247,6 +244,57 @@ async def test_extract_raises_value_error_on_non_json_response() -> None:
         extractor = EntityExtractor(settings=_settings())
         with pytest.raises(ValueError, match="LLM returned non-JSON content"):
             await extractor.extract(_make_event())
+
+
+@pytest.mark.asyncio
+async def test_extract_github_timeout_falls_back_to_deterministic_entities() -> None:
+    event = ChunkIndexedEvent(
+        chunk_id=_CHUNK_ID,
+        source_id=_SOURCE_ID,
+        tenant_id="tenant-1",
+        document_id="github:Acme/AuthService:src/main.py",
+        text="import fastapi",
+        token_count=10,
+        embedding_model="text-embedding-3-small",
+        indexed_at=datetime.now(tz=UTC),
+    )
+
+    with patch("litellm.acompletion", new=AsyncMock(side_effect=asyncio.TimeoutError)):
+        extractor = EntityExtractor(settings=_settings())
+        result = await extractor.extract(event)
+
+    assert [entity.entity_type for entity in result.entities] == [
+        EntityType.DEVELOPER,
+        EntityType.REPOSITORY,
+        EntityType.SERVICE,
+        EntityType.DOCUMENT,
+    ]
+    assert result.entities[0].name == "Acme"
+    assert result.entities[1].name == "Acme/AuthService"
+    assert result.entities[2].name == "AuthService"
+    assert result.entities[3].name == "main.py"
+
+
+@pytest.mark.asyncio
+async def test_extract_github_invalid_json_falls_back_to_deterministic_entities() -> None:
+    event = ChunkIndexedEvent(
+        chunk_id=_CHUNK_ID,
+        source_id=_SOURCE_ID,
+        tenant_id="tenant-1",
+        document_id="github:Acme/AuthService:README.md",
+        text="hello",
+        token_count=10,
+        embedding_model="text-embedding-3-small",
+        indexed_at=datetime.now(tz=UTC),
+    )
+    mock_response = _make_litellm_response("not json at all")
+
+    with patch("litellm.acompletion", new=AsyncMock(return_value=mock_response)):
+        extractor = EntityExtractor(settings=_settings())
+        result = await extractor.extract(event)
+
+    assert len(result.entities) == 4
+    assert result.entities[-1].properties["file_path"] == "README.md"
 
 
 # ---------------------------------------------------------------------------

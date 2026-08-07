@@ -101,7 +101,7 @@ export CONTEXTIQ_PROD_TOKEN="your-production-jwt-token"
   "servers": {
     "contextiq": {
       "type": "http",
-      "url": "http://localhost:8000/mcp/sse/",
+      "url": "http://localhost:8000/mcp/",
       "headers": {
         "Authorization": "Bearer ${env:CONTEXTIQ_TOKEN}",
         "Content-Type": "application/json"
@@ -141,9 +141,10 @@ export CONTEXTIQ_PROD_TOKEN="your-production-jwt-token"
 **Steps**:
 1. Open VS Code in your project
 2. Create `.vscode/mcp.json` if it doesn't exist
-3. Add the ContextIQ server
-4. Reload VS Code window
-5. Use Copilot Chat to access ContextIQ tools
+3. Add the ContextIQ server or copy the starter from `examples/contextiq-mcp-starter`
+4. Run `setup-contextiq-dev-login` once if you installed the starter tasks
+5. Reload VS Code window
+6. Use Copilot Chat to access ContextIQ tools
 
 ---
 
@@ -213,9 +214,14 @@ These extensions typically read from `.vscode/mcp.json` in your workspace.
 
 ContextIQ supports two MCP transports:
 
+### VS Code Workspace MCP
+- **Endpoint**: `http://localhost:8000/mcp/`
+- **Best for**: GitHub Copilot in VS Code, workspace-local `.vscode/mcp.json`
+- **Protocol**: MCP over HTTP POST
+
 ### Server-Sent Events (SSE) - Recommended
 - **Endpoint**: `http://localhost:8000/mcp/sse/`
-- **Best for**: Most AI assistants, long-running operations
+- **Best for**: Claude Desktop, Cursor, Continue, and other clients that explicitly expect SSE
 - **Protocol**: HTTP with streaming responses
 
 ### WebSocket (WS)
@@ -251,7 +257,7 @@ export CONTEXTIQ_TOKEN="eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9..."
 export CONTEXTIQ_PROD_TOKEN="eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9..."
 
 # Custom endpoint
-export CONTEXTIQ_MCP_URL="https://contextiq.example.com/mcp/sse"
+export CONTEXTIQ_MCP_URL="https://contextiq.example.com/mcp/"
 ```
 
 For Windows PowerShell:
@@ -287,15 +293,20 @@ Once connected, AI assistants can access these ContextIQ tools:
 
 ## Verification
 
-Test your connection using curl:
+Verify by client type:
 
 ```bash
-# Test SSE endpoint
+# Health check for all clients
+curl http://localhost:8000/healthz
+
+# Test SSE endpoint for SSE-based clients
 curl --max-time 5 \
   -H "Authorization: Bearer $CONTEXTIQ_TOKEN" \
   -H "Accept: text/event-stream" \
   http://localhost:8000/mcp/sse/
 ```
+
+For VS Code, reload the window after configuring `.vscode/mcp.json` and confirm the server appears in Copilot Chat. If VS Code asks for a client ID, it did not receive a valid bearer token header.
 
 ---
 

@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import datetime as dt
 from collections.abc import Iterator
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, patch
 from uuid import uuid4
 
 import pytest
@@ -116,16 +116,24 @@ async def test_create_knowledge_source_returns_201() -> None:
     app.dependency_overrides[decode_jwt_claims] = lambda: _ADMIN_CLAIMS
     app.dependency_overrides[get_knowledge_source_service] = lambda: svc
     try:
-        async with AsyncClient(
-            transport=ASGITransport(app), base_url="http://test"
-        ) as client:
-            response = await client.post("/v1/knowledge-sources", json=_VALID_PAYLOAD)
+        with patch(
+            "src.knowledge_sources.routers.knowledge_source_router._emit_initial_index_event",
+            new=AsyncMock(),
+        ), patch(
+            "src.knowledge_sources.routers.knowledge_source_router._refresh_runtime_connector_registry",
+            new=AsyncMock(),
+        ) as refresh_registry:
+            async with AsyncClient(
+                transport=ASGITransport(app), base_url="http://test"
+            ) as client:
+                response = await client.post("/v1/knowledge-sources", json=_VALID_PAYLOAD)
         assert response.status_code == 201
         body = response.json()
         assert body["id"] == str(_SOURCE_ID)
         assert body["connector_type"] == "github"
         assert body["status"] == "active"
         assert body["document_count"] == 42
+        refresh_registry.assert_awaited_once()
     finally:
         app.dependency_overrides.pop(decode_jwt_claims, None)
         app.dependency_overrides.pop(get_knowledge_source_service, None)
@@ -228,15 +236,20 @@ async def test_toggle_status_inactive_returns_200() -> None:
     app.dependency_overrides[decode_jwt_claims] = lambda: _ADMIN_CLAIMS
     app.dependency_overrides[get_knowledge_source_service] = lambda: svc
     try:
-        async with AsyncClient(
-            transport=ASGITransport(app), base_url="http://test"
-        ) as client:
-            response = await client.patch(
-                f"/v1/knowledge-sources/{_SOURCE_ID}/status",
-                json={"active": False},
-            )
+        with patch(
+            "src.knowledge_sources.routers.knowledge_source_router._refresh_runtime_connector_registry",
+            new=AsyncMock(),
+        ) as refresh_registry:
+            async with AsyncClient(
+                transport=ASGITransport(app), base_url="http://test"
+            ) as client:
+                response = await client.patch(
+                    f"/v1/knowledge-sources/{_SOURCE_ID}/status",
+                    json={"active": False},
+                )
         assert response.status_code == 200
         assert response.json()["status"] == "inactive"
+        refresh_registry.assert_awaited_once()
     finally:
         app.dependency_overrides.pop(decode_jwt_claims, None)
         app.dependency_overrides.pop(get_knowledge_source_service, None)
@@ -321,12 +334,17 @@ async def test_delete_knowledge_source_returns_204() -> None:
     app.dependency_overrides[decode_jwt_claims] = lambda: _ADMIN_CLAIMS
     app.dependency_overrides[get_knowledge_source_service] = lambda: svc
     try:
-        async with AsyncClient(
-            transport=ASGITransport(app), base_url="http://test"
-        ) as client:
-            response = await client.delete(f"/v1/knowledge-sources/{_SOURCE_ID}")
+        with patch(
+            "src.knowledge_sources.routers.knowledge_source_router._refresh_runtime_connector_registry",
+            new=AsyncMock(),
+        ) as refresh_registry:
+            async with AsyncClient(
+                transport=ASGITransport(app), base_url="http://test"
+            ) as client:
+                response = await client.delete(f"/v1/knowledge-sources/{_SOURCE_ID}")
         assert response.status_code == 204
         svc.delete.assert_awaited_once_with(_SOURCE_ID)
+        refresh_registry.assert_awaited_once()
     finally:
         app.dependency_overrides.pop(decode_jwt_claims, None)
         app.dependency_overrides.pop(get_knowledge_source_service, None)

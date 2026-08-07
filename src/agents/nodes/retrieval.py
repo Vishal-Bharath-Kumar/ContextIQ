@@ -16,11 +16,13 @@ import logging
 
 from src.agents.config import settings
 from src.agents.retrieval.aggregator import ContextAggregator
-from src.agents.retrieval.parallel_dispatcher import ParallelConnectorDispatcher
+from src.agents.retrieval.parallel_dispatcher import ContextChunk, ParallelConnectorDispatcher
 from src.agents.schemas.execution_plan import ExecutionPlan
 from src.agents.state import AgentState, ExecutionStatus
 from src.connector_sdk.registry import ConnectorRegistry
+from src.gateway.tools.enterprise._local_tools import CODE_ROOTS, DOC_ROOT, search_workspace
 from src.observability.tracing.node_span import otel_node_span
+from src.retrieval.ranking.filters import count_tokens
 
 _logger = logging.getLogger(__name__)
 
@@ -100,7 +102,13 @@ async def retrieval_node(state: AgentState) -> dict:
     registry = get_connector_registry()
     otel_ctx = state.get("_otel_ctx")
     request_id = str(state.get("request_id", ""))
-    for src in plan.sources:
+    source_ids = list(plan.sources)
+    if settings.prefer_runtime_available_sources:
+        available_sources = [src for src in source_ids if registry.get(src) is not None]
+        if available_sources:
+            source_ids = available_sources
+
+    for src in source_ids:
         connector = registry.get(src)
         if connector is not None:
             connector._otel_ctx = otel_ctx
@@ -112,7 +120,7 @@ async def retrieval_node(state: AgentState) -> dict:
 
     results = await dispatcher.fetch_all(
         query=prompt,
-        source_ids=plan.sources,
+        source_ids=source_ids,
         token_budget_per_source=plan.token_budget_per_source,
         intent_type=str(state.get("intent_type") or ""),
     )
@@ -123,6 +131,14 @@ async def retrieval_node(state: AgentState) -> dict:
         token_budget_per_source=plan.token_budget_per_source,
         global_token_budget=plan.token_budget_total,
     )
+    if not aggregated.chunks:
+        aggregated = _workspace_fallback_aggregate(
+            prompt=prompt,
+            intent_type=str(state.get("intent_type") or ""),
+            plan=plan,
+            degraded_sources=[d.model_dump() for d in aggregated.degraded_sources],
+        )
+
     ranked_chunks = _rank_chunks_for_intent(
         aggregated.chunks,
         str(state.get("intent_type") or ""),
@@ -136,6 +152,73 @@ async def retrieval_node(state: AgentState) -> dict:
         "current_node": "retrieval_agent",
         "status": ExecutionStatus.RUNNING,
     }
+
+
+def _workspace_fallback_aggregate(
+    *,
+    prompt: str,
+    intent_type: str,
+    plan: ExecutionPlan,
+    degraded_sources: list[dict],
+):
+    limit = min(max(plan.token_budget_total // 500, 4), 12)
+    matches = search_workspace(prompt, roots=CODE_ROOTS + [DOC_ROOT], limit=limit)
+    chunks: list[ContextChunk] = []
+    for index, match in enumerate(matches):
+        snippet = str(match.get("snippet") or "")
+        file_path = str(match.get("path") or f"workspace-{index}")
+        chunks.append(
+            ContextChunk(
+                chunk_id=f"workspace:{file_path}:{match.get('line') or index}",
+                source_id="workspace",
+                content=snippet,
+                token_count=max(1, count_tokens(snippet)),
+                score=_normalise_workspace_score(match.get("score")),
+                metadata={
+                    "file_path": file_path,
+                    "author": "workspace",
+                    "last_modified": str(match.get("last_modified") or ""),
+                    "source_url": file_path,
+                    "title": str(match.get("title") or ""),
+                    "intent_type": intent_type,
+                },
+            )
+        )
+
+    aggregated = ContextAggregator.AggregatedContext if False else None
+    from src.agents.retrieval.aggregator import AggregatedContext, DegradedSource  # noqa: PLC0415
+
+    degraded = [
+        DegradedSource(
+            source_id=str(item.get("source_id") or "unknown"),
+            error_type=str(item.get("error_type") or "unknown"),
+            message=str(item.get("message") or ""),
+        )
+        for item in degraded_sources
+    ]
+    if chunks:
+        degraded.append(
+            DegradedSource(
+                source_id="workspace",
+                error_type="LocalWorkspaceFallback",
+                message="No connector results were available; used local workspace retrieval fallback.",
+            )
+        )
+
+    return AggregatedContext(
+        chunks=chunks,
+        total_token_count=sum(chunk.token_count for chunk in chunks),
+        source_count=len({chunk.source_id for chunk in chunks}),
+        degraded_sources=degraded,
+    )
+
+
+def _normalise_workspace_score(raw_score: object) -> float:
+    try:
+        value = float(raw_score)
+    except (TypeError, ValueError):
+        return 0.5
+    return max(0.0, min(round(value / 20.0, 4), 1.0))
 
 
 def _rank_chunks_for_intent(chunks: list, intent_type: str, prompt: str) -> list:

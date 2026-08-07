@@ -6,7 +6,9 @@ tools when external connectors or services are not configured.
 
 from __future__ import annotations
 
+from collections import Counter
 import json
+import os
 import re
 import socket
 import subprocess
@@ -17,8 +19,13 @@ from typing import Any
 from mcp.types import TextContent
 
 PROJECT_ROOT = Path(__file__).resolve().parents[4]
-DOC_ROOT = PROJECT_ROOT / "docs"
-CODE_ROOTS = [PROJECT_ROOT / "src", PROJECT_ROOT / "tests", PROJECT_ROOT / "frontend"]
+WORKSPACE_ROOT = Path(os.environ.get("CONTEXTIQ_ENTERPRISE_WORKSPACE_ROOT", str(PROJECT_ROOT))).expanduser()
+DOC_ROOT = Path(os.environ.get("CONTEXTIQ_ENTERPRISE_DOC_ROOT", str(WORKSPACE_ROOT / "docs"))).expanduser()
+_CODE_ROOTS_ENV = os.environ.get("CONTEXTIQ_ENTERPRISE_CODE_ROOTS")
+if _CODE_ROOTS_ENV:
+    CODE_ROOTS = [Path(part.strip()).expanduser() for part in _CODE_ROOTS_ENV.split(",") if part.strip()]
+else:
+    CODE_ROOTS = [WORKSPACE_ROOT / "src", WORKSPACE_ROOT / "tests", WORKSPACE_ROOT / "frontend"]
 
 _TEXT_SUFFIXES = {
     ".py", ".ts", ".tsx", ".js", ".jsx", ".json", ".md", ".yml", ".yaml", ".sql", ".txt", ".toml",
@@ -34,7 +41,53 @@ _LANGUAGE_SUFFIXES = {
 
 
 def json_text_response(payload: dict[str, Any]) -> list[TextContent]:
-    return [TextContent(type="text", text=json.dumps(payload, default=_json_default))]
+    sanitised_payload, masking_counts = sanitize_payload(payload)
+    governance = sanitised_payload.setdefault("governance", {})
+    existing_counts = governance.get("masking_counts") or {}
+    governance["masking_counts"] = _merge_count_maps(existing_counts, masking_counts)
+    governance["redacted"] = bool(governance.get("redacted") or sum(masking_counts.values()) > 0)
+    return [TextContent(type="text", text=json.dumps(sanitised_payload, default=_json_default))]
+
+
+def build_tool_response(
+    *,
+    status: str,
+    summary: str,
+    data: dict[str, Any] | list[Any] | None = None,
+    diagnostics: dict[str, Any] | None = None,
+    governance: dict[str, Any] | None = None,
+    routing: dict[str, Any] | None = None,
+    compression: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    return {
+        "status": status,
+        "summary": summary,
+        "data": data,
+        "diagnostics": diagnostics or {},
+        "governance": governance or {},
+        "routing": routing or {},
+        "compression": compression or {},
+    }
+
+
+def build_error_response(
+    *,
+    summary: str,
+    error: Exception,
+    diagnostics: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    payload = build_tool_response(
+        status="error",
+        summary=summary,
+        data=None,
+        diagnostics={
+            **(diagnostics or {}),
+            "error_type": type(error).__name__,
+            "error_message": str(error),
+        },
+        governance={"blocked": False, "redacted": False},
+    )
+    return payload
 
 
 def search_workspace(
@@ -54,7 +107,15 @@ def search_workspace(
         if not text:
             continue
 
-        score, line_no = _score_text(text, phrase, tokens)
+        relative_path = _display_path(file_path)
+        title = _file_title(file_path, text)
+        score, line_no, matched_terms = _score_text(
+            text,
+            phrase,
+            tokens,
+            path_text=relative_path.lower(),
+            title_text=title.lower(),
+        )
         if score <= 0 or line_no is None:
             continue
 
@@ -64,11 +125,12 @@ def search_workspace(
         snippet = "\n".join(lines[start:end]).strip()
         results.append(
             {
-                "path": str(file_path.relative_to(PROJECT_ROOT)),
-                "title": _file_title(file_path, text),
+                "path": relative_path,
+                "title": title,
                 "line": line_no + 1,
                 "snippet": snippet,
                 "score": round(score, 3),
+                "matched_terms": matched_terms,
                 "last_modified": datetime.fromtimestamp(file_path.stat().st_mtime, tz=UTC).isoformat(),
             }
         )
@@ -92,7 +154,7 @@ def explain_code_file(
     symbols = re.findall(r"^(?:class|def|async def)\s+([A-Za-z0-9_]+)", text, flags=re.MULTILINE)
 
     return {
-        "file": str(resolved.relative_to(PROJECT_ROOT)),
+        "file": _display_path(resolved),
         "language": resolved.suffix.lstrip(".") or "text",
         "lines": f"{start_idx + 1}-{end_idx}",
         "line_count": len(lines),
@@ -109,7 +171,7 @@ def summarize_document_path(document_id: str, max_words: int) -> dict[str, Any]:
     headings = [line.lstrip("# ").strip() for line in text.splitlines() if line.startswith("#")]
     summary = _summarize_text(text, max_words=max_words)
     return {
-        "document_id": str(resolved.relative_to(PROJECT_ROOT)),
+        "document_id": _display_path(resolved),
         "title": headings[0] if headings else resolved.stem,
         "summary": summary,
         "key_points": headings[1:6] if len(headings) > 1 else [],
@@ -118,7 +180,9 @@ def summarize_document_path(document_id: str, max_words: int) -> dict[str, Any]:
 
 
 def service_graph() -> dict[str, dict[str, Any]]:
-    compose = PROJECT_ROOT / "docker-compose.yml"
+    compose = resolve_compose_path()
+    if compose is None:
+        return {}
     lines = compose.read_text(encoding="utf-8").splitlines()
     graph: dict[str, dict[str, Any]] = {}
     in_services = False
@@ -171,6 +235,85 @@ def service_graph() -> dict[str, dict[str, Any]]:
     return graph
 
 
+def service_graph_diagnostics() -> dict[str, Any]:
+    compose = resolve_compose_path()
+    if compose is None:
+        return {
+            "adapter": "docker_compose",
+            "source_available": False,
+            "compose_path": None,
+            "degraded_reasons": [
+                "No docker-compose metadata was available in the runtime environment.",
+            ],
+        }
+
+    return {
+        "adapter": "docker_compose",
+        "source_available": True,
+        "compose_path": str(compose),
+        "degraded_reasons": [],
+    }
+
+
+def resolve_compose_path() -> Path | None:
+    candidate_strings = [
+        os.environ.get("CONTEXTIQ_COMPOSE_PATH"),
+        os.environ.get("CONTEXTIQ_LOCAL_COMPOSE_PATH"),
+        str(WORKSPACE_ROOT / "docker-compose.yml"),
+        str(PROJECT_ROOT / "docker-compose.yml"),
+        str(Path.cwd() / "docker-compose.yml"),
+    ]
+    candidate_strings.extend(str(parent / "docker-compose.yml") for parent in WORKSPACE_ROOT.parents)
+    candidate_strings.extend(str(parent / "docker-compose.yml") for parent in PROJECT_ROOT.parents)
+
+    seen: set[Path] = set()
+    for candidate_string in candidate_strings:
+        if not candidate_string:
+            continue
+        candidate = Path(candidate_string).expanduser()
+        if candidate in seen:
+            continue
+        seen.add(candidate)
+        if candidate.exists() and candidate.is_file():
+            return candidate
+    return None
+
+
+def workspace_coverage(
+    *,
+    roots: list[Path],
+    suffixes: set[str] | None = None,
+    path_filter: str | None = None,
+) -> dict[str, Any]:
+    scanned_files = 0
+    root_summaries: list[dict[str, Any]] = []
+    for root in roots:
+        exists = root.exists()
+        root_count = 0
+        if exists:
+            for _file_path in _iter_files([root], suffixes=suffixes, path_filter=path_filter):
+                root_count += 1
+        scanned_files += root_count
+        root_summaries.append(
+            {
+                "root": _display_root(root),
+                "available": exists,
+                "scanned_files": root_count,
+            }
+        )
+
+    return {
+        "mode": "workspace_scan",
+        "index_required": False,
+        "index_ready": True,
+        "index_freshness": "live_filesystem",
+        "scanned_files": scanned_files,
+        "roots": root_summaries,
+        "path_filter": path_filter,
+        "suffixes": sorted(suffixes) if suffixes is not None else None,
+    }
+
+
 def git_history(limit: int, *, grep: str | None = None, paths: list[str] | None = None) -> list[dict[str, str]]:
     args = [
         "git",
@@ -214,6 +357,96 @@ def git_history(limit: int, *, grep: str | None = None, paths: list[str] | None 
             }
         )
     return rows
+
+
+def compose_service_logs(
+    *,
+    query: str,
+    service: str | None = None,
+    level: str | None = None,
+    limit: int = 50,
+) -> list[dict[str, str]]:
+    compose = resolve_compose_path()
+    if compose is None:
+        return []
+
+    args = [
+        "docker",
+        "compose",
+        "-f",
+        str(compose),
+        "logs",
+        "--no-color",
+        "--timestamps",
+        f"--tail={max(limit * 4, limit)}",
+    ]
+    if service:
+        args.append(service)
+
+    try:
+        proc = subprocess.run(
+            args,
+            cwd=compose.parent,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+    except FileNotFoundError:
+        return []
+
+    if proc.returncode != 0:
+        return []
+
+    lowered_query = query.lower().strip()
+    lowered_level = level.lower().strip() if level else None
+    rows: list[dict[str, str]] = []
+    for raw_line in proc.stdout.splitlines():
+        parsed = _parse_compose_log_line(raw_line)
+        if parsed is None:
+            continue
+        message = parsed["message"]
+        message_lower = message.lower()
+        if lowered_query and lowered_query not in message_lower:
+            continue
+        if lowered_level and lowered_level not in message_lower:
+            continue
+        rows.append(parsed)
+        if len(rows) >= limit:
+            break
+    return rows
+
+
+def _parse_compose_log_line(raw_line: str) -> dict[str, str] | None:
+    parts = raw_line.split("|", 1)
+    if len(parts) != 2:
+        return None
+    service_part = parts[0].strip()
+    message_part = parts[1].strip()
+    if not message_part:
+        return None
+
+    timestamp = ""
+    message = message_part
+    message_tokens = message_part.split(" ", 1)
+    if len(message_tokens) == 2 and "T" in message_tokens[0]:
+        timestamp, message = message_tokens[0], message_tokens[1]
+
+    service_name = service_part.split()[0] if service_part else "unknown"
+    level = _infer_log_level(message)
+    return {
+        "timestamp": timestamp,
+        "service": service_name,
+        "level": level,
+        "message": message.strip(),
+    }
+
+
+def _infer_log_level(message: str) -> str:
+    lowered = message.lower()
+    for candidate in ("critical", "error", "warn", "warning", "info", "debug"):
+        if candidate in lowered:
+            return "WARN" if candidate == "warning" else candidate.upper()
+    return "INFO"
 
 
 def latest_file_authors(resource: str, limit: int = 5) -> list[dict[str, str]]:
@@ -272,14 +505,15 @@ def resolve_workspace_path(path_or_id: str, roots: list[Path] | None = None) -> 
     candidate = Path(path_or_id)
     if candidate.is_absolute() and candidate.exists():
         return candidate
-    roots = roots or [PROJECT_ROOT]
+    roots = roots or [WORKSPACE_ROOT, PROJECT_ROOT]
     for root in roots:
         direct = root / path_or_id
         if direct.exists():
             return direct
     stem = candidate.stem.lower()
     for file_path in _iter_files(roots, suffixes=_TEXT_SUFFIXES):
-        if file_path.stem.lower() == stem or str(file_path.relative_to(PROJECT_ROOT)).lower() == path_or_id.lower():
+        relative_path = _display_path(file_path).lower()
+        if file_path.stem.lower() == stem or relative_path == path_or_id.lower():
             return file_path
     raise FileNotFoundError(path_or_id)
 
@@ -306,22 +540,109 @@ def _iter_files(
             yield file_path
 
 
-def _score_text(text: str, phrase: str, tokens: list[str]) -> tuple[float, int | None]:
+def sanitize_payload(value: Any) -> tuple[Any, dict[str, int]]:
+    if isinstance(value, str):
+        return _mask_sensitive_string(value)
+    if isinstance(value, list):
+        items: list[Any] = []
+        counts: Counter[str] = Counter()
+        for item in value:
+            sanitised, item_counts = sanitize_payload(item)
+            items.append(sanitised)
+            counts.update(item_counts)
+        return items, dict(counts)
+    if isinstance(value, dict):
+        mapping: dict[str, Any] = {}
+        counts = Counter()
+        for key, item in value.items():
+            sanitised, item_counts = sanitize_payload(item)
+            mapping[key] = sanitised
+            counts.update(item_counts)
+        return mapping, dict(counts)
+    return value, {}
+
+
+def _score_text(
+    text: str,
+    phrase: str,
+    tokens: list[str],
+    *,
+    path_text: str,
+    title_text: str,
+) -> tuple[float, int | None, list[str]]:
     lowered = text.lower()
     score = 0.0
-    first_match: int | None = None
+    best_line_idx: int | None = None
+    best_line_score = 0.0
+    matched_terms = sorted({token for token in tokens if token in lowered or token in path_text or token in title_text})
     if phrase and phrase in lowered:
         score += 10.0
+    if phrase and phrase in path_text:
+        score += 8.0
+    if phrase and phrase in title_text:
+        score += 6.0
+    score += sum(1.5 for token in tokens if token in path_text)
+    score += sum(1.0 for token in tokens if token in title_text)
     lines = text.splitlines()
     for idx, line in enumerate(lines):
         lowered_line = line.lower()
-        line_hits = sum(1 for token in tokens if token in lowered_line)
+        line_hits = float(sum(1 for token in tokens if token in lowered_line))
         if phrase and phrase in lowered_line:
             line_hits += 5
-        if line_hits and first_match is None:
-            first_match = idx
+        if line_hits > best_line_score:
+            best_line_score = line_hits
+            best_line_idx = idx
         score += float(line_hits)
-    return score, first_match
+    return score, best_line_idx, matched_terms
+
+
+def _mask_sensitive_string(value: str) -> tuple[str, dict[str, int]]:
+    try:
+        from src.governance.detection.pattern_registry import PatternRegistry  # noqa: PLC0415
+    except Exception:
+        return value, {}
+
+    findings = PatternRegistry().scan_text(value, "payload")
+    if not findings:
+        return value, {}
+
+    counts: Counter[str] = Counter()
+    result = value
+    processed_end = len(value)
+    for finding in sorted(findings, key=lambda item: item.char_offset, reverse=True):
+        if finding.char_end > processed_end:
+            continue
+        placeholder = f"[REDACTED:{finding.pattern_type.value}]"
+        result = result[: finding.char_offset] + placeholder + result[finding.char_end :]
+        processed_end = finding.char_offset
+        counts[finding.pattern_type.value] += 1
+
+    return result, dict(counts)
+
+
+def _merge_count_maps(first: dict[str, Any], second: dict[str, int]) -> dict[str, int]:
+    merged = Counter({str(key): int(value) for key, value in first.items()})
+    merged.update(second)
+    return dict(merged)
+
+
+def _display_path(file_path: Path) -> str:
+    for root in (WORKSPACE_ROOT, PROJECT_ROOT):
+        try:
+            return str(file_path.relative_to(root))
+        except ValueError:
+            continue
+    return str(file_path)
+
+
+def _display_root(root: Path) -> str:
+    for base in (WORKSPACE_ROOT, PROJECT_ROOT):
+        try:
+            relative = root.relative_to(base)
+            return "." if str(relative) == "." else str(relative)
+        except ValueError:
+            continue
+    return str(root)
 
 
 def _read_text(file_path: Path) -> str:

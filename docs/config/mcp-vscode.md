@@ -12,7 +12,7 @@ Create or update `.vscode/mcp.json`:
   "servers": {
     "contextiq": {
       "type": "http",
-      "url": "http://localhost:8000/mcp/sse/",
+      "url": "http://localhost:8000/mcp/",
       "headers": {
         "Authorization": "Bearer ${env:CONTEXTIQ_TOKEN}",
         "Content-Type": "application/json"
@@ -32,26 +32,34 @@ Create or update `.vscode/mcp.json`:
    touch .vscode/mcp.json
    ```
 
-2. **Set Environment Variable**
-   
-   Add to your `.env` file in project root:
-   ```bash
-   CONTEXTIQ_TOKEN=your-jwt-token-here
-   ```
-   
-   Or add to your shell profile:
-   ```bash
-   export CONTEXTIQ_TOKEN="your-jwt-token-here"
-   ```
+2. **Install the Reusable Starter Files**
 
-3. **Reload VS Code**
+  Prefer the ready-to-copy starter in `examples/contextiq-mcp-starter`:
+  ```bash
+  ./examples/contextiq-mcp-starter/install.sh /path/to/your-repo
+  ```
+
+  That installs `.vscode/mcp.json`, `.vscode/tasks.json`, `.github/prompts/contextiq.prompt.md`, and `.propel/tools/refresh_mcp_token_input.py` into the target repo.
+
+3. **Run the One-Time Setup Task**
+
+  In the target repo, run the `setup-contextiq-dev-login` task once. On macOS, it stores local dev credentials in Keychain and refreshes the bearer token automatically on future folder opens.
+
+4. **Reload VS Code**
    - Press `Cmd+Shift+P` (macOS) or `Ctrl+Shift+P` (Windows/Linux)
    - Type "Developer: Reload Window"
    - Press Enter
 
-4. **Verify Connection**
+5. **Verify Connection**
    - Open GitHub Copilot Chat
    - Type: `@workspace list available MCP servers`
+
+6. **Use the Slash Command**
+  - Open GitHub Copilot Chat
+  - Type `/contextiq list available ContextIQ tools`
+  - Prompt files in `.github/prompts/` are exposed as slash commands in VS Code, so `.github/prompts/contextiq.prompt.md` becomes `/contextiq`
+
+If you do not use the starter tasks, make sure `CONTEXTIQ_TOKEN` is exported in the environment before VS Code starts. A repo `.env` file alone is not sufficient for `${env:CONTEXTIQ_TOKEN}`.
 
 ## Workspace-Specific Configuration
 
@@ -63,7 +71,7 @@ For different repositories, create separate `.vscode/mcp.json` files:
   "servers": {
     "contextiq": {
       "type": "http",
-      "url": "http://localhost:8000/mcp/sse/",
+      "url": "http://localhost:8000/mcp/",
       "headers": {
         "Authorization": "Bearer ${env:CONTEXTIQ_TOKEN}",
         "X-Repository": "frontend-app",
@@ -80,7 +88,7 @@ For different repositories, create separate `.vscode/mcp.json` files:
   "servers": {
     "contextiq": {
       "type": "http",
-      "url": "http://localhost:8000/mcp/sse/",
+      "url": "http://localhost:8000/mcp/",
       "headers": {
         "Authorization": "Bearer ${env:CONTEXTIQ_TOKEN}",
         "X-Repository": "backend-api",
@@ -92,6 +100,15 @@ For different repositories, create separate `.vscode/mcp.json` files:
 ```
 
 ## Using ContextIQ with GitHub Copilot
+
+### Slash Command
+```
+/contextiq search enterprise docs for authentication patterns
+
+/contextiq find the service owner for the indexing pipeline
+
+/contextiq summarize the API gateway architecture
+```
 
 ### In Copilot Chat
 ```
@@ -111,6 +128,8 @@ Sync the GitHub repository in ContextIQ
 @workspace search ContextIQ for security best practices
 ```
 
+Use `/contextiq` when you want the chat request to explicitly prefer the ContextIQ MCP server before falling back to regular workspace tools.
+
 ### Inline Suggestions
 GitHub Copilot will automatically use ContextIQ context when:
 - Writing code related to enterprise patterns
@@ -126,7 +145,7 @@ For VS Code Multi-root Workspaces, create a shared `mcp.json`:
   "servers": {
     "contextiq-frontend": {
       "type": "http",
-      "url": "http://localhost:8000/mcp/sse/",
+      "url": "http://localhost:8000/mcp/",
       "headers": {
         "Authorization": "Bearer ${env:CONTEXTIQ_TOKEN}",
         "X-Repository": "frontend"
@@ -134,7 +153,7 @@ For VS Code Multi-root Workspaces, create a shared `mcp.json`:
     },
     "contextiq-backend": {
       "type": "http",
-      "url": "http://localhost:8000/mcp/sse/",
+      "url": "http://localhost:8000/mcp/",
       "headers": {
         "Authorization": "Bearer ${env:CONTEXTIQ_TOKEN}",
         "X-Repository": "backend"
@@ -142,7 +161,7 @@ For VS Code Multi-root Workspaces, create a shared `mcp.json`:
     },
     "contextiq-infra": {
       "type": "http",
-      "url": "http://localhost:8000/mcp/sse/",
+      "url": "http://localhost:8000/mcp/",
       "headers": {
         "Authorization": "Bearer ${env:CONTEXTIQ_TOKEN}",
         "X-Repository": "infrastructure"
@@ -159,7 +178,7 @@ For VS Code Multi-root Workspaces, create a shared `mcp.json`:
   "servers": {
     "contextiq-prod": {
       "type": "http",
-      "url": "https://contextiq.example.com/mcp/sse",
+      "url": "https://contextiq.example.com/mcp/",
       "headers": {
         "Authorization": "Bearer ${env:CONTEXTIQ_PROD_TOKEN}",
         "Content-Type": "application/json"
@@ -227,10 +246,8 @@ export CONTEXTIQ_TOKEN="your-token-here"
 # Verify ContextIQ is running
 docker compose ps
 
-# Test endpoint
-curl -H "Authorization: Bearer $CONTEXTIQ_TOKEN" \
-  -H "Accept: text/event-stream" \
-  http://localhost:8000/mcp/sse/
+# Test API reachability
+curl http://localhost:8000/healthz
 ```
 
 ### Tools Not Available
@@ -242,34 +259,42 @@ curl -H "Authorization: Bearer $CONTEXTIQ_TOKEN" \
 ### Authentication Errors
 - Verify token hasn't expired
 - Check token permissions
-- Regenerate token from ContextIQ auth service
+- If VS Code asks for a client ID, it is not receiving a valid `Authorization: Bearer ...` header
+- Regenerate token from ContextIQ auth service or run `setup-contextiq-dev-login`
 
 ## VS Code Tasks Integration
 
-Create `.vscode/tasks.json` to manage ContextIQ:
+Use the reusable task and helper pair from `examples/contextiq-mcp-starter`:
+
+- `.vscode/tasks.json`
+- `.propel/tools/refresh_mcp_token_input.py`
+
+Those files provide:
+
+- `setup-contextiq-dev-login` for the first credential capture
+- `refresh-contextiq-dev-token` on folder open
+
+If you copy only `.vscode/mcp.json`, the bearer token will eventually go stale and VS Code may fall back to asking for MCP client registration details.
+
+Minimal task entry:
 
 ```json
 {
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "Start ContextIQ",
+      "label": "refresh-contextiq-dev-token",
       "type": "shell",
-      "command": "docker compose up -d",
+      "command": "python3",
+      "args": [
+        ".propel/tools/refresh_mcp_token_input.py",
+        "--skip-if-missing"
+      ],
+      "runOptions": {
+        "runOn": "folderOpen"
+      },
       "problemMatcher": [],
-      "group": "build"
-    },
-    {
-      "label": "Stop ContextIQ",
-      "type": "shell",
-      "command": "docker compose down",
-      "problemMatcher": []
-    },
-    {
-      "label": "Check ContextIQ MCP",
-      "type": "shell",
-      "command": "curl -H 'Authorization: Bearer ${CONTEXTIQ_TOKEN}' -H 'Accept: text/event-stream' http://localhost:8000/mcp/sse/",
-      "problemMatcher": []
+      "detail": "Refreshes the ContextIQ MCP bearer token using cached local-dev credentials or environment variables."
     }
   ]
 }

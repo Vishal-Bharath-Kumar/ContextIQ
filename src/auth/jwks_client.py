@@ -24,6 +24,33 @@ logger = logging.getLogger(__name__)
 _JWKS_TTL_SECONDS: int = 300
 
 
+def _matches_expected_audience(claims: dict[str, Any], settings: KeycloakSettings) -> bool:
+    """Return True when the token is intended for the configured Keycloak client.
+
+    Local Keycloak access tokens may use the default ``aud=account`` while still
+    identifying the requesting client in ``azp``. Accept that Keycloak shape
+    only when the authorized party matches the configured client.
+    """
+    audience_claim = claims.get("aud")
+    expected_audience = settings.audience
+    if isinstance(audience_claim, str) and audience_claim == expected_audience:
+        return True
+    if isinstance(audience_claim, list) and expected_audience in audience_claim:
+        return True
+
+    authorized_party = claims.get("azp")
+    if authorized_party != settings.client_id:
+        return False
+
+    return audience_claim in (None, "account")
+
+
+def _matches_expected_issuer(claims: dict[str, Any], settings: KeycloakSettings) -> bool:
+    """Return True when the token issuer matches an allowed Keycloak issuer."""
+    issuer_claim = claims.get("iss")
+    return isinstance(issuer_claim, str) and issuer_claim in settings.accepted_issuers
+
+
 def _find_jwk(jwks_data: dict[str, Any], kid: str | None) -> dict[str, Any] | None:
     """Return the first JWK whose `kid` matches, or None."""
     return next(
@@ -150,12 +177,16 @@ class JWKSClient:
             token,
             matching_key,   # pass the raw JWK dict — python-jose constructs the key
             algorithms=settings.algorithms,
-            audience=settings.audience,
-            issuer=settings.issuer,
             options={
                 "verify_exp": True,   # AC-6: enforce 5-min access token lifetime
                 "verify_iat": True,
                 "verify_nbf": True,
+                "verify_iss": False,
+                "verify_aud": False,
             },
         )
+        if not _matches_expected_issuer(claims, settings):
+            raise JWTError("Invalid issuer")
+        if not _matches_expected_audience(claims, settings):
+            raise JWTError("Invalid audience or authorized party")
         return claims

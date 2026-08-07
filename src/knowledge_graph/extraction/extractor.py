@@ -4,6 +4,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+from pathlib import PurePosixPath
 import time
 from datetime import UTC, datetime
 from uuid import UUID
@@ -66,19 +67,28 @@ class EntityExtractor:
             },
         ]
 
-        response = await asyncio.wait_for(
-            litellm.acompletion(
-                model=self._settings.model_id,
-                api_base=get_ollama_base_url(),
-                messages=messages,
-                temperature=self._settings.temperature,
-                max_tokens=self._settings.max_tokens,
-            ),
-            timeout=self._settings.timeout_s,
-        )
-
-        raw_content = response.choices[0].message.content or ""
-        entities = self._parse_response(raw_content, event.source_id, event.chunk_id)
+        try:
+            response = await asyncio.wait_for(
+                litellm.acompletion(
+                    model=self._settings.model_id,
+                    api_base=get_ollama_base_url(),
+                    messages=messages,
+                    temperature=self._settings.temperature,
+                    max_tokens=self._settings.max_tokens,
+                ),
+                timeout=self._settings.timeout_s,
+            )
+            raw_content = response.choices[0].message.content or ""
+            entities = self._parse_response(raw_content, event.source_id, event.chunk_id)
+        except (TimeoutError, ValueError) as exc:
+            if not self._supports_deterministic_fallback(event):
+                raise
+            logger.warning(
+                "EntityExtractor: falling back to deterministic entities for chunk=%s: %s",
+                event.chunk_id,
+                exc,
+            )
+            entities = self._fallback_entities(event)
         duration_ms = (time.monotonic() - start) * 1000
 
         logger.debug(
@@ -102,10 +112,7 @@ class EntityExtractor:
         chunk_id: UUID,
     ) -> list[ExtractedEntity]:
         """Parse raw LLM JSON into validated ExtractedEntity objects."""
-        try:
-            data = json.loads(raw)
-        except json.JSONDecodeError as exc:
-            raise ValueError(f"LLM returned non-JSON content: {raw!r}") from exc
+        data = _load_first_json_object(raw)
 
         now = datetime.now(tz=UTC)
         entities: list[ExtractedEntity] = []
@@ -131,3 +138,132 @@ class EntityExtractor:
                     "EntityExtractor: skipping malformed entity item %r: %s", item, exc
                 )
         return entities
+
+    def _fallback_entities(self, event: ChunkIndexedEvent) -> list[ExtractedEntity]:
+        now = datetime.now(tz=UTC)
+        entities: list[ExtractedEntity] = []
+        document_id = event.document_id
+
+        if document_id.startswith("github:"):
+            _prefix, repository, path = document_id.split(":", 2)
+            repo_canonical = repository.strip().lower()
+            owner_name, repo_name = _split_repository_name(repository)
+
+            if owner_name is not None:
+                owner_canonical = owner_name.strip().lower()
+                entities.append(
+                    ExtractedEntity(
+                        entity_id=make_entity_id(EntityType.DEVELOPER, owner_canonical),
+                        entity_type=EntityType.DEVELOPER,
+                        name=owner_name,
+                        canonical_name=owner_canonical,
+                        source_id=event.source_id,
+                        chunk_id=event.chunk_id,
+                        created_at=now,
+                        properties={
+                            "repository": repository,
+                            "fallback_role": "repository_owner",
+                        },
+                    )
+                )
+
+            entities.append(
+                ExtractedEntity(
+                    entity_id=make_entity_id(EntityType.REPOSITORY, repo_canonical),
+                    entity_type=EntityType.REPOSITORY,
+                    name=repository,
+                    canonical_name=repo_canonical,
+                    source_id=event.source_id,
+                    chunk_id=event.chunk_id,
+                    created_at=now,
+                    properties={
+                        "repository": repository,
+                        "owner": owner_name,
+                        "repo_name": repo_name,
+                        "fallback_role": "repository",
+                    },
+                )
+            )
+
+            service_canonical = repo_name.strip().lower()
+            entities.append(
+                ExtractedEntity(
+                    entity_id=make_entity_id(EntityType.SERVICE, service_canonical),
+                    entity_type=EntityType.SERVICE,
+                    name=repo_name,
+                    canonical_name=service_canonical,
+                    source_id=event.source_id,
+                    chunk_id=event.chunk_id,
+                    created_at=now,
+                    properties={
+                        "repository": repository,
+                        "owner": owner_name,
+                        "repo_name": repo_name,
+                        "fallback_role": "service",
+                    },
+                )
+            )
+
+            path_name = PurePosixPath(path).name or path
+            document_canonical = f"{repository}/{path}".strip().lower()
+            entities.append(
+                ExtractedEntity(
+                    entity_id=make_entity_id(EntityType.DOCUMENT, document_canonical),
+                    entity_type=EntityType.DOCUMENT,
+                    name=path_name,
+                    canonical_name=document_canonical,
+                    source_id=event.source_id,
+                    chunk_id=event.chunk_id,
+                    created_at=now,
+                    properties={
+                        "document_id": document_id,
+                        "repository": repository,
+                        "file_path": path,
+                        "owner": owner_name,
+                        "repo_name": repo_name,
+                        "fallback_role": "document",
+                    },
+                )
+            )
+            return entities
+
+        document_canonical = document_id.strip().lower()
+        entities.append(
+            ExtractedEntity(
+                entity_id=make_entity_id(EntityType.DOCUMENT, document_canonical),
+                entity_type=EntityType.DOCUMENT,
+                name=document_id,
+                canonical_name=document_canonical,
+                source_id=event.source_id,
+                chunk_id=event.chunk_id,
+                created_at=now,
+                properties={"document_id": document_id},
+            )
+        )
+        return entities
+
+    def _supports_deterministic_fallback(self, event: ChunkIndexedEvent) -> bool:
+        return event.document_id.startswith("github:")
+
+
+def _load_first_json_object(raw: str) -> dict:
+    text = raw.strip()
+    if not text:
+        return {}
+
+    decoder = json.JSONDecoder()
+    try:
+        parsed, _end = decoder.raw_decode(text)
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"LLM returned non-JSON content: {raw!r}") from exc
+
+    if not isinstance(parsed, dict):
+        raise ValueError(f"LLM returned unexpected JSON payload: {raw!r}")
+    return parsed
+
+
+def _split_repository_name(repository: str) -> tuple[str | None, str]:
+    parts = repository.split("/", 1)
+    if len(parts) == 2:
+        return parts[0], parts[1]
+    return None, repository

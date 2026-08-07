@@ -7,6 +7,7 @@ returned through the MCP content channel.
 from __future__ import annotations
 
 import json
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -106,7 +107,7 @@ class TestContextToolPayloads:
                     "type": "context_package",
                     "prompt": prompt,
                     "intent": "debugging",
-                    "context": [],
+                    "context": [{"source_id": "github", "path": "src/auth.py", "content": "def login(): ..."}],
                     "governance": {"summary": {"audit_log": {"user": "user-123"}}},
                     "degraded_sources": [],
                 },
@@ -126,9 +127,453 @@ class TestContextToolPayloads:
         assert payload["mode"] == "pipeline"
         assert payload["context"]["governance"]["summary"]["audit_log"]["user"] == "user-123"
 
+    async def test_generate_context_workspace_fallback_masks_secrets_and_populates_metrics(self) -> None:
+        mcp = FastMCP("test-context")
+        register_context_tools(mcp)
+
+        candidate_models = [
+            {
+                "model_id": "gpt-4o-mini",
+                "latency_tier": "fast",
+                "capabilities": ["chat"],
+                "context_window": 32000,
+                "cost_per_1k_tokens": 0.5,
+            },
+            {
+                "model_id": "ollama/llama3.2",
+                "latency_tier": "medium",
+                "capabilities": ["chat", "code"],
+                "context_window": 128000,
+                "cost_per_1k_tokens": 0.0,
+            },
+        ]
+        secret_value = "ghp_1234567890abcdefghijklmnopqrstuvABCDE1"
+        matches = [
+            {
+                "path": "src/api/auth.py",
+                "title": "auth",
+                "line": 14,
+                "snippet": f'Authorization: Bearer {secret_value} password="TopSecret123!"',
+                "score": 14.2,
+            }
+        ]
+
+        with (
+            patch("src.gateway.tools.enterprise.context_tools._try_pipeline_context", AsyncMock(return_value=None)),
+            patch("src.gateway.tools.enterprise.context_tools.search_workspace", return_value=matches),
+            patch("src.gateway.tools.enterprise.context_tools._candidate_models", AsyncMock(return_value=candidate_models)),
+        ):
+            payload = await _invoke_tool(
+                mcp,
+                "generate_context",
+                {
+                    "prompt": "For the current workspace repository, identify the main services/components and describe the end-to-end workflow.",
+                    "max_tokens": 1024,
+                    "compression_level": "high",
+                },
+            )
+
+        assert payload["status"] == "success"
+        assert payload["mode"] == "workspace_fallback"
+        assert payload["routing"]["selected_model"] == "ollama/llama3.2"
+        assert payload["compression"]["tokens_before"] is not None
+        assert payload["compression"]["tokens_after"] is not None
+        assert secret_value not in json.dumps(payload)
+        assert payload["governance"]["redacted"] is True
+        assert payload["governance"]["masking_counts"]
+
+    async def test_generate_context_pipeline_backfills_routing_and_compression_metadata(self) -> None:
+        mcp = FastMCP("test-context")
+        register_context_tools(mcp)
+
+        candidate_models = [
+            {
+                "model_id": "gpt-4o-mini",
+                "latency_tier": "fast",
+                "capabilities": ["chat"],
+                "context_window": 32000,
+                "cost_per_1k_tokens": 0.5,
+            },
+            {
+                "model_id": "ollama/llama3.2",
+                "latency_tier": "medium",
+                "capabilities": ["chat", "code"],
+                "context_window": 128000,
+                "cost_per_1k_tokens": 0.0,
+            },
+        ]
+        fake_pipeline = {
+            "status": "complete",
+            "intent_type": "architecture",
+            "selected_model": "gpt-4o-mini",
+            "model_routing_score": 0.0,
+            "ranked_context": [
+                {
+                    "source_id": "github",
+                    "path": "src/main.py",
+                    "content": "create_app wires FastAPI routers, auth middleware, and the MCP mounts.",
+                },
+                {
+                    "source_id": "docs",
+                    "path": "docs/api/architecture/overview.md",
+                    "content": "Architecture overview covering retrieval, ranking, compression, and governance.",
+                },
+            ],
+            "final_response": {
+                "type": "context_package",
+                "intent": "architecture",
+                "context": [
+                    {
+                        "source_id": "github",
+                        "path": "src/main.py",
+                        "content": "create_app wires FastAPI routers, auth middleware, and the MCP mounts.",
+                    }
+                ],
+                "degraded_sources": [],
+            },
+        }
+
+        with (
+            patch("src.gateway.tools.enterprise.context_tools._try_pipeline_context", AsyncMock(return_value=fake_pipeline)),
+            patch("src.gateway.tools.enterprise.context_tools._candidate_models", AsyncMock(return_value=candidate_models)),
+        ):
+            payload = await _invoke_tool(
+                mcp,
+                "generate_context",
+                {
+                    "prompt": "For the current workspace repository, identify the main services/components and describe the end-to-end workflow.",
+                    "max_tokens": 2048,
+                    "compression_level": "medium",
+                },
+            )
+
+        assert payload["status"] == "success"
+        assert payload["mode"] == "pipeline"
+        assert payload["routing"]["selected_model"] == "ollama/llama3.2"
+        assert payload["compression"]["tokens_before"] is not None
+        assert payload["compression"]["tokens_after"] is not None
+        assert payload["tokens_before_compression"] is not None
+        assert payload["tokens_after_compression"] is not None
+
+    async def test_generate_context_falls_back_when_pipeline_returns_degraded_empty_context(self) -> None:
+        mcp = FastMCP("test-context")
+        register_context_tools(mcp)
+
+        candidate_models = [
+            {
+                "model_id": "ollama/llama3.2",
+                "latency_tier": "medium",
+                "capabilities": ["chat", "code"],
+                "context_window": 128000,
+                "cost_per_1k_tokens": 0.0,
+            }
+        ]
+        fake_pipeline = {
+            "status": "complete",
+            "intent_type": "architecture",
+            "selected_model": "gpt-4o-mini",
+            "model_routing_score": 0.0,
+            "degraded_sources": [{"source_id": "github", "error_type": "ConnectorAuthError", "message": "401"}],
+            "final_response": {
+                "type": "context_package",
+                "intent": "architecture",
+                "context": [],
+                "degraded_sources": [{"source_id": "github", "error_type": "ConnectorAuthError", "message": "401"}],
+            },
+        }
+        fallback_matches = [
+            {"path": "docs/architecture/system.md", "title": "System", "line": 3, "snippet": "retrieval ranking compression governance", "score": 12.0}
+        ]
+
+        with (
+            patch("src.gateway.tools.enterprise.context_tools._try_pipeline_context", AsyncMock(return_value=fake_pipeline)),
+            patch("src.gateway.tools.enterprise.context_tools.search_workspace", return_value=fallback_matches),
+            patch("src.gateway.tools.enterprise.context_tools._candidate_models", AsyncMock(return_value=candidate_models)),
+        ):
+            payload = await _invoke_tool(
+                mcp,
+                "generate_context",
+                {"prompt": "ContextIQ architecture", "max_tokens": 1024, "compression_level": "medium"},
+            )
+
+        assert payload["status"] == "success"
+        assert payload["mode"] == "workspace_fallback"
+        assert payload["context"]["context"][0]["path"] == "docs/architecture/system.md"
+
+    async def test_generate_context_routes_operational_count_prompts_to_live_runtime_branch(self) -> None:
+        mcp = FastMCP("test-context")
+        register_context_tools(mcp)
+
+        fake_now = datetime(2026, 8, 4, 10, 10, 42, tzinfo=UTC)
+        candidate_models = [
+            {
+                "model_id": "gpt-4o-mini",
+                "latency_tier": "fast",
+                "capabilities": ["chat"],
+                "context_window": 32000,
+                "cost_per_1k_tokens": 0.5,
+            }
+        ]
+
+        class _ScalarResult:
+            def __init__(self, value: int) -> None:
+                self._value = value
+
+            def scalar_one(self) -> int:
+                return self._value
+
+        class _RowsResult:
+            def __init__(self, rows: list[tuple]) -> None:
+                self._rows = rows
+
+            def __iter__(self):
+                return iter(self._rows)
+
+        class _Session:
+            def __init__(self) -> None:
+                self._call_count = 0
+
+            async def execute(self, _statement):
+                self._call_count += 1
+                if self._call_count == 1:
+                    return _ScalarResult(36)
+                if self._call_count == 2:
+                    return _ScalarResult(107)
+                if self._call_count == 3:
+                    return _RowsResult(
+                        [
+                            (None, None, None, None, 55),
+                            (
+                                "7089df8d-881e-4f29-b42c-7392a8560a55",
+                                "ContextIQ",
+                                "github",
+                                "Vishal-Bharath-Kumar/ContextIQ",
+                                49,
+                            ),
+                        ]
+                    )
+                return _RowsResult(
+                    [
+                        (
+                            "7089df8d-881e-4f29-b42c-7392a8560a55",
+                            "ContextIQ",
+                            "github",
+                            "Vishal-Bharath-Kumar/ContextIQ",
+                            "github:Vishal-Bharath-Kumar/ContextIQ:src/agents/checkpointer.py",
+                            2,
+                            fake_now,
+                        )
+                    ]
+                )
+
+        class _SessionFactoryContext:
+            async def __aenter__(self) -> _Session:
+                return _Session()
+
+            async def __aexit__(self, exc_type, exc, tb) -> bool:
+                return False
+
+        class _SessionFactory:
+            def __call__(self) -> _SessionFactoryContext:
+                return _SessionFactoryContext()
+
+        with (
+            patch("src.data.database.primary_session_factory", return_value=_SessionFactory()),
+            patch("src.gateway.tools.enterprise.context_tools._candidate_models", AsyncMock(return_value=candidate_models)),
+            patch("src.gateway.tools.enterprise.context_tools._try_pipeline_context", AsyncMock(side_effect=AssertionError("pipeline should not be called"))),
+        ):
+            payload = await _invoke_tool(
+                mcp,
+                "generate_context",
+                {
+                    "prompt": "give the live total traces available and fetch the indexed documents",
+                    "max_tokens": 2048,
+                    "compression_level": "medium",
+                },
+            )
+
+        assert payload["status"] == "success"
+        assert payload["mode"] == "runtime"
+        assert payload["diagnostics"]["adapter"] == "runtime_operational_context"
+        assert payload["data"]["live_stats"]["total_traces"] == 36
+        assert payload["data"]["live_stats"]["total_distinct_indexed_documents"] == 107
+        assert payload["context"]["answer"].startswith("Live runtime stats: 36 total traces")
+
+    async def test_generate_context_routes_service_health_prompts_to_runtime_branch(self) -> None:
+        mcp = FastMCP("test-context")
+        register_context_tools(mcp)
+
+        candidate_models = [
+            {
+                "model_id": "gpt-4o-mini",
+                "latency_tier": "fast",
+                "capabilities": ["chat"],
+                "context_window": 32000,
+                "cost_per_1k_tokens": 0.5,
+            }
+        ]
+        health_rows = [
+            {
+                "service": "api",
+                "status": "healthy",
+                "ports": [{"host_port": 8000, "container_port": 8000, "reachable": True}],
+                "depends_on": ["postgres", "redis"],
+                "timestamp": "2026-08-04T12:00:00Z",
+            }
+        ]
+
+        with (
+            patch("src.gateway.tools.enterprise.context_tools.service_graph", return_value={"api": {"ports": [], "depends_on": []}}),
+            patch("src.gateway.tools.enterprise.context_tools.service_graph_diagnostics", return_value={"adapter": "docker_compose", "source_available": True, "degraded_reasons": []}),
+            patch("src.gateway.tools.enterprise.context_tools.service_health_snapshot", return_value=health_rows),
+            patch("src.gateway.tools.enterprise.context_tools._candidate_models", AsyncMock(return_value=candidate_models)),
+            patch("src.gateway.tools.enterprise.context_tools._try_pipeline_context", AsyncMock(side_effect=AssertionError("pipeline should not be called"))),
+        ):
+            payload = await _invoke_tool(
+                mcp,
+                "generate_context",
+                {
+                    "prompt": "show me the current health status of the api service",
+                    "max_tokens": 1024,
+                    "compression_level": "medium",
+                },
+            )
+
+        assert payload["status"] == "success"
+        assert payload["mode"] == "runtime"
+        assert payload["data"]["live_health"]["service"] == "api"
+        assert payload["data"]["live_health"]["health"][0]["status"] == "healthy"
+        assert payload["context"]["answer"].startswith("Live service-health snapshot for api")
+
+    async def test_generate_context_routes_deployment_history_prompts_to_runtime_branch(self) -> None:
+        mcp = FastMCP("test-context")
+        register_context_tools(mcp)
+
+        candidate_models = [
+            {
+                "model_id": "gpt-4o-mini",
+                "latency_tier": "fast",
+                "capabilities": ["chat"],
+                "context_window": 32000,
+                "cost_per_1k_tokens": 0.5,
+            }
+        ]
+        deployments = [
+            {
+                "commit": "abc123",
+                "timestamp": "2026-08-04 12:34:56 +0000",
+                "author": "Vishal",
+                "message": "deploy api hotfix",
+            }
+        ]
+
+        with (
+            patch("src.gateway.tools.enterprise.context_tools.service_graph", return_value={"api": {"ports": [], "depends_on": []}}),
+            patch("src.gateway.tools.enterprise.context_tools.git_history", return_value=deployments),
+            patch("src.gateway.tools.enterprise.context_tools._candidate_models", AsyncMock(return_value=candidate_models)),
+            patch("src.gateway.tools.enterprise.context_tools._try_pipeline_context", AsyncMock(side_effect=AssertionError("pipeline should not be called"))),
+        ):
+            payload = await _invoke_tool(
+                mcp,
+                "generate_context",
+                {
+                    "prompt": "show me the latest deployment history for the api service",
+                    "max_tokens": 1024,
+                    "compression_level": "medium",
+                },
+            )
+
+        assert payload["status"] == "success"
+        assert payload["mode"] == "runtime"
+        assert payload["data"]["live_deployments"]["service"] == "api"
+        assert payload["data"]["live_deployments"]["deployments"][0]["commit"] == "abc123"
+        assert payload["context"]["answer"].startswith("Retrieved 1 deployment-history entry/entries for api")
+
+    async def test_generate_context_routes_log_prompts_to_runtime_branch(self) -> None:
+        mcp = FastMCP("test-context")
+        register_context_tools(mcp)
+
+        candidate_models = [
+            {
+                "model_id": "gpt-4o-mini",
+                "latency_tier": "fast",
+                "capabilities": ["chat"],
+                "context_window": 32000,
+                "cost_per_1k_tokens": 0.5,
+            }
+        ]
+        logs = [
+            {
+                "timestamp": "2026-08-04T12:10:00Z",
+                "service": "api",
+                "level": "ERROR",
+                "message": "database timeout while syncing connector",
+            }
+        ]
+
+        with (
+            patch("src.gateway.tools.enterprise.context_tools.service_graph", return_value={"api": {"ports": [], "depends_on": []}}),
+            patch("src.gateway.tools.enterprise.context_tools.compose_service_logs", return_value=logs),
+            patch("src.gateway.tools.enterprise.context_tools._candidate_models", AsyncMock(return_value=candidate_models)),
+            patch("src.gateway.tools.enterprise.context_tools._try_pipeline_context", AsyncMock(side_effect=AssertionError("pipeline should not be called"))),
+        ):
+            payload = await _invoke_tool(
+                mcp,
+                "generate_context",
+                {
+                    "prompt": "show me the latest error logs for the api service",
+                    "max_tokens": 1024,
+                    "compression_level": "medium",
+                },
+            )
+
+        assert payload["status"] == "success"
+        assert payload["mode"] == "runtime"
+        assert payload["data"]["live_logs"]["service"] == "api"
+        assert payload["data"]["live_logs"]["level"] == "error"
+        assert payload["data"]["live_logs"]["logs"][0]["message"] == "database timeout while syncing connector"
+        assert payload["context"]["answer"].startswith("Retrieved 1 live log entry/entries for api at level error")
+
 
 @pytest.mark.asyncio
 class TestSourceCodeToolPayloads:
+    async def test_search_code_uses_indexed_repository_results_when_repository_supplied(self) -> None:
+        mcp = FastMCP("test-source")
+        register_source_code_tools(mcp)
+
+        indexed_results = [
+            {
+                "path": "README.md",
+                "line": 1,
+                "snippet": "KitchenIQ indexed readme",
+                "score": 8.5,
+                "matched_terms": ["readme"],
+                "last_modified": "2026-08-04T16:37:14+00:00",
+                "document_id": "github:Vishal-Bharath-Kumar/KitchenIQ:README.md",
+                "title": "README.md",
+            }
+        ]
+        diagnostics = {
+            "adapter": "opensearch_index_search",
+            "source_availability": {"resolved": True, "matched_scope": "Vishal-Bharath-Kumar/KitchenIQ"},
+            "degraded_reasons": [],
+        }
+
+        with patch(
+            "src.gateway.tools.enterprise.source_code_tools._search_indexed_repository",
+            new=AsyncMock(return_value=(indexed_results, diagnostics)),
+        ) as indexed_search:
+            payload = await _invoke_tool(
+                mcp,
+                "search_code",
+                {"query": "README", "repository": "Vishal-Bharath-Kumar/KitchenIQ", "limit": 5},
+            )
+
+        indexed_search.assert_awaited_once()
+        assert payload["status"] == "success"
+        assert payload["results"][0]["path"] == "README.md"
+        assert payload["diagnostics"]["adapter"] == "opensearch_index_search"
+
     async def test_search_code_returns_workspace_results(self) -> None:
         mcp = FastMCP("test-source")
         register_source_code_tools(mcp)
@@ -142,6 +587,57 @@ class TestSourceCodeToolPayloads:
         assert payload["status"] == "success"
         assert payload["results"][0]["path"] == "src/main.py"
         assert payload["total"] == 1
+
+    async def test_search_code_empty_returns_diagnostics(self) -> None:
+        mcp = FastMCP("test-source")
+        register_source_code_tools(mcp)
+
+        with patch(
+            "src.gateway.tools.enterprise.source_code_tools.search_workspace",
+            return_value=[],
+        ):
+            payload = await _invoke_tool(mcp, "search_code", {"query": "nonexistent symbol", "limit": 5})
+
+        assert payload["status"] == "empty"
+        assert payload["diagnostics"]["adapter"] == "workspace_search"
+        assert "source_availability" in payload["diagnostics"]
+
+    async def test_search_repository_uses_indexed_repository_results(self) -> None:
+        mcp = FastMCP("test-source")
+        register_source_code_tools(mcp)
+
+        indexed_results = [
+            {
+                "path": "KitchenIQ/KitchenIQ/App.swift",
+                "line": 1,
+                "snippet": "@main struct KitchenIQApp: App {",
+                "score": 12.4,
+                "matched_terms": ["app", "main"],
+                "last_modified": "2026-08-04T16:37:14+00:00",
+                "document_id": "github:Vishal-Bharath-Kumar/KitchenIQ:KitchenIQ/KitchenIQ/App.swift",
+                "title": "App.swift",
+            }
+        ]
+        diagnostics = {
+            "adapter": "opensearch_index_search",
+            "source_availability": {"resolved": True, "matched_scope": "Vishal-Bharath-Kumar/KitchenIQ"},
+            "degraded_reasons": [],
+        }
+
+        with patch(
+            "src.gateway.tools.enterprise.source_code_tools._search_indexed_repository",
+            new=AsyncMock(return_value=(indexed_results, diagnostics)),
+        ) as indexed_search:
+            payload = await _invoke_tool(
+                mcp,
+                "search_repository",
+                {"repository": "Vishal-Bharath-Kumar/KitchenIQ", "query": "App"},
+            )
+
+        indexed_search.assert_awaited_once()
+        assert payload["status"] == "success"
+        assert payload["results"][0]["path"] == "KitchenIQ/KitchenIQ/App.swift"
+        assert payload["diagnostics"]["adapter"] == "opensearch_index_search"
 
     async def test_explain_code_returns_summary_fields(self) -> None:
         mcp = FastMCP("test-source")
@@ -232,6 +728,44 @@ class TestKnowledgeGraphToolPayloads:
         assert payload["dependencies"]["upstream"][0]["name"] == "postgres"
         assert payload["dependencies"]["downstream"][0]["name"] == "admin-portal"
 
+    async def test_dependency_graph_degrades_without_graph_metadata(self) -> None:
+        mcp = FastMCP("test-kg")
+        register_knowledge_graph_tools(mcp)
+
+        with (
+            patch("src.gateway.tools.enterprise.knowledge_graph_tools.service_graph", return_value={}),
+            patch(
+                "src.gateway.tools.enterprise.knowledge_graph_tools.service_graph_diagnostics",
+                return_value={
+                    "adapter": "docker_compose",
+                    "source_available": False,
+                    "compose_path": None,
+                    "degraded_reasons": ["No docker-compose metadata was available in the runtime environment."],
+                },
+            ),
+        ):
+            payload = await _invoke_tool(mcp, "dependency_graph", {"service": "ContextIQ", "depth": 2})
+
+        assert payload["status"] == "degraded"
+        assert payload["diagnostics"]["source_available"] is False
+
+    async def test_related_services_returns_structured_empty_when_service_missing(self) -> None:
+        mcp = FastMCP("test-kg")
+        register_knowledge_graph_tools(mcp)
+
+        graph = {"api": {"depends_on": ["postgres"]}, "postgres": {"depends_on": []}}
+        with (
+            patch("src.gateway.tools.enterprise.knowledge_graph_tools.service_graph", return_value=graph),
+            patch(
+                "src.gateway.tools.enterprise.knowledge_graph_tools.service_graph_diagnostics",
+                return_value={"adapter": "docker_compose", "source_available": True, "compose_path": "/tmp/docker-compose.yml", "degraded_reasons": []},
+            ),
+        ):
+            payload = await _invoke_tool(mcp, "related_services", {"service": "ContextIQ"})
+
+        assert payload["status"] == "empty"
+        assert payload["related"] == []
+
     async def test_find_owner_returns_owner_list(self) -> None:
         mcp = FastMCP("test-kg")
         register_knowledge_graph_tools(mcp)
@@ -273,3 +807,19 @@ class TestOperationsToolPayloads:
 
         assert payload["status"] == "success"
         assert payload["health"][0]["service"] == "api"
+
+    async def test_service_health_returns_structured_empty_for_unknown_service(self) -> None:
+        mcp = FastMCP("test-ops")
+        register_operations_tools(mcp)
+
+        with (
+            patch("src.gateway.tools.enterprise.operations_tools.service_graph", return_value={"api": {"depends_on": [], "ports": []}}),
+            patch(
+                "src.gateway.tools.enterprise.operations_tools.service_graph_diagnostics",
+                return_value={"adapter": "docker_compose", "source_available": True, "compose_path": "/tmp/docker-compose.yml", "degraded_reasons": []},
+            ),
+        ):
+            payload = await _invoke_tool(mcp, "service_health", {"service": "ContextIQ"})
+
+        assert payload["status"] == "empty"
+        assert payload["health"] == []

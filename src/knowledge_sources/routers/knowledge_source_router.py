@@ -23,7 +23,9 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.agents.nodes.retrieval import set_connector_registry
 from src.auth import JWTClaimsDep, require_admin
+from src.connector_sdk.registry import ConnectorRegistry
 from src.data.database import primary_session_factory
 from src.data.dependencies import get_db
 from src.knowledge_sources.dependencies import get_knowledge_source_service
@@ -42,6 +44,7 @@ from src.knowledge_sources.schemas.sync_job import SyncJobResponse
 from src.knowledge_sources.services.health_check_service import HealthCheckService
 from src.knowledge_sources.services.knowledge_source_service import KnowledgeSourceService
 from src.knowledge_sources.sync.executor import SyncJobExecutor
+from src.knowledge_sources.runtime_connectors import apply_runtime_connector_overrides
 from src.events.producer import get_kafka_producer
 
 router = APIRouter(
@@ -57,6 +60,22 @@ async def get_audit_repo(
     session: Annotated[AsyncSession, Depends(get_db)],
 ) -> AuditRepository:
     return AuditRepository(session)
+
+
+async def _refresh_runtime_connector_registry(app_state: object) -> None:
+    """Rebuild the live connector registry from the latest knowledge-source config."""
+    if getattr(app_state, "connector_registry", None) is None:
+        _log.debug("runtime_connector_refresh_skipped_no_registry")
+        return
+
+    refreshed_registry = ConnectorRegistry()
+    await refreshed_registry.load()
+    await apply_runtime_connector_overrides(
+        refreshed_registry,
+        primary_session_factory(),
+    )
+    app_state.connector_registry = refreshed_registry  # type: ignore[attr-defined]
+    set_connector_registry(refreshed_registry)
 
 
 async def _emit_initial_index_event(source_id: UUID) -> None:
@@ -105,6 +124,7 @@ async def _emit_initial_index_event(source_id: UUID) -> None:
     summary="Register a new knowledge source",
 )
 async def create_knowledge_source(
+    request: Request,
     payload: KnowledgeSourceCreate,
     service: Annotated[KnowledgeSourceService, Depends(get_knowledge_source_service)],
     session: Annotated[AsyncSession, Depends(get_db)],
@@ -128,6 +148,7 @@ async def create_knowledge_source(
         )
     )
     await session.commit()
+    await _refresh_runtime_connector_registry(request.app.state)
 
     # Emit one best-effort initial indexing trigger so newly created
     # connectors surface indexed document counts in the UI without manual steps.
@@ -157,6 +178,7 @@ class ToggleStatusRequest(BaseModel):
     summary="Toggle a knowledge source active or inactive",
 )
 async def toggle_knowledge_source_status(
+    request: Request,
     source_id: UUID,
     body: ToggleStatusRequest,
     service: Annotated[KnowledgeSourceService, Depends(get_knowledge_source_service)],
@@ -179,6 +201,7 @@ async def toggle_knowledge_source_status(
         )
     )
     await session.commit()
+    await _refresh_runtime_connector_registry(request.app.state)
     return result
 
 
@@ -188,6 +211,7 @@ async def toggle_knowledge_source_status(
     summary="Permanently delete a knowledge source",
 )
 async def delete_knowledge_source(
+    request: Request,
     source_id: UUID,
     service: Annotated[KnowledgeSourceService, Depends(get_knowledge_source_service)],
 ) -> None:
@@ -198,6 +222,7 @@ async def delete_knowledge_source(
     Returns 204 on success, 404 if source_id does not exist.
     """
     await service.delete(source_id)
+    await _refresh_runtime_connector_registry(request.app.state)
 
 
 @router.post(

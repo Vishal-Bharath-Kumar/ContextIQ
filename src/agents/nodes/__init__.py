@@ -4,11 +4,24 @@ Keep this package import-light so tests can import individual node modules
 without triggering optional runtime dependencies from unrelated nodes.
 """
 
-from src.agents.nodes.compression import compression_node
-from src.agents.nodes.governance import governance_node
-from src.agents.nodes.intent import intent_node
-from src.agents.nodes.retrieval import retrieval_node
-from src.agents.nodes.routing import routing_node
+from __future__ import annotations
+
+from importlib import import_module
+
+
+def __getattr__(name: str):
+    module_map = {
+        "intent_node": "src.agents.nodes.intent",
+        "retrieval_node": "src.agents.nodes.retrieval",
+        "governance_node": "src.agents.nodes.governance",
+        "compression_node": "src.agents.nodes.compression",
+        "routing_node": "src.agents.nodes.routing",
+    }
+    module_name = module_map.get(name)
+    if module_name is None:
+        raise AttributeError(name)
+    module = import_module(module_name)
+    return getattr(module, name)
 
 __all__ = [
     "intent_node",

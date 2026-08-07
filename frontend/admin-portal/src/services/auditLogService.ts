@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import type { UseQueryResult } from "@tanstack/react-query";
 import axios from "axios";
 
 export interface AuditLogEntry {
@@ -50,7 +51,7 @@ export const AUDIT_KEYS = {
   list: (params: AuditLogSearchParams) => ["audit-log", params] as const,
 };
 
-export function useAuditLog(params: AuditLogSearchParams) {
+export function useAuditLog(params: AuditLogSearchParams): UseQueryResult<AuditLogPage, Error> {
   return useQuery({
     queryKey: AUDIT_KEYS.list(params),
     queryFn:  async () => {
