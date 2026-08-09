@@ -79,6 +79,19 @@ class GitHubConnector(BaseConnector):
                 missing the required ``"token"`` key.
         """
         credential = await self._token_provider.get_credential()
+        if not credential.token.strip():
+            self._credential = None
+            if self._config.repos and await self._supports_public_readonly_mode():
+                self._anonymous_public_readonly = True
+                logger.warning(
+                    "github_connector_public_readonly_mode_enabled",
+                    extra={"repos": self._config.repos, "reason": "empty_token"},
+                )
+                return
+            raise ConnectorAuthError(
+                "GitHub credential validation failed: Vault secret contained an empty token"
+            )
+
         self._credential = credential
         self._anonymous_public_readonly = False
 
