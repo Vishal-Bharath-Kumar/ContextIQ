@@ -17,7 +17,7 @@ from src.connectors.github.config import GitHubConnectorConfig
 # instead, so binary/generated files must be filtered client-side.
 _INDEXABLE_EXTENSIONS = (
     ".md", ".mdx", ".rst", ".txt",
-    ".py", ".js", ".jsx", ".ts", ".tsx", ".go", ".java", ".kt", ".rb", ".cs",
+    ".py", ".js", ".jsx", ".ts", ".tsx", ".go", ".java", ".kt", ".rb", ".cs", ".swift",
     ".json", ".yaml", ".yml", ".toml", ".cfg", ".ini", ".sh",
 )
 
@@ -29,7 +29,7 @@ def _path_priority(path: str) -> tuple[int, str]:
         priority -= 40
     elif "/src/" in lowered:
         priority -= 12
-    if lowered.endswith((".py", ".ts", ".tsx", ".js", ".jsx", ".go", ".java", ".kt", ".rb", ".cs")):
+    if lowered.endswith((".py", ".ts", ".tsx", ".js", ".jsx", ".go", ".java", ".kt", ".rb", ".cs", ".swift")):
         priority -= 10
     if lowered.startswith(("src/agents/", "src/gateway/", "src/knowledge_sources/", "src/retrieval/")):
         priority -= 15
@@ -53,7 +53,7 @@ def _branch_priority(paths: list[str]) -> tuple[int, int, int, int]:
     code_count = sum(
         1
         for path in paths
-        if path.endswith((".py", ".ts", ".tsx", ".js", ".jsx", ".go", ".java", ".kt", ".rb", ".cs"))
+        if path.endswith((".py", ".ts", ".tsx", ".js", ".jsx", ".go", ".java", ".kt", ".rb", ".cs", ".swift"))
     )
     hidden_count = sum(1 for path in paths if path.startswith("."))
     doc_count = sum(1 for path in paths if path.startswith("docs/") or path.endswith((".md", ".mdx", ".rst")))

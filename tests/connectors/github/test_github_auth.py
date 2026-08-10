@@ -298,3 +298,18 @@ class TestGitHubConnector:
 
         assert connector._anonymous_public_readonly is True
         assert connector._auth_header() == {}
+
+    @pytest.mark.asyncio
+    async def test_authenticate_falls_back_to_public_readonly_mode_for_empty_token(self) -> None:
+        config = _make_config(repos=["owner/repo"])
+        connector = GitHubConnector(config=config)
+        mock_client = _mock_vault_client(token="")
+
+        with patch("src.connectors.github.auth.hvac.Client", return_value=mock_client), patch(
+            "src.connectors.github.connector.GitHubConnector._supports_public_readonly_mode",
+            new=AsyncMock(return_value=True),
+        ):
+            await connector.authenticate()
+
+        assert connector._anonymous_public_readonly is True
+        assert connector._auth_header() == {}

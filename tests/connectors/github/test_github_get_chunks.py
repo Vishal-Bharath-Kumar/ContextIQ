@@ -104,12 +104,35 @@ class TestListRepoFiles:
         )
         _mock_other_branch_404s()
         client = GitHubContentClient(_make_config())
-        async with httpx.AsyncClient() as http_client:
+        async with httpx.AsyncClient(trust_env=False) as http_client:
             paths = await client.list_repo_files(
                 http_client, "owner/repo", {"Authorization": "Bearer x"}
             )
 
         assert paths == ["src/app.py", "README.md"]
+
+    @respx.mock
+    async def test_includes_swift_source_files_in_repo_listing(self) -> None:
+        respx.get(_trees_url("owner/repo", "main")).mock(
+            return_value=httpx.Response(
+                200,
+                json=_tree_response(
+                    [
+                        ("KitchenIQ/KitchenIQ/App.swift", "blob"),
+                        ("KitchenIQ/KitchenIQ/Assets.xcassets/AccentColor.colorset/Contents.json", "blob"),
+                        ("KitchenIQ/KitchenIQ/Preview Assets/logo.png", "blob"),
+                    ]
+                ),
+            )
+        )
+        _mock_other_branch_404s()
+        client = GitHubContentClient(_make_config())
+        async with httpx.AsyncClient(trust_env=False) as http_client:
+            paths = await client.list_repo_files(
+                http_client, "owner/repo", {"Authorization": "Bearer x"}
+            )
+
+        assert "KitchenIQ/KitchenIQ/App.swift" in paths
 
     @respx.mock
     async def test_falls_back_to_master_branch_on_404(self) -> None:
