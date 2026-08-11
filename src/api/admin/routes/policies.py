@@ -12,6 +12,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.api.admin.dependencies import require_admin_role
+from src.audit.trace.object_store import TraceObjectStore
 from src.data.dependencies import get_db
 from src.gateway.schemas.auth_types import JWTClaims
 from src.governance.policy.audit_repository import PolicyAuditRepository
@@ -394,8 +395,9 @@ async def preview_policy(
     """
     preview_svc = PolicyPreviewService(
         session=session,
-        opa_client=httpx.AsyncClient(),
+        opa_client=httpx.AsyncClient(trust_env=False),
         opa_base=_OPA_BASE_URL,
+        object_store=TraceObjectStore(),
     )
     try:
         result = await preview_svc.preview(policy_id=policy_id, request=request)

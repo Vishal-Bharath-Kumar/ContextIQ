@@ -92,6 +92,32 @@ class TestLLMResponseNode:
         assert "Keycloak token exchange" in result["final_response"]["answer"]
 
     @pytest.mark.asyncio
+    async def test_generate_context_uses_full_llm_response_path(self) -> None:
+        runtime = SimpleNamespace(
+            fallback_invoker=MagicMock(),
+            get_model_definition=AsyncMock(
+                return_value=SimpleNamespace(latency_tier=LatencyTier.MEDIUM)
+            ),
+        )
+        runtime.fallback_invoker.invoke = AsyncMock(
+            return_value=LLMResponse(
+                model_id="gpt-4o",
+                content="The auth flow fails at the Keycloak exchange step.",
+                input_tokens=210,
+                output_tokens=28,
+                finish_reason="stop",
+            )
+        )
+        state = _make_state(tool_name="generate_context", _config={"routing_runtime": runtime})
+
+        result = await llm_response_node(state)
+
+        assert result["status"] == ExecutionStatus.COMPLETE
+        assert result["final_response"]["type"] == "llm_response"
+        assert result["final_response"]["selected_model"] == "gpt-4o"
+        assert "Keycloak exchange" in result["final_response"]["answer"]
+
+    @pytest.mark.asyncio
     async def test_preserves_context_package_without_runtime_services(self) -> None:
         state = _make_state()
 

@@ -221,6 +221,7 @@ def _assemble_trace(state: AgentState) -> ExecutionTrace:
         request_id=request_id,
         tenant_id=s.get("tenant_id") or "default",
         user_id=user_id,
+        user_roles=_extract_trace_user_roles(s, jwt_claims),
         timestamp=timestamp,
         latency_ms=s.get("total_latency_ms"),
         prompt=s.get("prompt") or s.get("query") or "",
@@ -252,6 +253,17 @@ def _map_chunks(chunks: list[dict[str, Any]]) -> list[RetrievedChunkSummary]:
             )
         )
     return result
+
+
+def _extract_trace_user_roles(
+    state: dict[str, Any],
+    jwt_claims: dict[str, Any],
+) -> list[str]:
+    roles_from_claims = list(
+        jwt_claims.get("roles")
+        or jwt_claims.get("realm_access", {}).get("roles", [])
+    )
+    return roles_from_claims or list(state.get("roles") or [])
 
 
 def _get_request_id(state: AgentState) -> uuid.UUID:

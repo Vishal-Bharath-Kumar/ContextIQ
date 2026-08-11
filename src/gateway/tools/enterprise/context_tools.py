@@ -61,6 +61,7 @@ def register_context_tools(mcp: FastMCP, context_service: Any = None) -> None:
         prompt: str,
         max_tokens: int = 4000,
         compression_level: str = "medium",
+        full_agent_pipeline: bool = False,
     ) -> list[TextContent]:
         """Generate optimized enterprise context for an AI request.
         
@@ -75,6 +76,9 @@ def register_context_tools(mcp: FastMCP, context_service: Any = None) -> None:
             Maximum context size in tokens
         compression_level:
             Compression aggressiveness (low, medium, high)
+        full_agent_pipeline:
+            When true, force the LangGraph agent pipeline before any runtime
+            shortcut or fallback retrieval path.
             
         Returns
         -------
@@ -87,6 +91,7 @@ def register_context_tools(mcp: FastMCP, context_service: Any = None) -> None:
                 prompt=prompt,
                 max_tokens=max_tokens,
                 compression_level=compression_level,
+                full_agent_pipeline=full_agent_pipeline,
                 context_service=context_service,
             )
             result.setdefault("diagnostics", {})["elapsed_ms"] = round((time.perf_counter() - started) * 1000, 2)
@@ -240,8 +245,19 @@ async def _generate_context_payload(
     prompt: str,
     max_tokens: int,
     compression_level: str,
+    full_agent_pipeline: bool = False,
     context_service: Any = None,
 ) -> dict[str, Any]:
+    degraded_reason: str | None = None
+    if full_agent_pipeline:
+        pipeline_payload, degraded_reason = await _resolve_pipeline_context_payload(
+            prompt=prompt,
+            max_tokens=max_tokens,
+            compression_level=compression_level,
+        )
+        if pipeline_payload is not None:
+            return pipeline_payload
+
     runtime_payload = await _try_live_operational_context(
         prompt=prompt,
         max_tokens=max_tokens,
@@ -264,34 +280,48 @@ async def _generate_context_payload(
             adapter="context_service",
         )
 
-    pipeline_result = await _try_pipeline_context(prompt)
-    if pipeline_result is not None:
-        normalised_pipeline = await _normalise_pipeline_context_payload(
-            pipeline_result,
+    if not full_agent_pipeline:
+        pipeline_payload, degraded_reason = await _resolve_pipeline_context_payload(
             prompt=prompt,
             max_tokens=max_tokens,
             compression_level=compression_level,
         )
-        pipeline_data = normalised_pipeline.get("data") if isinstance(normalised_pipeline.get("data"), dict) else {}
-        pipeline_context = (pipeline_data.get("context") or []) if isinstance(pipeline_data, dict) else []
-        pipeline_answer = pipeline_data.get("answer") if isinstance(pipeline_data, dict) else None
-        if not pipeline_context and not pipeline_answer:
-            degraded_reasons = list(((normalised_pipeline.get("diagnostics") or {}).get("degraded_reasons") or []))
-            degraded_reasons.append("LangGraph pipeline returned no usable context; workspace fallback retrieval was used.")
-            return await _build_workspace_fallback_context_payload(
-                prompt=prompt,
-                max_tokens=max_tokens,
-                compression_level=compression_level,
-                degraded_reason="; ".join(str(reason) for reason in degraded_reasons if reason),
-            )
-        return normalised_pipeline
+    if pipeline_payload is not None:
+        return pipeline_payload
 
     return await _build_workspace_fallback_context_payload(
         prompt=prompt,
         max_tokens=max_tokens,
         compression_level=compression_level,
-        degraded_reason="LangGraph pipeline unavailable or failed; used workspace-backed fallback retrieval.",
+        degraded_reason=degraded_reason or "LangGraph pipeline unavailable or failed; used workspace-backed fallback retrieval.",
     )
+
+
+async def _resolve_pipeline_context_payload(
+    *,
+    prompt: str,
+    max_tokens: int,
+    compression_level: str,
+) -> tuple[dict[str, Any] | None, str | None]:
+    pipeline_result = await _try_pipeline_context(prompt)
+    if pipeline_result is None:
+        return None, None
+
+    normalised_pipeline = await _normalise_pipeline_context_payload(
+        pipeline_result,
+        prompt=prompt,
+        max_tokens=max_tokens,
+        compression_level=compression_level,
+    )
+    pipeline_data = normalised_pipeline.get("data") if isinstance(normalised_pipeline.get("data"), dict) else {}
+    pipeline_context = (pipeline_data.get("context") or []) if isinstance(pipeline_data, dict) else []
+    pipeline_answer = pipeline_data.get("answer") if isinstance(pipeline_data, dict) else None
+    if pipeline_context or pipeline_answer:
+        return normalised_pipeline, None
+
+    degraded_reasons = list(((normalised_pipeline.get("diagnostics") or {}).get("degraded_reasons") or []))
+    degraded_reasons.append("LangGraph pipeline returned no usable context; adaptive fallback retrieval was used.")
+    return None, "; ".join(str(reason) for reason in degraded_reasons if reason)
 
 
 async def _try_pipeline_context(prompt: str) -> dict[str, Any] | None:
@@ -1103,6 +1133,7 @@ async def _normalise_pipeline_context_payload(
         preferred_model=str(pipeline_result.get("selected_model") or final_response.get("selected_model") or ""),
         preferred_score=float(pipeline_result.get("model_routing_score") or final_response.get("model_routing_score") or 0.0),
         candidate_models=list(pipeline_result.get("fallback_chain") or final_response.get("fallback_chain") or []),
+        preserve_preferred_model=bool(final_response.get("answer")),
     )
     compression = {
         "enabled": bool(
@@ -1271,6 +1302,7 @@ async def _build_routing_metadata(
     preferred_model: str | None = None,
     preferred_score: float | None = None,
     candidate_models: list[str] | None = None,
+    preserve_preferred_model: bool = False,
 ) -> dict[str, Any]:
     candidates = await _candidate_models(candidate_models)
     prompt_tokens = count_tokens(prompt)
@@ -1289,9 +1321,13 @@ async def _build_routing_metadata(
         context_window = int(candidate.get("context_window") or _context_window_hint(model_id))
         cost = float(candidate.get("cost_per_1k_tokens") or _cost_hint(model_id))
 
-        if preferred_model and model_id == preferred_model and (preferred_score or 0.0) > 0:
-            score += min(float(preferred_score), 1.0)
-            reasons.append("selected by configured routing pipeline")
+        if preferred_model and model_id == preferred_model:
+            if preserve_preferred_model:
+                score = max(score, max(float(preferred_score or 0.0), 1.0))
+                reasons.append("selected by the completed pipeline response")
+            elif (preferred_score or 0.0) > 0:
+                score += min(float(preferred_score), 1.0)
+                reasons.append("selected by configured routing pipeline")
         if complexity > 1600 or governance_pressure > 0 or intent_lower in {"architecture", "debugging", "code-gen"}:
             if "code" in capabilities or "chat" in capabilities:
                 score += 0.45
@@ -1309,7 +1345,7 @@ async def _build_routing_metadata(
         if context_window >= max(complexity + 512, 1024):
             score += 0.2
             reasons.append("context window can hold retrieved material")
-        if requested_tool == "generate_context":
+        if requested_tool == "generate_context" and not preserve_preferred_model:
             score += 0.1
             reasons.append("tool only needs context packaging rather than full final answer")
         score -= min(cost / 100.0, 0.15)

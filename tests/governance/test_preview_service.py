@@ -99,18 +99,19 @@ async def test_preview_returns_allow_deny_counts(
     _ = mock  # unused but documents intent
 
     temp_name = f"{_TEMP_POLICY_PREFIX}{existing_policy_id.hex}"
+    preview_data_path = f"preview/{temp_name}"
     # OPA mock: push and delete succeed; evaluation always allows
     import respx
 
     respx.put(url__regex=rf".*/v1/policies/{temp_name}.*").respond(200)
     respx.delete(url__regex=rf".*/v1/policies/{temp_name}.*").respond(200)
-    respx.post(url__regex=rf".*/v1/data/{temp_name}/allow").respond(
+    respx.post(url__regex=rf".*/v1/data/{preview_data_path}/allow").respond(
         200, json={"result": True}
     )
 
     svc = PolicyPreviewService(
         session=async_session,
-        opa_client=httpx.AsyncClient(),
+        opa_client=httpx.AsyncClient(trust_env=False),
         opa_base=_OPA_BASE,
     )
     result = await svc.preview(
@@ -131,6 +132,7 @@ async def test_preview_deletes_temp_policy_on_evaluation_error(
 ) -> None:
     """AC-3: temp policy is deleted even when OPA evaluation returns an error."""
     temp_name = f"{_TEMP_POLICY_PREFIX}{existing_policy_id.hex}"
+    preview_data_path = f"preview/{temp_name}"
     deleted: list[bool] = []
 
     import respx
@@ -141,11 +143,11 @@ async def test_preview_deletes_temp_policy_on_evaluation_error(
         or httpx.Response(200)
     )
     # OPA evaluation returns 500 — causes evaluation failure
-    respx.post(url__regex=rf".*/v1/data/{temp_name}/allow").respond(500)
+    respx.post(url__regex=rf".*/v1/data/{preview_data_path}/allow").respond(500)
 
     svc = PolicyPreviewService(
         session=async_session,
-        opa_client=httpx.AsyncClient(),
+        opa_client=httpx.AsyncClient(trust_env=False),
         opa_base=_OPA_BASE,
     )
     result = await svc.preview(

@@ -92,6 +92,7 @@ class ExecutionTrace(BaseModel):
     request_id: UUID
     tenant_id: str
     user_id: str  # sub claim from JWT
+    user_roles: list[str] = Field(default_factory=list)
 
     # Timing (AC-2: timestamp)
     timestamp: datetime

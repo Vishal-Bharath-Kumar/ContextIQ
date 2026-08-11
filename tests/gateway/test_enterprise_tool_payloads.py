@@ -255,6 +255,134 @@ class TestContextToolPayloads:
         assert payload["tokens_before_compression"] is not None
         assert payload["tokens_after_compression"] is not None
 
+    async def test_generate_context_pipeline_preserves_selected_model_when_answer_generated(self) -> None:
+        mcp = FastMCP("test-context")
+        register_context_tools(mcp)
+
+        candidate_models = [
+            {
+                "model_id": "gpt-4o",
+                "latency_tier": "medium",
+                "capabilities": ["chat", "code"],
+                "context_window": 128000,
+                "cost_per_1k_tokens": 0.25,
+            },
+            {
+                "model_id": "ollama/llama3.2",
+                "latency_tier": "medium",
+                "capabilities": ["chat", "code"],
+                "context_window": 128000,
+                "cost_per_1k_tokens": 0.0,
+            },
+        ]
+        fake_pipeline = {
+            "status": "complete",
+            "intent_type": "debugging",
+            "selected_model": "gpt-4o",
+            "model_routing_score": 0.82,
+            "fallback_chain": ["gpt-4o", "ollama/llama3.2"],
+            "ranked_context": [
+                {
+                    "source_id": "github",
+                    "path": "src/auth/dev_login.py",
+                    "content": "The token exchange with Keycloak raises 503 when the upstream realm is unavailable.",
+                }
+            ],
+            "final_response": {
+                "type": "llm_response",
+                "intent": "debugging",
+                "selected_model": "gpt-4o",
+                "answer": "Login fails because the Keycloak token exchange returns 503.",
+                "context": [
+                    {
+                        "source_id": "github",
+                        "path": "src/auth/dev_login.py",
+                        "content": "The token exchange with Keycloak raises 503 when the upstream realm is unavailable.",
+                    }
+                ],
+                "degraded_sources": [],
+            },
+        }
+
+        with (
+            patch("src.gateway.tools.enterprise.context_tools._try_pipeline_context", AsyncMock(return_value=fake_pipeline)),
+            patch("src.gateway.tools.enterprise.context_tools._candidate_models", AsyncMock(return_value=candidate_models)),
+        ):
+            payload = await _invoke_tool(
+                mcp,
+                "generate_context",
+                {
+                    "prompt": "Explain why the authentication flow fails in this code path.",
+                    "max_tokens": 2048,
+                    "compression_level": "medium",
+                },
+            )
+
+        assert payload["status"] == "success"
+        assert payload["mode"] == "pipeline"
+        assert payload["context"]["answer"] == "Login fails because the Keycloak token exchange returns 503."
+        assert payload["routing"]["selected_model"] == "gpt-4o"
+        assert "completed pipeline response" in payload["routing"]["rationale"]
+
+    async def test_generate_context_full_agent_pipeline_skips_runtime_shortcuts(self) -> None:
+        mcp = FastMCP("test-context")
+        register_context_tools(mcp)
+
+        candidate_models = [
+            {
+                "model_id": "gpt-4o-mini",
+                "latency_tier": "fast",
+                "capabilities": ["chat", "code"],
+                "context_window": 32000,
+                "cost_per_1k_tokens": 0.5,
+            }
+        ]
+        fake_pipeline = {
+            "status": "complete",
+            "intent_type": "operations",
+            "selected_model": "gpt-4o-mini",
+            "model_routing_score": 0.71,
+            "ranked_context": [
+                {
+                    "source_id": "github",
+                    "path": "src/gateway/main.py",
+                    "content": "The gateway wires graph startup, tracing, and the MCP transports during application startup.",
+                }
+            ],
+            "final_response": {
+                "type": "context_package",
+                "intent": "operations",
+                "context": [
+                    {
+                        "source_id": "github",
+                        "path": "src/gateway/main.py",
+                        "content": "The gateway wires graph startup, tracing, and the MCP transports during application startup.",
+                    }
+                ],
+                "degraded_sources": [],
+            },
+        }
+
+        with (
+            patch("src.gateway.tools.enterprise.context_tools._try_pipeline_context", AsyncMock(return_value=fake_pipeline)),
+            patch("src.gateway.tools.enterprise.context_tools._try_live_operational_context", AsyncMock(side_effect=AssertionError("runtime shortcut should not be called"))),
+            patch("src.gateway.tools.enterprise.context_tools._candidate_models", AsyncMock(return_value=candidate_models)),
+        ):
+            payload = await _invoke_tool(
+                mcp,
+                "generate_context",
+                {
+                    "prompt": "show me the current health status of the api service",
+                    "max_tokens": 1024,
+                    "compression_level": "medium",
+                    "full_agent_pipeline": True,
+                },
+            )
+
+        assert payload["status"] == "success"
+        assert payload["mode"] == "pipeline"
+        assert payload["context"]["intent"] == "operations"
+
     async def test_generate_context_falls_back_when_pipeline_returns_degraded_empty_context(self) -> None:
         mcp = FastMCP("test-context")
         register_context_tools(mcp)

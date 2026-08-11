@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { MixerHorizontalIcon, PlusIcon, DownloadIcon } from "@radix-ui/react-icons";
+import { MixerHorizontalIcon, DownloadIcon } from "@radix-ui/react-icons";
 
 import { useModels } from "../../services/modelService";
 import { ModelRow } from "../../components/models/ModelRow";
@@ -49,10 +49,6 @@ export function ModelListPage() {
             <Link to="/models/install" className="btn-primary">
               <DownloadIcon aria-hidden="true" />
               Install Model
-            </Link>
-            <Link to="/models/add" className="btn-secondary">
-              <PlusIcon aria-hidden="true" />
-              Register Model
             </Link>
           </>
         }

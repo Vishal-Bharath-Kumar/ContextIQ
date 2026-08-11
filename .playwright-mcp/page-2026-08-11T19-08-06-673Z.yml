@@ -1,0 +1,18 @@
+- main "Sign in" [ref=e3]:
+  - generic [ref=e4]:
+    - generic [ref=e5]:
+      - heading "ContextIQ" [level=1] [ref=e9]
+      - paragraph [ref=e10]: Admin Portal
+    - generic [ref=e12]:
+      - generic [ref=e13]:
+        - generic [ref=e14]: Username
+        - textbox "Username" [active] [ref=e16]:
+          - /placeholder: you@contextiq.dev
+      - generic [ref=e17]:
+        - generic [ref=e18]: Password
+        - generic [ref=e19]:
+          - textbox "Password" [ref=e20]:
+            - /placeholder: ••••••••
+          - button "Show password" [ref=e21] [cursor=pointer]
+      - button "Sign in" [ref=e24] [cursor=pointer]
+    - paragraph [ref=e25]: Local-dev sign-in exchanges credentials for a Keycloak-issued session.

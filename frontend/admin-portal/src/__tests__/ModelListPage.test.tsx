@@ -109,6 +109,13 @@ describe("ModelListPage — AC-1", () => {
     renderPage();
     expect(screen.getByRole("status")).toBeInTheDocument();
   });
+
+  it("does not render a register model action in the header", async () => {
+    renderPage();
+    await screen.findByText("gpt-4o");
+    expect(screen.queryByRole("link", { name: /register model/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /install model/i })).toBeInTheDocument();
+  });
 });
 
 // ---------------------------------------------------------------------------

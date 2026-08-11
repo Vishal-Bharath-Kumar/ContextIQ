@@ -1,12 +1,14 @@
 from __future__ import annotations
 
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from src.agents.state import AgentState, ExecutionStatus
 from src.model_invoker.schemas.fallback_chain import FallbackChain, InvocationFailure
 from src.model_registry.schemas.model_definition import LatencyTier
-from src.model_router.runtime_services import RoutingRuntimeServices
 from src.observability.tracing.node_span import otel_node_span
+
+if TYPE_CHECKING:
+    from src.model_router.runtime_services import RoutingRuntimeServices
 
 _SYSTEM_PROMPT = (
     "You are ContextIQ, an enterprise engineering assistant. "
@@ -19,19 +21,12 @@ _SYSTEM_PROMPT = (
 @otel_node_span("routing.llm_response")
 async def llm_response_node(state: AgentState) -> AgentState:
     config = cast(dict[str, Any], state.get("_config") or {})
-    runtime_services = cast(RoutingRuntimeServices | None, config.get("routing_runtime"))
+    runtime_services = cast("RoutingRuntimeServices | None", config.get("routing_runtime"))
     selected_model = str(state.get("selected_model") or "")
     fallback_chain_ids = [
         model_id for model_id in (state.get("fallback_chain") or [selected_model]) if model_id
     ]
     base_response = dict(state.get("final_response") or {})
-
-    if str(state.get("tool_name") or "") == "generate_context":
-        return {
-            "final_response": base_response,
-            "current_node": "llm_response_agent",
-            "status": ExecutionStatus.COMPLETE,
-        }
 
     if runtime_services is None or not selected_model or not fallback_chain_ids:
         return {
