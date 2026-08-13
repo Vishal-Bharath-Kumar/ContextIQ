@@ -226,6 +226,7 @@ def _assemble_trace(state: AgentState) -> ExecutionTrace:
         latency_ms=s.get("total_latency_ms"),
         prompt=s.get("prompt") or s.get("query") or "",
         intent=str(intent),
+        intent_confidence=s.get("intent_confidence"),
         execution_plan=plan_steps,
         retrieved_chunks_pre_compression=pre_chunks,
         retrieved_chunks_post_compression=post_chunks,

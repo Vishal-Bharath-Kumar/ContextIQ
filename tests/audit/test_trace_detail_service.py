@@ -54,6 +54,7 @@ def _make_trace(
     *,
     request_id: uuid.UUID = _REQUEST_ID,
     intent: str = "technical_support",
+    intent_confidence: float | None = 0.91,
     execution_plan: list[ExecutionPlanStep] | None = None,
 ) -> ExecutionTrace:
     return ExecutionTrace(
@@ -63,6 +64,7 @@ def _make_trace(
         timestamp=_BASE_TS,
         prompt="How do I reset my password?",
         intent=intent,
+        intent_confidence=intent_confidence,
         latency_ms=123.4,
         execution_plan=execution_plan or [
             ExecutionPlanStep(node="retrieval_node", eval_ms=50.0),
@@ -224,6 +226,7 @@ async def test_get_detail_cache_miss_fetches_from_minio(
     assert isinstance(result, TraceDetailResponse)
     assert result.request_id == trace.request_id
     assert result.intent_classification == trace.intent
+    assert result.intent_confidence == pytest.approx(trace.intent_confidence or 0.0)
 
     # cache must be populated
     cached = await fake_cache.get(f"{_CACHE_PREFIX}{_REQUEST_ID}")

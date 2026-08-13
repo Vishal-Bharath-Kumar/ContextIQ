@@ -79,6 +79,7 @@ class TraceDetailResponse(BaseModel):
 
     # AC-3 fields
     intent_classification: str
+    intent_confidence: float | None = None
     retrieved_sources: list[RetrievedChunkSummary]
     compression_delta: CompressionDelta | None = None
     governance_decisions: GovernanceDecisionSummary

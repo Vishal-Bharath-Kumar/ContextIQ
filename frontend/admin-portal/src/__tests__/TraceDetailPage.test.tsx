@@ -28,6 +28,7 @@ const server = setupServer(
       timestamp: "2026-07-09T12:00:00Z",
       latency_ms: 182,
       intent_classification: "debugging",
+      intent_confidence: 0.92,
       retrieved_sources: [
         {
           chunk_id: "chunk-001",
@@ -131,6 +132,7 @@ describe("TraceDetailPage", () => {
 
     expect(await screen.findByRole("heading", { name: /Trace req-abc-123/i })).toBeInTheDocument();
     expect(screen.getByText("Intent Classification")).toBeInTheDocument();
+    expect(screen.getByText("92%")).toBeInTheDocument();
     expect(screen.getByText("Pipeline Timeline (2 steps)")).toBeInTheDocument();
     expect(screen.getByText("Model Routing")).toBeInTheDocument();
     expect(screen.getByText("gpt-4o-mini")).toBeInTheDocument();

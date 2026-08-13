@@ -13,7 +13,6 @@ import { ConnectorListPage } from "../pages/connectors/ConnectorListPage";
 import { ForbiddenPage } from "../pages/errors/ForbiddenPage";
 import { LoginPage } from "../pages/errors/LoginPage";
 import { RegisterPage } from "../pages/errors/RegisterPage";
-import { AddModelPage } from "../pages/models/AddModelPage";
 import { InstallModelPage } from "../pages/models/InstallModelPage";
 import { ModelListPage } from "../pages/models/ModelListPage";
 import { RoutingWeightsPage } from "../pages/models/RoutingWeightsPage";
@@ -116,14 +115,6 @@ export const ADMIN_ROUTES: RouteObject[] = [
         element: (
           <RequirePlatformEngineer>
             <ModelListPage />
-          </RequirePlatformEngineer>
-        ),
-      },
-      {
-        path: "models/add",
-        element: (
-          <RequirePlatformEngineer>
-            <AddModelPage />
           </RequirePlatformEngineer>
         ),
       },

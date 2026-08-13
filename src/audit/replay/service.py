@@ -169,6 +169,7 @@ def _to_detail_response(trace: ExecutionTrace) -> TraceDetailResponse:
         timestamp=trace.timestamp,
         latency_ms=trace.latency_ms,
         intent_classification=trace.intent,
+        intent_confidence=trace.intent_confidence,
         retrieved_sources=list(trace.retrieved_chunks_post_compression),
         compression_delta=trace.compression_delta,
         governance_decisions=trace.governance_decisions,

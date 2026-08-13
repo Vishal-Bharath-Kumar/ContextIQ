@@ -73,6 +73,7 @@ export interface TraceDetailResponse {
   latency_ms:            number | null;
   // AC-3 fields
   intent_classification: string;
+  intent_confidence:     number | null;
   retrieved_sources:     RetrievedChunkSummary[];
   compression_delta:     CompressionDelta | null;
   governance_decisions:  GovernanceDecisionSummary;

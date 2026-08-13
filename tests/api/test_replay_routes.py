@@ -55,6 +55,7 @@ _DETAIL_RESPONSE = TraceDetailResponse(
     timestamp=_NOW,
     latency_ms=120.5,
     intent_classification="question_answering",
+    intent_confidence=0.87,
     retrieved_sources=[],
     compression_delta=CompressionDelta(
         tokens_before=500, tokens_after=300, chunks_before=10, chunks_after=6

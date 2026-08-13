@@ -230,7 +230,17 @@ export function TraceDetailPage() {
 
           {/* AC-3: Intent classification */}
           <SectionPanel title="Intent Classification">
-            <p className="font-mono text-sm">{trace.intent_classification}</p>
+            <dl className="space-y-1">
+              <MetaRow label="Intent" value={<span className="font-mono text-sm">{trace.intent_classification}</span>} />
+              <MetaRow
+                label="Confidence"
+                value={
+                  trace.intent_confidence !== null
+                    ? `${Math.round(trace.intent_confidence * 100)}%`
+                    : "—"
+                }
+              />
+            </dl>
           </SectionPanel>
 
           {/* AC-2 + AC-3: Pipeline timeline */}

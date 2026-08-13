@@ -101,6 +101,7 @@ class ExecutionTrace(BaseModel):
     # Content (AC-2: prompt, intent)
     prompt: str
     intent: str  # classification result, e.g. "technical_support"
+    intent_confidence: float | None = None
 
     # Pipeline steps (AC-2: execution_plan)
     execution_plan: list[ExecutionPlanStep] = Field(default_factory=list)

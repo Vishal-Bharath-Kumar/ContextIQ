@@ -113,13 +113,14 @@ def reset_singletons() -> Generator[None, None, None]:
 
 
 def test_assemble_trace_maps_required_fields() -> None:
-    state = _make_state()
+    state = _make_state(intent_confidence=0.82)
     trace = _assemble_trace(state)
 
     assert isinstance(trace.request_id, uuid.UUID)
     assert trace.tenant_id == "tenant-abc"
     assert trace.user_id == "user-123"
     assert trace.intent == "policy_lookup"
+    assert trace.intent_confidence == pytest.approx(0.82)
     assert trace.prompt == "What is the policy?"
     assert trace.model_selected == "gpt-4o"
     assert trace.prompt_tokens == 300
